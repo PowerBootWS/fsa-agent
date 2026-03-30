@@ -3,11 +3,22 @@ Tutor Agent - Primary user interaction agent
 Handles conversation, feedback, guidance, and active learning
 """
 import os
+import json
+import requests
 
 
 class TutorAgent:
     def __init__(self):
-        self.anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
+        self.api_key = os.getenv('OPENROUTER_API_KEY')
+        self.model = os.getenv('OPENROUTER_MODEL', 'anthropic/claude-sonnet-4-6-20250515')
+        self.base_url = "https://openrouter.ai/api/v1"
+        self.client = None
+        if self.api_key:
+            self.client = requests.Session()
+            self.client.headers.update({
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            })
 
     def respond(self, user_message, lesson_context, progress, state):
         """
@@ -29,9 +40,16 @@ class TutorAgent:
 
         complexity_level = state.get('complexity_level', 3)
 
-        # Simple response logic - in production would use Anthropic API
-        # For now, generates contextual responses based on lesson content
+        # Use Anthropic API if available
+        if self.client:
+            return self._call_api(
+                user_message=user_message,
+                lesson_context=lesson_context,
+                progress=progress,
+                state=state
+            )
 
+        # Fallback to simple response logic
         response = self._generate_response(
             user_message=user_message,
             key_points=key_points,
@@ -42,6 +60,62 @@ class TutorAgent:
         )
 
         return response
+
+    def _call_api(self, user_message, lesson_context, progress, state):
+        """Call OpenRouter API for tutoring response"""
+        # Build context for the tutor
+        system_prompt = self._build_system_prompt(lesson_context, progress, state)
+
+        try:
+            response = self.client.post(
+                f"{self.base_url}/chat/completions",
+                json={
+                    "model": self.model,
+                    "max_tokens": 500,
+                    "system": system_prompt,
+                    "messages": [
+                        {"role": "user", "content": user_message}
+                    ]
+                },
+                timeout=30
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            # Fallback on error
+            return f"I'm having trouble responding right now. {str(e)}"
+
+    def _build_system_prompt(self, lesson_context, progress, state):
+        """Build the system prompt for the tutor"""
+        summary = lesson_context.get('summary', 'No lesson summary available.')
+        key_points = lesson_context.get('key_points', [])
+        practice_questions = lesson_context.get('practice_questions', [])
+
+        prompt = f"""You are an expert tutor for Power Engineering students in Canada.
+Your role is to help students learn through interactive conversation, practice questions, and feedback.
+
+Current Lesson:
+{summary}
+
+Key Learning Points:
+{json.dumps(key_points, indent=2)}
+
+Practice Questions:
+{json.dumps(practice_questions, indent=2)}
+
+User Progress: {json.dumps(progress, indent=2)}
+Current State: {json.dumps(state, indent=2)}
+
+Instructions:
+- Be encouraging and supportive
+- Ask clarifying questions when needed
+- Provide hints when users struggle
+- Reference the lesson content in your responses
+- Keep responses concise and focused
+- Use practice questions to reinforce learning"""
+
+        return prompt
 
     def _generate_response(self, user_message, key_points, practice_questions, summary, complexity_level, state):
         """Generate contextual tutoring response"""
@@ -118,4 +192,5 @@ class TutorAgent:
             "Excellent reasoning!",
             "You're grasping these concepts well!",
         ]
-        return encouragements[hash(user_answer) % len(encouragements)]
+        import random
+        return random.choice(encouragements)
