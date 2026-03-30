@@ -2,11 +2,12 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY server/package*.json ./
 
 RUN npm ci --only=production
 
-COPY src/ ./src/
+COPY server/src/ ./src/
+COPY client/build/ ./client/build/
 
 EXPOSE 3000
 

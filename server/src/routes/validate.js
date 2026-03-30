@@ -15,9 +15,10 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'Invalid email format' });
   }
 
-  // Validate lessonId format (UUID)
+  // Validate lessonId format (UUID or integer)
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(lessonId)) {
+  const intRegex = /^[0-9]+$/;
+  if (!uuidRegex.test(lessonId) && !intRegex.test(lessonId)) {
     return res.status(400).json({ error: 'Invalid lessonId format' });
   }
 
