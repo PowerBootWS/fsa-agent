@@ -51,7 +51,8 @@ def chat():
         lesson_context=lesson_context,
         progress=progress,
         tutor=tutor,
-        display=display
+        display=display,
+        researcher=researcher
     )
 
     return jsonify(response)

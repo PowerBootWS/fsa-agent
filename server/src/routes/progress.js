@@ -28,7 +28,7 @@ router.get('/:lessonId', async (req, res) => {
 // Update user progress
 router.post('/', async (req, res) => {
   try {
-    const { user, lessonId, score, struggles, attempts, complexityLevel, completed } = req.body;
+    const { user, lessonId, score, struggles, attempts, complexityLevel, completed, outcome, sessionNotes } = req.body;
 
     if (!user || !lessonId) {
       return res.status(400).json({ error: 'Missing required parameters' });
@@ -42,6 +42,8 @@ router.post('/', async (req, res) => {
       attempts,
       complexityLevel,
       completed,
+      outcome,
+      sessionNotes,
     });
 
     res.json(progress);

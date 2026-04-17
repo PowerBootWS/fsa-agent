@@ -33,3 +33,6 @@ coverage/
 # Misc
 *.tgz
 .cache/
+
+# Google OAuth credentials (never commit)
+credentials/

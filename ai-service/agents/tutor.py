@@ -1,196 +1,139 @@
 """
 Tutor Agent - Primary user interaction agent
-Handles conversation, feedback, guidance, and active learning
+All conversational responses are LLM-generated via OpenRouter.
+No scripted fallback — requires a valid OPENROUTER_API_KEY.
 """
 import os
-import json
 import requests
+from agents import tutor_prompt
+
+
+# Profanity word list — checked before any API call
+PROFANITY_WORDS = [
+    'fuck', 'shit', 'ass', 'bitch', 'bastard', 'crap',
+    'dick', 'cock', 'pussy', 'cunt', 'whore', 'slut', 'retard'
+]
+
+# Max chat history entries to include in each prompt (12 = 6 exchanges)
+MAX_HISTORY_ENTRIES = 12
 
 
 class TutorAgent:
     def __init__(self):
         self.api_key = os.getenv('OPENROUTER_API_KEY')
         self.model = os.getenv('OPENROUTER_MODEL', 'anthropic/claude-sonnet-4-6-20250515')
-        self.base_url = "https://openrouter.ai/api/v1"
-        self.client = None
-        if self.api_key:
-            self.client = requests.Session()
-            self.client.headers.update({
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            })
+        self.base_url = 'https://openrouter.ai/api/v1'
 
-    def respond(self, user_message, lesson_context, progress, state):
+        if not self.api_key:
+            print('WARNING: OPENROUTER_API_KEY is not set. Tutor will not function.')
+
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Authorization': f'Bearer {self.api_key}',
+            'Content-Type': 'application/json',
+            'HTTP-Referer': os.getenv('PARENT_DOMAIN', 'https://fsa-agent.local'),
+            'X-Title': 'FSA Tutor Agent',
+        })
+
+    def respond(self, user_message, lesson_context, progress, state, first_name=None):
         """
-        Generate tutor response with feedback and guidance
+        Generate a tutor response via the LLM.
 
         Args:
-            user_message: The user's input
-            lesson_context: Lesson data from Researcher
-            progress: User's progress data
-            state: Current conversation state from Orchestrator
+            user_message: The student's input text
+            lesson_context: dict from researcher.get_lesson_context()
+            progress: dict from researcher.get_user_progress() (may be None)
+            state: dict from orchestrator conversation_state (mutated in place)
+            first_name: student's first name
 
         Returns:
-            str: Tutoring response
+            dict with:
+                - response: tutor response text (may contain Markdown and LaTeX)
+                - action: optional action string ('warning' | 'stop' | None)
         """
-        # Extract relevant context
-        key_points = lesson_context.get('key_points', [])
-        practice_questions = lesson_context.get('practice_questions', [])
-        summary = lesson_context.get('summary', '')
+        # Check profanity before anything else
+        profanity_result = self._check_profanity(user_message, state)
+        if profanity_result:
+            return profanity_result
 
-        complexity_level = state.get('complexity_level', 3)
+        # Build system prompt from current context
+        system_prompt = tutor_prompt.build(lesson_context, progress, state, first_name)
 
-        # Use Anthropic API if available
-        if self.client:
-            return self._call_api(
-                user_message=user_message,
-                lesson_context=lesson_context,
-                progress=progress,
-                state=state
-            )
+        # Build messages list: rolling history + current message
+        history = state.get('chat_history', [])[-MAX_HISTORY_ENTRIES:]
+        messages = history + [{'role': 'user', 'content': user_message}]
 
-        # Fallback to simple response logic
-        response = self._generate_response(
-            user_message=user_message,
-            key_points=key_points,
-            practice_questions=practice_questions,
-            summary=summary,
-            complexity_level=complexity_level,
-            state=state
-        )
+        # Call the LLM
+        response_text = self._call_api(system_prompt, messages)
 
-        return response
+        # Update rolling chat history in state (orchestrator owns state)
+        if 'chat_history' not in state:
+            state['chat_history'] = []
+        state['chat_history'].append({'role': 'user', 'content': user_message})
+        state['chat_history'].append({'role': 'assistant', 'content': response_text})
+        # Trim to cap
+        if len(state['chat_history']) > MAX_HISTORY_ENTRIES:
+            state['chat_history'] = state['chat_history'][-MAX_HISTORY_ENTRIES:]
 
-    def _call_api(self, user_message, lesson_context, progress, state):
-        """Call OpenRouter API for tutoring response"""
-        # Build context for the tutor
-        system_prompt = self._build_system_prompt(lesson_context, progress, state)
+        return {'response': response_text}
 
+    def _call_api(self, system_prompt, messages):
+        """Call OpenRouter and return the response text."""
         try:
-            response = self.client.post(
-                f"{self.base_url}/chat/completions",
+            response = self.session.post(
+                f'{self.base_url}/chat/completions',
                 json={
-                    "model": self.model,
-                    "max_tokens": 500,
-                    "system": system_prompt,
-                    "messages": [
-                        {"role": "user", "content": user_message}
-                    ]
+                    'model': self.model,
+                    'max_tokens': 600,
+                    'messages': [
+                        {'role': 'system', 'content': system_prompt},
+                        *messages,
+                    ],
                 },
-                timeout=30
+                timeout=30,
             )
             response.raise_for_status()
             data = response.json()
-            return data["choices"][0]["message"]["content"]
+            return data['choices'][0]['message']['content']
+
+        except requests.exceptions.Timeout:
+            return "I'm taking a bit longer than usual to think — please try sending your message again."
+
+        except requests.exceptions.ConnectionError:
+            return "I'm having trouble connecting right now. Please try again in a moment."
+
         except Exception as e:
-            # Fallback on error
-            return f"I'm having trouble responding right now. {str(e)}"
+            print(f'TutorAgent API error: {e}')
+            return "Something went wrong on my end. Please try again — I'll be right here."
 
-    def _build_system_prompt(self, lesson_context, progress, state):
-        """Build the system prompt for the tutor"""
-        summary = lesson_context.get('summary', 'No lesson summary available.')
-        key_points = lesson_context.get('key_points', [])
-        practice_questions = lesson_context.get('practice_questions', [])
-
-        prompt = f"""You are an expert tutor for Power Engineering students in Canada.
-Your role is to help students learn through interactive conversation, practice questions, and feedback.
-
-Current Lesson:
-{summary}
-
-Key Learning Points:
-{json.dumps(key_points, indent=2)}
-
-Practice Questions:
-{json.dumps(practice_questions, indent=2)}
-
-User Progress: {json.dumps(progress, indent=2)}
-Current State: {json.dumps(state, indent=2)}
-
-Instructions:
-- Be encouraging and supportive
-- Ask clarifying questions when needed
-- Provide hints when users struggle
-- Reference the lesson content in your responses
-- Keep responses concise and focused
-- Use practice questions to reinforce learning"""
-
-        return prompt
-
-    def _generate_response(self, user_message, key_points, practice_questions, summary, complexity_level, state):
-        """Generate contextual tutoring response"""
-
-        # Check if user is asking a question vs attempting practice
+    def _check_profanity(self, user_message, state):
+        """
+        Check for profanity. First offence: warning. Second: stop.
+        Returns a dict on offence, None if clean.
+        """
         user_lower = user_message.lower()
+        profanity_count = state.get('profanity_count', 0)
 
-        # Greeting
-        if any(word in user_lower for word in ['hello', 'hi', 'hey', 'start']):
-            return f"Welcome! I'm your tutor for this lesson. {summary} Let's learn together. Would you like to start with a practice question?"
+        for word in PROFANITY_WORDS:
+            if word in user_lower:
+                if profanity_count == 0:
+                    state['profanity_count'] = 1
+                    return {
+                        'response': (
+                            "Let's keep our conversation focused and professional — "
+                            "that's the kind of environment where the best learning happens. "
+                            "Ready to continue with the lesson?"
+                        ),
+                        'action': 'warning',
+                    }
+                else:
+                    return {
+                        'response': (
+                            "I need to end this session now due to continued inappropriate language. "
+                            "Come back when you're ready to focus on your studies — "
+                            "I'm here to help whenever you are."
+                        ),
+                        'action': 'stop',
+                    }
 
-        # Help request
-        if 'help' in user_lower or 'hint' in user_lower:
-            # Provide hint from key points
-            if key_points:
-                hint = key_points[0].get('content', 'Review the lesson material carefully.')
-                return f"Here's a hint: {hint}"
-            return "Let me guide you through this. Let's break it down step by step."
-
-        # Check if responding to a practice question
-        if 'question' in state or any(q.get('question', '').lower()[:50] in user_lower for q in practice_questions):
-            return self._evaluate_answer(user_lower, practice_questions, key_points, state)
-
-        # Default - encourage engagement
-        if len(user_message) < 20:
-            return "Tell me more about what you're thinking. What's your current understanding?"
-
-        # Provide response referencing lesson content
-        response_parts = []
-
-        if key_points:
-            # Reference a relevant key point
-            relevant_point = key_points[min(complexity_level - 1, len(key_points) - 1)]
-            response_parts.append(f"Remember, {relevant_point.get('content', '')}")
-
-        response_parts.append("Based on that, what's your next step?")
-
-        return " ".join(response_parts)
-
-    def _evaluate_answer(self, user_answer, practice_questions, key_points, state):
-        """Evaluate user answer and provide feedback"""
-
-        for q in practice_questions:
-            correct = q.get('correct_answer', '').lower()
-            if correct in user_answer:
-                # Correct answer
-                return "Excellent! You're right. " + self._get_encouragement() + " Ready for the next one?"
-
-            # Check if close (partial match)
-            if any(word in user_answer for word in correct.split()[:2] if len(word) > 3):
-                return "You're close! " + self._get_hint(q, key_points)
-
-        # Wrong or unclear
-        if key_points:
-            hint = key_points[0].get('content', '')
-            return f"You're on the right track. Remember, {hint}. Based on that, which option would you pick now?"
-
-        return "Let's try this together. What does the lesson say about this concept?"
-
-    def _get_hint(self, question, key_points):
-        """Get a contextual hint"""
-        topic = question.get('topic', '')
-        for point in key_points:
-            if point.get('topic') == topic:
-                return f"Hint: {point.get('content', '')}"
-        return "Think about the key concepts we covered."
-
-    def _get_encouragement(self):
-        """Get random encouragement"""
-        encouragements = [
-            "Great job working through that!",
-            "You've got this!",
-            "That's the right thinking!",
-            "Excellent reasoning!",
-            "You're grasping these concepts well!",
-        ]
-        import random
-        return random.choice(encouragements)
+        return None

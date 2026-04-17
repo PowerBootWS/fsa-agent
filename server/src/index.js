@@ -13,9 +13,17 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       frameAncestors: [`'self'`, process.env.PARENT_DOMAIN || 'localhost'],
+      scriptSrc: ["'self'", "'unsafe-eval'", "https://cdn.jsdelivr.net", "https://static.cloudflareinsights.com"],
     },
   },
+  frameguard: false,
 }));
+
+// Override X-Frame-Options to allow embedding from parent domain
+app.use((req, res, next) => {
+  res.removeHeader('X-Frame-Options');
+  next();
+});
 
 // CORS - restrict to parent domain only
 const corsOptions = {
@@ -44,18 +52,20 @@ const validateRouter = require('./routes/validate');
 const lessonRouter = require('./routes/lesson');
 const chatRouter = require('./routes/chat');
 const progressRouter = require('./routes/progress');
+const chatHistoryRouter = require('./routes/chat-history');
 
 app.use('/api/validate', validateRouter);
 app.use('/api/lesson', lessonRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/progress', progressRouter);
+app.use('/api/chat-history', chatHistoryRouter);
 
 // Serve React app from client build
-app.use(express.static('../client/build'));
+app.use(express.static(path.join(__dirname, '../client/build')));
 
 // Handle React routing - return index.html for all non-API routes
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/build/index.html'));
+  res.sendFile(path.join(__dirname, '../../client/build/index.html'));
 });
 
 // Error handler

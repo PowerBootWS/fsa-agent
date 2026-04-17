@@ -23,8 +23,14 @@ class DisplayAgent:
         """
         key = f"{state.get('user', 'default')}:{state.get('lesson_id', 'default')}"
 
+        # Handle tutor_response as either string or dict
+        if isinstance(tutor_response, dict):
+            response_text = tutor_response.get('response', '')
+        else:
+            response_text = str(tutor_response) if tutor_response else ''
+
         # Check conversation flow for display triggers
-        response_lower = tutor_response.lower()
+        response_lower = response_text.lower()
 
         # Show summary on start
         if 'welcome' in response_lower or 'start' in response_lower:
@@ -114,3 +120,73 @@ class DisplayAgent:
         """Get current display state"""
         key = f"{user}:{lesson_id}"
         return self.current_display.get(key, {})
+
+    def create_initial_display(self, initial_context):
+        """
+        Create initial display when user first interacts
+
+        Args:
+            initial_context: Initial context from Researcher (includes seed_sentence and key_points)
+
+        Returns:
+            dict: Initial display content
+        """
+        # Build initial display with seed sentence and key points
+        seed_sentence = initial_context.get('seed_sentence', 'Welcome to your lesson.')
+        key_points = initial_context.get('key_points', [])
+
+        # Format key points for display (extract_from_text returns strings)
+        formatted_points = []
+        for kp in key_points[:3]:  # Show first 3 key points
+            if isinstance(kp, dict):
+                formatted_points.append({
+                    'title': kp.get('title', 'Key Point'),
+                    'content': kp.get('content', ''),
+                })
+            else:
+                formatted_points.append({
+                    'title': 'Key Point',
+                    'content': str(kp),
+                })
+
+        display_content = {
+            'type': 'summary',
+            'title': 'Lesson Overview',
+            'content': seed_sentence,
+            'key_points': formatted_points,
+        }
+
+        return display_content
+
+    def create_question_display(self, question_data, question_index):
+        """
+        Create display content for a multiple choice question
+
+        Args:
+            question_data: Question dict with question, options, etc.
+            question_index: Index of current question
+
+        Returns:
+            dict: Display content for the question
+        """
+        options = question_data.get('options', [])
+
+        # Format options as A, B, C, D
+        formatted_options = []
+        for i, opt in enumerate(options):
+            label = chr(65 + i)  # A, B, C, D
+            formatted_options.append({
+                'label': label,
+                'text': opt
+            })
+
+        # Support both 'question_text' (questions table) and legacy 'question' field
+        question_text = question_data.get('question_text') or question_data.get('question', '')
+
+        return {
+            'type': 'question',
+            'title': f'Practice Question {question_index + 1}',
+            'question': question_text,
+            'options': formatted_options,
+            'topic': question_data.get('topic', ''),
+        }

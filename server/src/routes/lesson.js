@@ -19,4 +19,16 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Get ordered lesson chunks for transcript view
+router.get('/:id/chunks', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const chunks = await db.getLessonChunks(id);
+    res.json(chunks);
+  } catch (error) {
+    console.error('Error fetching lesson chunks:', error);
+    res.status(500).json({ error: 'Failed to fetch lesson chunks' });
+  }
+});
+
 module.exports = router;

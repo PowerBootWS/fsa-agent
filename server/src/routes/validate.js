@@ -15,11 +15,12 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'Invalid email format' });
   }
 
-  // Validate lessonId format (UUID or integer)
+  // Validate lessonId format: lesson_code (e.g. '2A1-1-1'), UUID, or integer
+  const lessonCodeRegex = /^[A-Z0-9]{2,5}-\d{1,3}-\d{1,3}$/i;
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const intRegex = /^[0-9]+$/;
-  if (!uuidRegex.test(lessonId) && !intRegex.test(lessonId)) {
-    return res.status(400).json({ error: 'Invalid lessonId format' });
+  if (!lessonCodeRegex.test(lessonId) && !uuidRegex.test(lessonId) && !intRegex.test(lessonId)) {
+    return res.status(400).json({ error: 'Invalid lessonId format. Expected format: 2A1-1-1 (course-chapter-objective)' });
   }
 
   // Create session context (in production, use proper session management)
