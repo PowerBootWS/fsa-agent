@@ -11,7 +11,8 @@ class DisplayAgent:
 
     def determine_update(self, state, tutor_response, lesson_context):
         """
-        Determine what should be displayed in the top section
+        Determine what should be displayed in the top section.
+        Only called when routing has NOT already set a display_update.
 
         Args:
             state: Current conversation state from Orchestrator
@@ -21,7 +22,12 @@ class DisplayAgent:
         Returns:
             dict: Content to display or None
         """
-        key = f"{state.get('user', 'default')}:{state.get('lesson_id', 'default')}"
+        activity = state.get('activity', 'greeting')
+
+        # Never override display during active practice/staged activities —
+        # questions are managed exclusively by the orchestrator routing in those modes.
+        if activity in ('practice', 'staged_problem', 'chapter_quiz'):
+            return None
 
         # Handle tutor_response as either string or dict
         if isinstance(tutor_response, dict):
@@ -32,13 +38,9 @@ class DisplayAgent:
         # Check conversation flow for display triggers
         response_lower = response_text.lower()
 
-        # Show summary on start
-        if 'welcome' in response_lower or 'start' in response_lower:
-            return self._create_display('summary', lesson_context)
-
-        # Show practice question when tutor introduces one
-        if 'practice question' in response_lower or 'question' in response_lower:
-            return self._create_display('question', lesson_context, state)
+        # Show summary on start / greeting
+        if activity == 'greeting':
+            return None  # Greeting display is set by create_initial_display on first load
 
         # Show hint when tutor gives one
         if 'hint' in response_lower or 'remember' in response_lower:
@@ -47,11 +49,6 @@ class DisplayAgent:
         # Show key point when referenced
         if 'key point' in response_lower or 'important' in response_lower:
             return self._create_display('key_point', lesson_context)
-
-        # Default: show summary if nothing else
-        current = self.current_display.get(key, {}).get('type')
-        if not current:
-            return self._create_display('summary', lesson_context)
 
         return None
 

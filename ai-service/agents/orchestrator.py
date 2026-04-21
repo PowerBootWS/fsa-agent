@@ -94,6 +94,10 @@ class Orchestrator:
         first_name = state['first_name']
         state['exchange_count'] = state.get('exchange_count', 0) + 1
 
+        # Detect page-reload / session-resume: client sends message='hello' on init.
+        # We treat this as a resume if the session is already initialized.
+        is_init_hello = message.strip().lower() == 'hello'
+
         # On first interaction: set up initial display
         display_update = None
         if not state['initialized']:
@@ -104,11 +108,48 @@ class Orchestrator:
             state['key_points'] = lesson_context.get('key_points', [])
             display_update = display.create_initial_display(initial_context)
             state['initialized'] = True
+        elif is_init_hello:
+            # Session already exists (page reload / tab switch).
+            # Re-send the appropriate display so the client has fresh content.
+            activity = state.get('activity', 'greeting')
+            if activity in ('practice', 'staged_problem') and state.get('current_question_id'):
+                # Re-emit the current question display so the panel shows it again
+                current_q = None
+                seen = state.get('seen_question_ids', [])
+                if seen:
+                    # Re-fetch the most recently seen question
+                    questions = researcher.get_questions(
+                        lesson_id=lesson_id,
+                        complexity_level=5,  # fetch any difficulty
+                        question_type='objective_practice',
+                        limit=20,
+                    )
+                    last_id = state.get('current_question_id')
+                    for q in questions:
+                        if q['id'] == last_id:
+                            current_q = q
+                            break
+                if current_q:
+                    display_update = display.create_question_display(
+                        current_q, max(0, state.get('questions_done', 1) - 1)
+                    )
+                else:
+                    # Fall back to summary display
+                    initial_context = researcher.extract_key_points(lesson_context)
+                    display_update = display.create_initial_display(initial_context)
+            else:
+                # Greeting or other mode — re-send the summary display
+                initial_context = researcher.extract_key_points(lesson_context)
+                display_update = display.create_initial_display(initial_context)
 
-        # Route based on current activity
-        display_update, state = self._route_activity(
-            state, message, lesson_context, researcher, display, display_update
-        )
+        # Route based on current activity.
+        # Skip routing for session-resume hello pings — they just refresh the display.
+        is_resume = is_init_hello and state.get('exchange_count', 0) > 1
+        state['is_resume'] = is_resume
+        if not is_resume:
+            display_update, state = self._route_activity(
+                state, message, lesson_context, researcher, display, display_update
+            )
 
         # Fetch relevant chunks for this activity and message
         # context_hint: use current question topic if in practice, else the user message
@@ -128,6 +169,15 @@ class Orchestrator:
         )
         state['relevant_chunks'] = relevant_chunks
 
+        # Tell the tutor whether the display panel is actually showing a question right now.
+        # This prevents it from saying "the question is above" when only a summary is displayed.
+        state['display_is_question'] = (
+            isinstance(display_update, dict) and display_update.get('type') == 'question'
+        ) or (
+            # Also true if awaiting feedback and no display_update override (client keeps current question)
+            state.get('awaiting_next_question') and display_update is None
+        )
+
         # Call tutor agent for the conversational response
         tutor_result = tutor.respond(
             user_message=message,
@@ -144,8 +194,10 @@ class Orchestrator:
             tutor_response = str(tutor_result)
             action = None
 
-        # If display wasn't set by routing, check if tutor response suggests an update
-        if not display_update:
+        # If display wasn't set by routing AND we're not in feedback/awaiting mode,
+        # check if tutor response suggests a display update.
+        # Suppress this during awaiting_next_question — the current question must stay visible.
+        if not display_update and not state.get('awaiting_next_question'):
             display_update = display.determine_update(
                 state=state,
                 tutor_response=tutor_response,
@@ -219,9 +271,16 @@ class Orchestrator:
                     state['activity'] = 'greeting'
 
                 elif intent == INTENT_PROVIDE_ANSWER:
-                    # Evaluate the answer and advance
+                    # Evaluate the answer — but DON'T load the next question yet.
+                    # The tutor needs to respond to this answer first (feedback, correction, etc.)
+                    # We stay in 'awaiting_feedback' sub-state so the current question stays on display.
                     self._evaluate_practice_answer(state, message, lesson_context)
-                    # Load next question if under limit
+                    state['awaiting_next_question'] = True
+                    # display_update stays None → client preserves current question display
+
+                elif intent in (INTENT_CONTINUE, INTENT_SELECT_PRACTICE) and state.get('awaiting_next_question'):
+                    # Student has acknowledged the feedback and is ready for the next question
+                    state['awaiting_next_question'] = False
                     if state['questions_done'] < MAX_QUESTIONS_PER_OBJECTIVE and not state.get('session_limit_reached'):
                         display_update = self._load_next_question(state, lesson_context, researcher, display)
 
@@ -274,8 +333,11 @@ class Orchestrator:
         )
 
         if not questions:
-            # No more questions available
+            # No questions available for this lesson (not yet loaded into DB, or all seen)
             state['session_limit_reached'] = True
+            state['no_questions_available'] = True
+            # Fall back to discussion mode so the tutor doesn't try to present a question
+            state['activity'] = 'free_discussion'
             return None
 
         question = questions[0]
@@ -461,6 +523,12 @@ class Orchestrator:
         Classify the student's message intent using a lightweight LLM call.
         Falls back to keyword matching if API is unavailable.
         """
+        # Short greetings are always 'other' — never route them to practice
+        stripped = message.strip().lower()
+        if stripped in ('hello', 'hi', 'hey', 'hiya', 'greetings', 'good morning',
+                        'good afternoon', 'good evening', 'howdy'):
+            return INTENT_OTHER
+
         if self._api_key:
             try:
                 session = requests.Session()

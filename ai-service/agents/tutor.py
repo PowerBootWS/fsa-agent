@@ -60,11 +60,17 @@ class TutorAgent:
         system_prompt = tutor_prompt.build(lesson_context, progress, state, first_name)
 
         # Build messages list: rolling history + current message
-        history = state.get('chat_history', [])[-MAX_HISTORY_ENTRIES:]
+        # Sanitize history to remove any 'undefined' artefacts stored in prior turns
+        import re
+        raw_history = state.get('chat_history', [])[-MAX_HISTORY_ENTRIES:]
+        history = [
+            {**entry, 'content': re.sub(r'\bundefined\b|\bnull\b', '', entry.get('content', '')).strip()}
+            for entry in raw_history
+        ]
         messages = history + [{'role': 'user', 'content': user_message}]
 
         # Call the LLM
-        response_text = self._call_api(system_prompt, messages)
+        response_text = self._sanitize_response(self._call_api(system_prompt, messages))
 
         # Update rolling chat history in state (orchestrator owns state)
         if 'chat_history' not in state:
@@ -105,6 +111,19 @@ class TutorAgent:
         except Exception as e:
             print(f'TutorAgent API error: {e}')
             return "Something went wrong on my end. Please try again — I'll be right here."
+
+    def _sanitize_response(self, text):
+        """Strip artefacts that the LLM occasionally appends (e.g. literal 'undefined')."""
+        import re
+        # Remove any standalone occurrence of 'undefined', 'null', or 'None' that leaked
+        # from template context — these appear as isolated words, often at the end.
+        # Match them at end-of-string, or surrounded by whitespace/punctuation.
+        text = re.sub(r'\bundefined\b', '', text)
+        text = re.sub(r'\bnull\b', '', text)
+        # Collapse double spaces/newlines left by removal
+        text = re.sub(r'  +', ' ', text)
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        return text.strip()
 
     def _check_profanity(self, user_message, state):
         """

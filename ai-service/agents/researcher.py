@@ -109,7 +109,11 @@ class Researcher:
             conn.close()
 
             if result:
-                return {'first_name': result['first_name'], 'email': result['email']}
+                # Guard against NULL first_name stored in DB
+                stored_name = result['first_name']
+                if stored_name and str(stored_name).strip():
+                    return {'first_name': str(stored_name).strip(), 'email': result['email']}
+                # Name is NULL/empty — fall through to email-derived fallback
 
         except Exception as e:
             print(f'Researcher.get_user_by_email error: {e}')
@@ -395,6 +399,8 @@ class Researcher:
                 WHERE {lesson_filter}
                   AND difficulty <= %s
                   AND question_type = %s
+                  AND options IS NOT NULL
+                  AND jsonb_array_length(options) > 0
                   {exclude_clause}
                 ORDER BY difficulty DESC, RANDOM()
                 LIMIT %s

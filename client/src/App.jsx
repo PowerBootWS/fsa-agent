@@ -185,6 +185,26 @@ function TranscriptView({ lesson }) {
   );
 }
 
+// Safely extract a plain string from whatever shape the API returns for tutor_response
+function extractResponse(tutor_response) {
+  if (tutor_response == null) return '';
+  if (typeof tutor_response === 'string') return sanitizeText(tutor_response);
+  if (typeof tutor_response === 'object') {
+    return sanitizeText(tutor_response.response || JSON.stringify(tutor_response));
+  }
+  return sanitizeText(String(tutor_response));
+}
+
+// Strip any literal "undefined" or "null" artefacts that may appear in LLM output or JS coercion
+function sanitizeText(text) {
+  if (typeof text !== 'string') return '';
+  return text
+    .replace(/\bundefined\b/g, '')
+    .replace(/\bnull\b/g, '')
+    .replace(/  +/g, ' ')
+    .trim();
+}
+
 function LessonView({ lesson, user, lessonId, chatState, setChatState, layoutMode = 'stacked' }) {
   const updateMessages = (updater) => {
     setChatState(prev => ({
@@ -197,7 +217,6 @@ function LessonView({ lesson, user, lessonId, chatState, setChatState, layoutMod
   useEffect(() => {
     // Only initialize if we haven't already
     if (!chatState.displayContent || chatState.messages.length === 0) {
-      // Send initial message to get greeting
       fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -205,29 +224,24 @@ function LessonView({ lesson, user, lessonId, chatState, setChatState, layoutMod
       })
       .then(res => res.json())
       .then(data => {
-        let responseText = data.tutor_response;
-        if (typeof responseText === 'object' && responseText !== null) {
-          responseText = responseText.response || JSON.stringify(responseText);
-        }
         setChatState(prev => ({
           ...prev,
-          messages: [{ role: 'tutor', content: responseText }],
-          displayContent: data.display_update
+          messages: [{ role: 'tutor', content: extractResponse(data.tutor_response) }],
+          displayContent: data.display_update ?? prev.displayContent
         }));
       })
       .catch(err => console.error('Init error:', err));
     }
   }, []);
 
-  // Send message to chat (used by clickable options)
+  // Send message to chat (used by clickable options in DisplaySection)
   const sendAnswer = (answer) => {
-    // Add user message
     setChatState(prev => ({
       ...prev,
-      messages: [...prev.messages, { role: 'user', content: answer }]
+      messages: [...prev.messages, { role: 'user', content: answer }, { role: 'tutor', content: '...thinking...' }],
+      sending: true,
     }));
 
-    // Send to API (simulating user typing)
     fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -235,23 +249,20 @@ function LessonView({ lesson, user, lessonId, chatState, setChatState, layoutMod
     })
     .then(res => res.json())
     .then(data => {
-      // Extract response text
-      let responseText = data.tutor_response;
-      if (typeof responseText === 'object' && responseText !== null) {
-        responseText = responseText.response || JSON.stringify(responseText);
-      }
-
       setChatState(prev => ({
         ...prev,
-        messages: [...prev.messages, { role: 'tutor', content: responseText }],
-        displayContent: data.display_update
+        messages: [...prev.messages.slice(0, -1), { role: 'tutor', content: extractResponse(data.tutor_response) }],
+        // Only update display if the server sends a new one — preserve question during answer feedback
+        displayContent: data.display_update ?? prev.displayContent,
+        sending: false,
       }));
     })
     .catch(err => {
       console.error('Chat error:', err);
       setChatState(prev => ({
         ...prev,
-        messages: [...prev.messages, { role: 'tutor', content: 'Sorry, I encountered an error. Please try again.' }]
+        messages: [...prev.messages.slice(0, -1), { role: 'tutor', content: 'Sorry, I encountered an error. Please try again.' }],
+        sending: false,
       }));
     });
   };
@@ -319,6 +330,8 @@ function MathContent({ text }) {
 }
 
 function DisplaySection({ lesson, displayContent, onAnswer }) {
+  const [collapsed, setCollapsed] = useState(false);
+
   const content = displayContent || {
     type: 'summary',
     title: 'Lesson Overview',
@@ -328,51 +341,85 @@ function DisplaySection({ lesson, displayContent, onAnswer }) {
   const keyPoints = content.key_points || [];
   const displayType = content.type;
 
+  const CollapseToggle = ({ label }) => (
+    <button
+      className="display-collapse-btn"
+      onClick={() => setCollapsed(c => !c)}
+      title={collapsed ? 'Expand context panel' : 'Collapse context panel'}
+    >
+      {label}
+      <span className="display-collapse-icon">{collapsed ? '▼' : '▲'}</span>
+    </button>
+  );
+
   // Render question type with options
   if (displayType === 'question' && content.question) {
     const options = content.options || [];
     const handleOptionClick = (label) => {
-      if (onAnswer) onAnswer(label);
+      if (onAnswer) onAnswer(`My answer is ${label}`);
     };
     return (
-      <div className="display-section question-section">
-        <div className="display-title">{content.title}</div>
-        <div className="display-question">
-          <MathContent text={content.question} />
+      <div className={`display-section question-section${collapsed ? ' collapsed' : ''}`}>
+        <div className="display-header">
+          <CollapseToggle label={content.title} />
         </div>
-        <div className="display-options">
-          {options.map((opt, idx) => (
-            <div
-              key={idx}
-              className="option-item clickable"
-              onClick={() => handleOptionClick(opt.label)}
-            >
-              <span className="option-label">{opt.label}.</span>
-              <span className="option-text"><MathContent text={opt.text} /></span>
+        {!collapsed && (
+          <>
+            <div className="display-question">
+              <MathContent text={content.question} />
             </div>
-          ))}
-        </div>
-        <div className="display-hint">Click an answer or type A, B, C, or D</div>
+            <div className="display-options">
+              {options.map((opt, idx) => (
+                <div
+                  key={idx}
+                  className="option-item clickable"
+                  onClick={() => handleOptionClick(opt.label)}
+                >
+                  <span className="option-label">{opt.label}.</span>
+                  <span className="option-text"><MathContent text={opt.text} /></span>
+                </div>
+              ))}
+            </div>
+            <div className="display-hint">Click an answer or type A, B, C, or D</div>
+          </>
+        )}
       </div>
     );
   }
 
   // Render summary / key-points view
   return (
-    <div className="display-section">
-      <div className="display-title">{content.title}</div>
-      <div className="display-content">
-        <MathContent text={content.content} />
+    <div className={`display-section${collapsed ? ' collapsed' : ''}`}>
+      <div className="display-header">
+        <CollapseToggle label={content.title} />
       </div>
-      {keyPoints.length > 0 && (
-        <div className="display-key-points">
-          {keyPoints.map((kp, idx) => (
-            <div key={idx} className="key-point">
-              <div className="key-point-title">{kp.title}</div>
-              <div className="key-point-content"><MathContent text={kp.content} /></div>
+      {!collapsed && (
+        <>
+          {content.content && (
+            <div className="display-content">
+              <MathContent text={content.content} />
             </div>
-          ))}
-        </div>
+          )}
+          {keyPoints.length > 0 && (
+            <ul className="display-key-points">
+              {keyPoints.map((kp, idx) => (
+                <li key={idx} className="key-point">
+                  {kp.title && <span className="key-point-title">{kp.title}: </span>}
+                  <span className="key-point-content"><MathContent text={
+                    // Truncate long content to first sentence or ~120 chars
+                    (() => {
+                      const text = kp.content || '';
+                      const firstSentence = text.match(/^[^.!?]+[.!?]/);
+                      if (firstSentence && firstSentence[0].length <= 140) return firstSentence[0];
+                      if (text.length > 120) return text.slice(0, 120).trimEnd() + '…';
+                      return text;
+                    })()
+                  } /></span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </div>
   );
@@ -380,24 +427,24 @@ function DisplaySection({ lesson, displayContent, onAnswer }) {
 
 // Typewriter effect: streams full markdown text word-by-word, then renders final markdown
 function TutorMessage({ content, animate = false }) {
-  const [displayed, setDisplayed] = useState(animate ? '' : content);
+  // Normalize content to a string upfront — this is the single source of truth
+  const safeContent = (typeof content === 'string' && content) ? content : '';
+  const [displayed, setDisplayed] = useState(animate ? '' : safeContent);
   const [done, setDone] = useState(!animate);
   const rafRef = useRef(null);
 
   useEffect(() => {
-    if (!animate || content === '...thinking...') {
-      setDisplayed(content);
+    if (!animate || safeContent === '...thinking...') {
+      setDisplayed(safeContent);
       setDone(true);
       return;
     }
 
     // Split into tokens: words and whitespace/punctuation, preserving LaTeX blocks intact
-    // We chunk by "word + following whitespace" to avoid breaking mid-token
     const tokens = [];
-    // Protect $$...$$ and $...$ blocks as single tokens
     const tokenRegex = /\$\$[\s\S]*?\$\$|\$[^$\n]+?\$|\S+\s*/g;
     let m;
-    while ((m = tokenRegex.exec(content)) !== null) {
+    while ((m = tokenRegex.exec(safeContent)) !== null) {
       tokens.push(m[0]);
     }
 
@@ -405,25 +452,24 @@ function TutorMessage({ content, animate = false }) {
     setDisplayed('');
     setDone(false);
 
-    // ~180 words/min reading pace → ~333ms/word, but we want it slightly faster to feel responsive
-    // ~250 wpm → ~240ms/word; split each word's time across characters for smoothness
-    const msPerWord = 60;  // approx 1000 wpm — fast enough to feel live, slow enough to notice
+    const msPerWord = 60;
 
     const tick = () => {
       if (idx >= tokens.length) {
         setDone(true);
         return;
       }
-      setDisplayed(prev => prev + tokens[idx]);
+      const token = tokens[idx];
+      setDisplayed(prev => prev + (typeof token === 'string' ? token : ''));
       idx++;
       rafRef.current = setTimeout(tick, msPerWord);
     };
 
     rafRef.current = setTimeout(tick, 0);
     return () => clearTimeout(rafRef.current);
-  }, [content, animate]);
+  }, [safeContent, animate]);
 
-  if (content === '...thinking...') {
+  if (safeContent === '...thinking...') {
     return (
       <div className="thinking-dots">
         <span className="thinking-dot"></span>
@@ -432,10 +478,7 @@ function TutorMessage({ content, animate = false }) {
       </div>
     );
   }
-  if (typeof content !== 'string') return <span>{String(content)}</span>;
 
-  // While animating, render the partial text; once done render full markdown
-  // We render markdown throughout so formatting appears as text streams in
   return (
     <ReactMarkdown
       remarkPlugins={[remarkMath]}
@@ -473,19 +516,14 @@ function ChatSection({ user, lessonId, messages, setMessages, setDisplayContent 
     setInput('');
     setSending(true);
 
-    // Append user message + thinking indicator to full history
+    // Show user message + thinking indicator immediately
     setMessages(prev => [
       ...prev,
       { role: 'user', content: userMessage },
       { role: 'tutor', content: '...thinking...' },
     ]);
 
-    // Natural thinking delay: 1–3 seconds
-    const delay = 1000 + Math.random() * 2000;
-
     try {
-      await new Promise(resolve => setTimeout(resolve, delay));
-
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -496,15 +534,14 @@ function ChatSection({ user, lessonId, messages, setMessages, setDisplayContent 
 
       const data = await res.json();
 
-      let responseText = data.tutor_response;
-      if (typeof responseText === 'object' && responseText !== null) {
-        responseText = responseText.response || JSON.stringify(responseText);
-      }
+      // Replace thinking indicator with real response
+      setMessages(prev => [
+        ...prev.slice(0, -1),
+        { role: 'tutor', content: extractResponse(data.tutor_response) },
+      ]);
 
-      // Replace the thinking indicator with the real response
-      setMessages(prev => [...prev.slice(0, -1), { role: 'tutor', content: responseText }]);
-
-      if (data.display_update) {
+      // Only update display if the server sends a new one — preserve question during feedback
+      if (data.display_update != null) {
         setDisplayContent(data.display_update);
       }
     } catch (err) {
@@ -557,8 +594,8 @@ function ChatSection({ user, lessonId, messages, setMessages, setDisplayContent 
         })}
         {allMessages.length === 0 && (
           <div className="message tutor">
-            <div className="message-content">
-              Welcome! I'm your tutor for this lesson. Let's get started.
+            <div className="message-content loading-session">
+              Loading tutoring session…
             </div>
           </div>
         )}

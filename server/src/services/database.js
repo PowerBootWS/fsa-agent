@@ -95,6 +95,29 @@ async function updateUserProgress({ user, lessonId, score, struggles, attempts, 
   return result.rows[0];
 }
 
+/**
+ * Insert or update a user record.
+ * Returns { user: { email, first_name, last_name }, created: bool }
+ */
+async function upsertUser({ email, first_name, last_name }) {
+  const result = await pool.query(
+    `INSERT INTO users (email, first_name, last_name)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (email) DO UPDATE SET
+       first_name = EXCLUDED.first_name,
+       last_name  = COALESCE(EXCLUDED.last_name, users.last_name),
+       updated_at = NOW()
+     RETURNING email, first_name, last_name,
+               (xmax = 0) AS created`,
+    [email, first_name, last_name || null]
+  );
+  const row = result.rows[0];
+  return {
+    user: { email: row.email, first_name: row.first_name, last_name: row.last_name },
+    created: row.created,
+  };
+}
+
 async function saveChatHistory(userEmail, lessonId, messages) {
   const safeMessages = typeof messages === 'string' ? messages : JSON.stringify(messages);
 
@@ -114,5 +137,6 @@ module.exports = {
   getLessonChunks,
   getUserProgress,
   updateUserProgress,
+  upsertUser,
   saveChatHistory,
 };

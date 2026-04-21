@@ -19,7 +19,8 @@ def build(lesson_context, progress, state, first_name=None):
     Returns:
         str: fully-formed system prompt
     """
-    name = first_name or state.get('first_name', 'there')
+    raw_name = first_name or state.get('first_name') or ''
+    name = str(raw_name).strip() if raw_name and str(raw_name).strip() not in ('None', 'undefined', 'null') else 'there'
     activity = state.get('activity', 'greeting')
     complexity_level = state.get('complexity_level', 3)
     questions_done = state.get('questions_done', 0)
@@ -29,11 +30,22 @@ def build(lesson_context, progress, state, first_name=None):
 
     relevant_chunks = state.get('relevant_chunks') or []
 
+    awaiting_next_question = state.get('awaiting_next_question', False)
+    is_resume = state.get('is_resume', False)
+    # Only true when a question is ACTUALLY being sent to the display panel this turn.
+    # Do not infer from activity alone — the display may show a summary even in practice mode.
+    question_in_display = state.get('display_is_question', False)
+
+    no_questions_available = state.get('no_questions_available', False)
+
     sections = [
         _build_identity(name),
         _build_lesson_content(lesson_context, relevant_chunks),
-        _build_session_state(activity, complexity_level, questions_done, session_limit_reached, near_context_limit, progress),
+        _build_session_state(activity, complexity_level, questions_done, session_limit_reached, near_context_limit, progress, awaiting_next_question, is_resume, no_questions_available),
     ]
+
+    if question_in_display:
+        sections.append(_build_display_panel_note(activity, awaiting_next_question))
 
     if activity == 'staged_problem':
         sections.append(_build_staged_problem_block(state))
@@ -99,7 +111,7 @@ def _format_chunks(chunks):
     return '\n\n---\n\n'.join(parts)
 
 
-def _build_session_state(activity, complexity_level, questions_done, session_limit_reached, near_context_limit, progress):
+def _build_session_state(activity, complexity_level, questions_done, session_limit_reached, near_context_limit, progress, awaiting_next_question=False, is_resume=False, no_questions_available=False):
     prior_session = ''
     if progress:
         prior_score = progress.get('score', 0)
@@ -123,18 +135,53 @@ def _build_session_state(activity, complexity_level, questions_done, session_lim
     activity_desc = activity_descriptions.get(activity, activity)
 
     limit_note = ''
-    if session_limit_reached:
+    if no_questions_available:
+        limit_note = '\nNO PRACTICE QUESTIONS AVAILABLE: Practice questions for this lesson have not been loaded yet. Do not offer or attempt to present a practice question. Instead, offer to walk through the key concepts, discuss the topic, or explain anything the student found interesting in the lesson.'
+    elif session_limit_reached:
         limit_note = '\nSESSION LIMIT: The student has completed their 2 practice questions for this objective. Do not offer more practice questions — instead offer to review concepts, discuss the topic, or try the chapter quiz.'
 
     context_note = ''
     if near_context_limit:
         context_note = '\nCONTEXT LIMIT APPROACHING: This is one of the final exchanges in this session. When you respond, wrap up warmly. Thank the student for their focus today. Let them know this topic will come up again in the chapter quiz, which is a great chance to reinforce what they\'ve learned. Encourage them to continue to the next objective and mention they can always return for a fresh session. Keep the tone upbeat — this is a natural stopping point, not a failure.'
 
+    feedback_note = ''
+    if awaiting_next_question:
+        feedback_note = (
+            '\nFEEDBACK MODE: The student just answered the practice question shown above. '
+            'Give them your feedback on their answer. The question and options remain visible to the student. '
+            'After your feedback, invite them to try another question or move on — '
+            'e.g. "Ready to try another one, or would you like to talk through the concept more?"'
+        )
+
+    resume_note = ''
+    if is_resume:
+        resume_note = (
+            '\nSESSION RESUME: The student has returned to this lesson (page refresh or tab switch). '
+            'Welcome them back briefly and remind them where they left off. '
+            'Do not start from scratch — just pick up where the session was.'
+        )
+
     return f"""## CURRENT SESSION STATE
 Activity: {activity_desc}
 Complexity level: {complexity_level} / 5
 Questions completed this session: {questions_done}
-{prior_session}{limit_note}{context_note}"""
+{prior_session}{limit_note}{context_note}{feedback_note}{resume_note}"""
+
+
+def _build_display_panel_note(activity, awaiting_next_question):
+    if awaiting_next_question:
+        return """## DISPLAY PANEL
+The practice question and answer options are currently shown in the display panel ABOVE this chat window. The student can see them clearly.
+- Do NOT repeat or quote the question text or answer options in your response.
+- Give your feedback on their answer choice directly and concisely.
+- After feedback, invite them to try another question or move on — e.g. "Ready for another one, or want to talk through the concept?"
+- Do NOT write the word 'undefined', 'null', or 'None' in your response under any circumstances."""
+    else:
+        return """## DISPLAY PANEL
+A practice question is currently shown in the display panel ABOVE this chat window. The student can see the question and clickable answer options there.
+- Do NOT repeat, restate, or quote the question or its answer options in your response.
+- Briefly introduce that a question is ready for them (e.g. "I've put a question up for you — give it a go!") and wait for their answer.
+- Do NOT write the word 'undefined', 'null', or 'None' in your response under any circumstances."""
 
 
 def _build_staged_problem_block(state):

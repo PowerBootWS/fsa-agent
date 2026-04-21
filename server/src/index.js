@@ -53,12 +53,14 @@ const lessonRouter = require('./routes/lesson');
 const chatRouter = require('./routes/chat');
 const progressRouter = require('./routes/progress');
 const chatHistoryRouter = require('./routes/chat-history');
+const enrollRouter = require('./routes/enroll');
 
 app.use('/api/validate', validateRouter);
 app.use('/api/lesson', lessonRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/progress', progressRouter);
 app.use('/api/chat-history', chatHistoryRouter);
+app.use('/api/enroll', enrollRouter);
 
 // Serve React app from client build
 app.use(express.static(path.join(__dirname, '../client/build')));
