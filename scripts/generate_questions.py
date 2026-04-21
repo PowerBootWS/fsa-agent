@@ -202,26 +202,52 @@ def build_user_prompt(lesson_code: str, meta: dict, practice_count: int, quiz_co
 # OpenRouter API call
 # ---------------------------------------------------------------------------
 
-def call_model(client: OpenAI, system: str, user: str, model: str) -> list[dict]:
-    """Call the model via OpenRouter and parse the returned JSON array."""
-    response = client.chat.completions.create(
-        model=model,
-        max_tokens=4096,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-    )
-    raw = response.choices[0].message.content.strip()
-
-    # Strip accidental markdown fences (some models add them despite instructions)
+def _clean_json(raw: str) -> str:
+    """
+    Strip markdown fences and any prose before/after the JSON array.
+    Finds the first '[' and last ']' and returns only what's between them.
+    """
+    # Strip markdown fences
     if raw.startswith("```"):
         lines = raw.splitlines()
-        # Drop first line (```json or ```) and last line (```)
         end = len(lines) - 1 if lines[-1].strip() == "```" else len(lines)
-        raw = "\n".join(lines[1:end])
+        raw = "\n".join(lines[1:end]).strip()
 
-    return json.loads(raw)
+    # Find the outermost JSON array bounds regardless of any surrounding text
+    start = raw.find("[")
+    end = raw.rfind("]")
+    if start != -1 and end != -1 and end > start:
+        raw = raw[start:end + 1]
+
+    return raw
+
+
+def call_model(client: OpenAI, system: str, user: str, model: str, retries: int = 2) -> list[dict]:
+    """Call the model via OpenRouter and parse the returned JSON array.
+    Retries up to `retries` times on JSON parse failure before raising.
+    """
+    last_exc = None
+    for attempt in range(1, retries + 2):  # +2: initial attempt + retries
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                max_tokens=4096,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            )
+            raw = response.choices[0].message.content.strip()
+            cleaned = _clean_json(raw)
+            return json.loads(cleaned)
+        except (json.JSONDecodeError, RecursionError, ValueError) as exc:
+            last_exc = exc
+            if attempt <= retries:
+                print(f"  JSON parse error (attempt {attempt}/{retries + 1}): {exc} — retrying ...", flush=True)
+                time.sleep(1)
+            else:
+                raise RuntimeError(f"Failed to parse model response after {retries + 1} attempts: {exc}") from exc
+    raise last_exc  # unreachable, satisfies type checkers
 
 
 # ---------------------------------------------------------------------------
