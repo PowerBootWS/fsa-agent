@@ -10,6 +10,8 @@ services:
       - fsa_postgres_data:/var/lib/postgresql/data
     networks:
       - fsa-network
+    ports:
+      - "5434:5432"
     restart: unless-stopped
 
   api:

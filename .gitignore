@@ -34,5 +34,8 @@ coverage/
 *.tgz
 .cache/
 
+# Generated artifacts (regenerate via aggregate_lesson_content.py)
+docs/source/lesson_content_aggregated.json
+
 # Google OAuth credentials (never commit)
 credentials/

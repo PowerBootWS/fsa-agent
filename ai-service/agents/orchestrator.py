@@ -272,16 +272,23 @@ class Orchestrator:
 
                 elif intent == INTENT_PROVIDE_ANSWER:
                     # Evaluate the answer — but DON'T load the next question yet.
-                    # The tutor needs to respond to this answer first (feedback, correction, etc.)
-                    # We stay in 'awaiting_feedback' sub-state so the current question stays on display.
+                    # The tutor needs to respond first (feedback, correction, etc.)
+                    # The current question stays on display while tutor gives feedback.
                     self._evaluate_practice_answer(state, message, lesson_context)
                     state['awaiting_next_question'] = True
                     # display_update stays None → client preserves current question display
 
-                elif intent in (INTENT_CONTINUE, INTENT_SELECT_PRACTICE) and state.get('awaiting_next_question'):
-                    # Student has acknowledged the feedback and is ready for the next question
+                elif intent in (INTENT_CONTINUE, INTENT_SELECT_PRACTICE, INTENT_OTHER) and state.get('awaiting_next_question'):
+                    # Student has acknowledged the feedback (or any follow-up message).
+                    # Clear feedback mode. If they want another question they'll ask;
+                    # if the limit is reached, the prompt handles it.
                     state['awaiting_next_question'] = False
-                    if state['questions_done'] < MAX_QUESTIONS_PER_OBJECTIVE and not state.get('session_limit_reached'):
+                    state['activity'] = 'greeting'  # Return to greeting between questions
+                    # Clear current question so resume doesn't re-display a stale question
+                    state['current_question_id'] = None
+                    if intent == INTENT_SELECT_PRACTICE and not state.get('session_limit_reached'):
+                        # They explicitly asked for another — load it now
+                        state['activity'] = 'practice'
                         display_update = self._load_next_question(state, lesson_context, researcher, display)
 
         elif activity == 'staged_problem':

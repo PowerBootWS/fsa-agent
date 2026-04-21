@@ -166,6 +166,95 @@ def insert_worked_problem(lesson_code, chapter_id, course_id, worked_problem, dr
         conn.close()
 
 
+def insert_question(lesson_code, chapter_id, course_id, q, dry_run=False):
+    """
+    Insert a single AI-generated MCQ into the questions table.
+
+    Skips if a question with the same lesson_code and question_text already exists.
+
+    Args:
+        lesson_code: e.g. '2A1-1-1'
+        chapter_id:  e.g. '2A1-1'
+        course_id:   e.g. '2A1'
+        q: dict with keys:
+            question_text   str
+            options         list[str]  (4 items)
+            correct_answer  int        (0-based index)
+            explanation     str
+            difficulty      int        (1-5)
+            topic           str
+            question_type   str        ('objective_practice' or 'chapter_quiz')
+        dry_run: if True, print instead of executing
+
+    Returns:
+        integer question id, or None on dry_run / skip
+    """
+    question_text = q.get('question_text', '').strip()
+    options = q.get('options', [])
+    correct_answer = int(q.get('correct_answer', 0))
+    explanation = q.get('explanation', '')
+    difficulty = int(q.get('difficulty', 3))
+    topic = q.get('topic', '')
+    question_type = q.get('question_type', 'objective_practice')
+
+    if dry_run:
+        print(f'[DRY RUN] insert_question: lesson_code={lesson_code!r} type={question_type!r} difficulty={difficulty}')
+        print(f'  Q: {question_text[:120]!r}')
+        for i, opt in enumerate(options):
+            marker = '*' if i == correct_answer else ' '
+            print(f'  {marker} {i}: {opt[:80]!r}')
+        if explanation:
+            print(f'  Explanation: {explanation[:100]!r}')
+        return None
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+
+        # Resolve lesson_id — lesson row must exist before inserting questions
+        cur.execute('SELECT id FROM lessons WHERE lesson_code = %s', (lesson_code,))
+        row = cur.fetchone()
+        if not row:
+            print(f'WARNING: lesson_code {lesson_code!r} not found in lessons table — skipping')
+            return None
+        lesson_id = row['id']
+
+        # Deduplicate by question_text
+        cur.execute(
+            'SELECT id FROM questions WHERE lesson_code = %s AND question_text = %s',
+            (lesson_code, question_text)
+        )
+        existing = cur.fetchone()
+        if existing:
+            return existing['id']
+
+        cur.execute(
+            """
+            INSERT INTO questions
+                (lesson_id, lesson_code, chapter_id, course_id,
+                 question_text, options, correct_answer, explanation,
+                 difficulty, topic, question_type)
+            VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s)
+            RETURNING id
+            """,
+            (
+                lesson_id, lesson_code, chapter_id, course_id,
+                question_text,
+                json.dumps(options),
+                correct_answer,
+                explanation,
+                difficulty,
+                topic,
+                question_type,
+            )
+        )
+        new_row = cur.fetchone()
+        conn.commit()
+        return new_row['id']
+    finally:
+        conn.close()
+
+
 def get_question_count(lesson_code):
     """Return current question count for a lesson_code."""
     conn = get_connection()
