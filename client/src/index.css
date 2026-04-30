@@ -483,6 +483,290 @@ body {
   text-align: center;
 }
 
+/* =========================================================
+   Quiz / Exam full-page layout
+   ========================================================= */
+
+.app-fullpage {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.quizexam-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #fff;
+}
+
+/* Header bar */
+.quizexam-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #f0f4f8;
+  border-bottom: 1px solid #d1d9e0;
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.quizexam-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2d4a6b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+}
+
+/* Progress bar */
+.exam-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+  min-width: 200px;
+}
+
+.exam-progress-label {
+  font-size: 12px;
+  color: #5a6c7d;
+  font-weight: 500;
+}
+
+.exam-progress-score {
+  color: #2563eb;
+}
+
+.exam-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: #d1d9e0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.exam-progress-fill {
+  height: 100%;
+  background: #2563eb;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Body split */
+.quizexam-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  gap: 0;
+}
+
+.quizexam-question-panel {
+  flex: 1.3;
+  overflow-y: auto;
+  padding: 24px 20px;
+  border-right: 1px solid #e0e7ef;
+  background: #fafbfc;
+}
+
+.quizexam-chat-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+}
+
+/* Question card */
+.quizexam-question-card {
+  background: #fff;
+  border: 1px solid #c8d8e8;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.quizexam-question-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.quizexam-question-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.quizexam-chapter-tag {
+  font-size: 11px;
+  background: #e0e7ff;
+  color: #4338ca;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.quizexam-question-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: #1a2e42;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.quizexam-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quizexam-option {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1.5px solid #d1dde8;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: all 0.18s ease;
+  font-size: 14px;
+  color: #333;
+}
+
+.quizexam-option:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.quizexam-option-label {
+  font-weight: 700;
+  color: #2563eb;
+  min-width: 22px;
+  flex-shrink: 0;
+}
+
+.quizexam-option-text {
+  color: #333;
+  line-height: 1.4;
+}
+
+.quizexam-exam-note {
+  margin-top: 14px;
+  font-size: 12px;
+  color: #9ba8b5;
+  font-style: italic;
+  text-align: center;
+}
+
+.quizexam-display-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+}
+
+.quizexam-display-placeholder {
+  color: #9ba8b5;
+  font-style: italic;
+  font-size: 14px;
+}
+
+/* Chat panel inside quiz/exam */
+.quizexam-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.quizexam-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Results panel */
+.results-panel {
+  background: #fff;
+  border: 1px solid #c8d8e8;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.results-score {
+  font-size: 36px;
+  font-weight: 800;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.results-score-pct {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.results-table th {
+  text-align: left;
+  padding: 8px 10px;
+  background: #f0f4f8;
+  color: #5a6c7d;
+  font-weight: 600;
+  border-bottom: 2px solid #d1d9e0;
+}
+
+.results-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e8eef4;
+  color: #333;
+}
+
+.results-row--strong td { background: #f0fdf4; }
+.results-row--weak td   { background: #fff7f7; }
+.results-row--mid td    { background: #fffbeb; }
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  .quizexam-body {
+    flex-direction: column;
+  }
+  .quizexam-question-panel {
+    border-right: none;
+    border-bottom: 1px solid #e0e7ef;
+    flex: none;
+    max-height: 55vh;
+  }
+  .quizexam-chat-panel {
+    flex: 1;
+    min-height: 280px;
+  }
+  .quizexam-header {
+    flex-wrap: wrap;
+  }
+  .exam-progress {
+    min-width: 160px;
+  }
+}
+
 /* Mobile adjustments */
 @media (max-width: 600px) {
   .content {

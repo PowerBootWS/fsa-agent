@@ -15,22 +15,37 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'Invalid email format' });
   }
 
-  // Validate lessonId format: lesson_code (e.g. '2A1-1-1'), UUID, or integer
-  const lessonCodeRegex = /^[A-Z0-9]{2,5}-\d{1,3}-\d{1,3}$/i;
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const intRegex = /^[0-9]+$/;
-  if (!lessonCodeRegex.test(lessonId) && !uuidRegex.test(lessonId) && !intRegex.test(lessonId)) {
-    return res.status(400).json({ error: 'Invalid lessonId format. Expected format: 2A1-1-1 (course-chapter-objective)' });
+  // Detect mode from lessonId format:
+  //   2B1-1-3  → lesson        (paper-chapter-objective, 3 segments)
+  //   2B1-1    → chapter_quiz  (paper-chapter, 2 segments)
+  //   2B1      → practice_exam (paper only, 1 segment)
+  //   integer  → lesson (numeric DB id, legacy)
+  //   UUID     → lesson (legacy)
+  const lessonRegex   = /^[A-Z0-9]{2,5}-\d{1,3}-\d{1,3}$/i;
+  const chapterRegex  = /^[A-Z0-9]{2,5}-\d{1,3}$/i;
+  const examRegex     = /^[A-Z0-9]{2,5}$/i;
+  const uuidRegex     = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const intRegex      = /^[0-9]+$/;
+
+  let mode;
+  if (lessonRegex.test(lessonId) || uuidRegex.test(lessonId) || intRegex.test(lessonId)) {
+    mode = 'lesson';
+  } else if (chapterRegex.test(lessonId)) {
+    mode = 'chapter_quiz';
+  } else if (examRegex.test(lessonId)) {
+    mode = 'practice_exam';
+  } else {
+    return res.status(400).json({ error: 'Invalid lessonId format. Expected 2B1-1-3 (lesson), 2B1-1 (chapter quiz), or 2B1 (practice exam).' });
   }
 
-  // Create session context (in production, use proper session management)
   const session = {
     user,
     lessonId,
+    mode,
     validatedAt: new Date().toISOString(),
   };
 
-  res.json({ success: true, session });
+  res.json({ success: true, session, mode });
 });
 
 module.exports = router;

@@ -16,16 +16,34 @@ INTENT_STOP = 'stop'
 INTENT_OTHER = 'other'
 
 # How many exchanges before we treat the session as near its context limit
-CONTEXT_LIMIT_EXCHANGES = 6
-MAX_QUESTIONS_PER_OBJECTIVE = 2
+CONTEXT_LIMIT_EXCHANGES = 20
+MAX_QUESTIONS_PER_OBJECTIVE = 5
 PROGRESS_SAVE_INTERVAL = 3  # save progress every N exchanges as a heartbeat
+
+CHAPTER_QUIZ_QUESTION_COUNT = 8
+PRACTICE_EXAM_QUESTION_COUNT = 50
+
+def _detect_mode(lesson_id):
+    """
+    Detect session mode from the lesson_id string.
+    Returns 'lesson', 'chapter_quiz', or 'practice_exam'.
+    """
+    import re
+    lid = str(lesson_id)
+    if re.match(r'^[A-Z0-9]{2,5}-\d{1,3}-\d{1,3}$', lid, re.IGNORECASE):
+        return 'lesson'
+    if re.match(r'^[A-Z0-9]{2,5}-\d{1,3}$', lid, re.IGNORECASE):
+        return 'chapter_quiz'
+    if re.match(r'^[A-Z0-9]{2,5}$', lid, re.IGNORECASE):
+        return 'practice_exam'
+    return 'lesson'  # numeric id or UUID → lesson
 
 
 class Orchestrator:
     def __init__(self):
         self.conversation_state = {}
         self._api_key = os.getenv('OPENROUTER_API_KEY')
-        self._model = os.getenv('OPENROUTER_MODEL', 'anthropic/claude-sonnet-4-6-20250515')
+        self._model = os.getenv('OPENROUTER_MODEL', 'deepseek/deepseek-v4-flash')
         self._base_url = 'https://openrouter.ai/api/v1'
 
     # ------------------------------------------------------------------
@@ -46,6 +64,7 @@ class Orchestrator:
         - action: optional action ('stop', 'warning', None)
         """
         state_key = f'{user}:{lesson_id}'
+        mode = _detect_mode(lesson_id)
 
         # Initialize state for new sessions
         if state_key not in self.conversation_state:
@@ -56,6 +75,7 @@ class Orchestrator:
             self.conversation_state[state_key] = {
                 'user': user,
                 'lesson_id': lesson_id,
+                'mode': mode,
                 'first_name': first_name,
                 'initialized': False,
                 'exchange_count': 0,
@@ -88,11 +108,35 @@ class Orchestrator:
 
                 # Profanity tracking
                 'profanity_count': 0,
+
+                # Chapter quiz state
+                'quiz_questions': [],       # pre-loaded list for the session
+                'quiz_index': 0,            # which question we're on
+                'quiz_correct': 0,          # running tally
+                'quiz_awaiting_feedback': False,
+                'quiz_current_correct_answer': None,
+
+                # Practice exam state
+                'exam_questions': [],       # pre-loaded list
+                'exam_index': 0,
+                'exam_results': [],         # list of {chapter_id, correct}
+                'exam_phase': 'answering',  # 'answering' or 'debrief'
             }
 
         state = self.conversation_state[state_key]
         first_name = state['first_name']
         state['exchange_count'] = state.get('exchange_count', 0) + 1
+        mode = state.get('mode', 'lesson')
+
+        # Route chapter quiz and practice exam modes entirely separately
+        if mode == 'chapter_quiz':
+            return self._process_chapter_quiz(
+                state, user, lesson_id, message, researcher, display
+            )
+        if mode == 'practice_exam':
+            return self._process_practice_exam(
+                state, user, lesson_id, message, researcher, display, tutor, lesson_context, progress
+            )
 
         # Detect page-reload / session-resume: client sends message='hello' on init.
         # We treat this as a resume if the session is already initialized.
@@ -349,6 +393,7 @@ class Orchestrator:
 
         question = questions[0]
         state['current_question_id'] = question['id']
+        state['current_question_difficulty'] = question.get('difficulty', 3)
         state['seen_question_ids'].append(question['id'])
 
         # Check if this is a multi-step problem
@@ -520,6 +565,465 @@ class Orchestrator:
         if score < 50:
             return 'struggled'
         return None  # in progress — don't write an outcome yet
+
+    # ------------------------------------------------------------------
+    # Chapter quiz flow
+    # ------------------------------------------------------------------
+
+    def _process_chapter_quiz(self, state, user, lesson_id, message, researcher, display):
+        """
+        Drive the chapter quiz session.
+        - Pre-loads CHAPTER_QUIZ_QUESTION_COUNT random chapter_quiz questions once.
+        - One question per turn, immediate right/wrong feedback from the LLM.
+        - Records each response silently.
+        - After all questions: summary debrief.
+        """
+        first_name = state['first_name']
+
+        # Parse chapter context from lesson_id e.g. '2B1-1'
+        parts = lesson_id.split('-')
+        course_id = parts[0] if parts else lesson_id
+        chapter_id = lesson_id  # e.g. '2B1-1'
+
+        # Load questions on first message
+        if not state['quiz_questions'] and not state.get('quiz_done'):
+            qs = researcher.get_chapter_quiz_questions(chapter_id, limit=CHAPTER_QUIZ_QUESTION_COUNT)
+            state['quiz_questions'] = qs
+            state['quiz_index'] = 0
+            state['quiz_correct'] = 0
+            state['quiz_awaiting_feedback'] = False
+
+        questions = state['quiz_questions']
+        idx = state['quiz_index']
+        total = len(questions)
+
+        # ---- Handle debrief phase ----
+        if state.get('quiz_done'):
+            correct = state['quiz_correct']
+            score_pct = int(correct / total * 100) if total else 0
+            topics_missed = state.get('quiz_topics_missed', [])
+            missed_str = ', '.join(topics_missed) if topics_missed else 'none in particular'
+            summary = (
+                f"Quiz complete, {first_name}! You got **{correct} out of {total}** "
+                f"({score_pct}%).\n\n"
+            )
+            if score_pct >= 80:
+                summary += f"Great work — you're clearly solid on this chapter. {missed_str != 'none in particular' and f'A quick look at **{missed_str}** would round things out nicely.' or ''}"
+            elif score_pct >= 60:
+                summary += f"Decent foundation. Worth revisiting **{missed_str}** before the practice exam — those topics came up in your wrong answers."
+            else:
+                summary += f"There's room to strengthen this chapter. I'd recommend going back through **{missed_str}** — those are the areas where you dropped marks. The practice exam will also help reinforce them."
+
+            return {
+                'tutor_response': summary,
+                'display_update': {'type': 'quiz_done', 'title': 'Chapter Quiz Complete',
+                                   'score': correct, 'total': total, 'score_pct': score_pct},
+                'progress_update': {},
+                'complexity_level': state['complexity_level'],
+                'first_name': first_name,
+                'action': None,
+                'mode': 'chapter_quiz',
+            }
+
+        # ---- No questions available ----
+        if not questions:
+            return {
+                'tutor_response': (
+                    f"Sorry {first_name}, I couldn't find any quiz questions for this chapter yet. "
+                    "Check back soon, or head back to the lessons to keep studying."
+                ),
+                'display_update': None,
+                'progress_update': {},
+                'complexity_level': state['complexity_level'],
+                'first_name': first_name,
+                'action': None,
+                'mode': 'chapter_quiz',
+            }
+
+        # ---- Feedback on previous answer ----
+        if state['quiz_awaiting_feedback']:
+            current_q = questions[idx - 1]  # question we just asked
+            correct_answer = state['quiz_current_correct_answer']
+            correct_index = current_q['correct_answer']
+            options = current_q['options']
+            correct_text = options[correct_index] if options and correct_index < len(options) else '?'
+            explanation = current_q.get('explanation', '')
+
+            # Parse what the student selected
+            student_correct = self._evaluate_mc_answer(message, correct_index)
+
+            # Record response silently
+            researcher.record_response(
+                user_email=user,
+                question_id=current_q['id'],
+                session_type='chapter_quiz',
+                course_id=course_id,
+                chapter_id=chapter_id,
+                correct=student_correct,
+            )
+
+            if student_correct:
+                state['quiz_correct'] += 1
+                feedback_prefix = f"Correct! "
+            else:
+                correct_label = chr(65 + correct_index)
+                feedback_prefix = f"Not quite — the correct answer was **{correct_label}. {correct_text}**. "
+                # Track missed topic
+                topic = current_q.get('topic', '')
+                if topic:
+                    state.setdefault('quiz_topics_missed', []).append(topic)
+
+            if explanation:
+                feedback = feedback_prefix + explanation
+            else:
+                feedback = feedback_prefix
+
+            state['quiz_awaiting_feedback'] = False
+
+            # If this was the last question, move to debrief
+            if idx >= total:
+                state['quiz_done'] = True
+                feedback += f"\n\nThat's all {total} questions! Let me tally up your results…"
+                # Return without a new question — next message triggers debrief
+                return {
+                    'tutor_response': feedback,
+                    'display_update': self._build_quiz_progress_display(idx, total, state['quiz_correct'], chapter_id),
+                    'progress_update': {},
+                    'complexity_level': state['complexity_level'],
+                    'first_name': first_name,
+                    'action': None,
+                    'mode': 'chapter_quiz',
+                }
+
+            # Load next question
+            next_q = questions[idx]
+            display_update = self._build_quiz_question_display(next_q, idx, total)
+            state['quiz_awaiting_feedback'] = True
+            state['quiz_current_correct_answer'] = next_q['correct_answer']
+            state['quiz_index'] = idx + 1
+
+            feedback += f"\n\n*Question {idx + 1} of {total} is ready — give it your best shot.*"
+            return {
+                'tutor_response': feedback,
+                'display_update': display_update,
+                'progress_update': {},
+                'complexity_level': state['complexity_level'],
+                'first_name': first_name,
+                'action': None,
+                'mode': 'chapter_quiz',
+            }
+
+        # ---- Present next question (or first question) ----
+        q = questions[idx]
+        display_update = self._build_quiz_question_display(q, idx, total)
+        state['quiz_awaiting_feedback'] = True
+        state['quiz_current_correct_answer'] = q['correct_answer']
+        state['quiz_index'] = idx + 1
+
+        if idx == 0:
+            intro = (
+                f"Let's get into it, {first_name}! Here's your Chapter Quiz — "
+                f"**{total} questions**, one at a time. I'll give you feedback after each one. "
+                f"There's no grade, just a quick read on where you stand. Ready? Here's question 1."
+            )
+        else:
+            intro = f"*Question {idx + 1} of {total}:*"
+
+        return {
+            'tutor_response': intro,
+            'display_update': display_update,
+            'progress_update': {},
+            'complexity_level': state['complexity_level'],
+            'first_name': first_name,
+            'action': None,
+            'mode': 'chapter_quiz',
+        }
+
+    def _build_quiz_question_display(self, q, idx, total):
+        options = q.get('options', [])
+        formatted = [{'label': chr(65 + i), 'text': opt} for i, opt in enumerate(options)]
+        return {
+            'type': 'question',
+            'title': f'Question {idx + 1} of {total}',
+            'question': q.get('question_text', ''),
+            'options': formatted,
+            'topic': q.get('topic', ''),
+            'question_id': q['id'],
+        }
+
+    def _build_quiz_progress_display(self, questions_done, total, correct, chapter_id):
+        return {
+            'type': 'quiz_progress',
+            'title': f'Chapter Quiz — {chapter_id}',
+            'questions_done': questions_done,
+            'total': total,
+            'correct': correct,
+        }
+
+    # ------------------------------------------------------------------
+    # Practice exam flow
+    # ------------------------------------------------------------------
+
+    def _process_practice_exam(self, state, user, lesson_id, message,
+                                researcher, display, tutor, lesson_context, progress):
+        """
+        Drive the adaptive practice exam session.
+        - Pre-loads PRACTICE_EXAM_QUESTION_COUNT questions with chapter weighting.
+        - Questions presented one at a time with NO per-question feedback.
+        - Records each answer silently.
+        - After all questions: LLM generates full chapter-level debrief.
+        """
+        first_name = state['first_name']
+        course_id = lesson_id  # e.g. '2B1'
+
+        # Load questions on first message
+        if not state['exam_questions'] and not state.get('exam_done'):
+            weights = researcher.get_chapter_weights(user, course_id)
+            qs = researcher.get_exam_questions(
+                course_id=course_id,
+                limit=PRACTICE_EXAM_QUESTION_COUNT,
+                weights=weights if weights else None,
+            )
+            state['exam_questions'] = qs
+            state['exam_index'] = 0
+            state['exam_results'] = []
+            state['exam_phase'] = 'answering'
+
+        questions = state['exam_questions']
+        idx = state['exam_index']
+        total = len(questions)
+
+        # ---- Debrief phase ----
+        if state.get('exam_done') or state.get('exam_phase') == 'debrief':
+            return self._generate_exam_debrief(
+                state, user, course_id, first_name, researcher, tutor, lesson_context, progress
+            )
+
+        # ---- No questions ----
+        if not questions:
+            return {
+                'tutor_response': (
+                    f"Sorry {first_name}, I couldn't load exam questions for {course_id} right now. "
+                    "Please try again in a moment."
+                ),
+                'display_update': None,
+                'progress_update': {},
+                'complexity_level': state['complexity_level'],
+                'first_name': first_name,
+                'action': None,
+                'mode': 'practice_exam',
+            }
+
+        # ---- Record answer for previous question ----
+        if idx > 0 and not state.get('exam_init_hello'):
+            prev_q = questions[idx - 1]
+            correct = self._evaluate_mc_answer(message, prev_q['correct_answer'])
+            state['exam_results'].append({
+                'chapter_id': prev_q['chapter_id'],
+                'question_id': prev_q['id'],
+                'correct': correct,
+            })
+            researcher.record_response(
+                user_email=user,
+                question_id=prev_q['id'],
+                session_type='practice_exam',
+                course_id=course_id,
+                chapter_id=prev_q['chapter_id'],
+                correct=correct,
+            )
+
+        state['exam_init_hello'] = False
+
+        # ---- Transition to debrief ----
+        if idx >= total:
+            state['exam_done'] = True
+            state['exam_phase'] = 'debrief'
+            return self._generate_exam_debrief(
+                state, user, course_id, first_name, researcher, tutor, lesson_context, progress
+            )
+
+        # ---- Present next question ----
+        q = questions[idx]
+        display_update = self._build_exam_question_display(q, idx, total)
+        state['exam_index'] = idx + 1
+
+        if idx == 0:
+            state['exam_init_hello'] = True  # Don't record the hello as an answer
+            intro = (
+                f"Welcome to your {course_id} Practice Exam, {first_name}! "
+                f"You'll get **{total} questions** from across all chapters. "
+                f"Just select your answer for each one — I'll save the feedback for the end "
+                f"so you can work through it at exam pace. Let's begin."
+            )
+        else:
+            intro = ''  # No commentary between questions in exam mode
+
+        return {
+            'tutor_response': intro if intro else None,
+            'display_update': display_update,
+            'progress_update': {},
+            'complexity_level': state['complexity_level'],
+            'first_name': first_name,
+            'action': None,
+            'mode': 'practice_exam',
+            'exam_progress': {'current': idx + 1, 'total': total},
+        }
+
+    def _build_exam_question_display(self, q, idx, total):
+        options = q.get('options', [])
+        formatted = [{'label': chr(65 + i), 'text': opt} for i, opt in enumerate(options)]
+        return {
+            'type': 'exam_question',
+            'title': f'Question {idx + 1} of {total}',
+            'question': q.get('question_text', ''),
+            'options': formatted,
+            'topic': q.get('topic', ''),
+            'chapter_id': q.get('chapter_id', ''),
+            'question_id': q['id'],
+            'progress': {'current': idx + 1, 'total': total},
+        }
+
+    def _generate_exam_debrief(self, state, user, course_id, first_name,
+                                researcher, tutor, lesson_context, progress):
+        """Generate the end-of-exam chapter-level debrief using the tutor LLM."""
+        results = state.get('exam_results', [])
+        if not results:
+            return {
+                'tutor_response': f"Exam complete, {first_name}! No results to summarize.",
+                'display_update': {'type': 'exam_done'},
+                'progress_update': {},
+                'complexity_level': state['complexity_level'],
+                'first_name': first_name,
+                'action': None,
+                'mode': 'practice_exam',
+            }
+
+        # Aggregate by chapter
+        chapter_stats = {}
+        for r in results:
+            cid = r['chapter_id'] or 'Unknown'
+            if cid not in chapter_stats:
+                chapter_stats[cid] = {'correct': 0, 'total': 0}
+            chapter_stats[cid]['total'] += 1
+            if r['correct']:
+                chapter_stats[cid]['correct'] += 1
+
+        total_q = len(results)
+        total_correct = sum(r['correct'] for r in results)
+        score_pct = int(total_correct / total_q * 100) if total_q else 0
+
+        # Build debrief summary for display panel
+        chapter_lines = []
+        weak_chapters = []
+        strong_chapters = []
+        for cid, s in sorted(chapter_stats.items()):
+            pct = int(s['correct'] / s['total'] * 100) if s['total'] else 0
+            status = 'Strong' if pct >= 70 else ('Needs review' if pct < 50 else 'Developing')
+            chapter_lines.append({'chapter': cid, 'correct': s['correct'],
+                                   'total': s['total'], 'pct': pct, 'status': status})
+            if pct < 60:
+                weak_chapters.append(cid)
+            elif pct >= 75:
+                strong_chapters.append(cid)
+
+        # Build a text summary for the tutor LLM to elaborate on
+        stats_text = '\n'.join(
+            f"  {cl['chapter']}: {cl['correct']}/{cl['total']} ({cl['pct']}%) — {cl['status']}"
+            for cl in chapter_lines
+        )
+        weak_str = ', '.join(weak_chapters) if weak_chapters else 'none'
+        strong_str = ', '.join(strong_chapters) if strong_chapters else 'none'
+
+        # Use LLM to generate warm, specific debrief
+        debrief_prompt = (
+            f"The student {first_name} just completed a {total_q}-question practice exam for {course_id}.\n"
+            f"Overall: {total_correct}/{total_q} ({score_pct}%)\n\n"
+            f"Per-chapter results:\n{stats_text}\n\n"
+            f"Strong chapters: {strong_str}\n"
+            f"Chapters needing review: {weak_str}\n\n"
+            f"Write a warm, concise debrief (5-8 sentences). Acknowledge their overall score. "
+            f"Highlight 1-2 strong chapters by name. Clearly identify weak chapters and recommend "
+            f"going back to review those lessons before re-sitting the exam. "
+            f"Mention that their next exam attempt will be weighted toward their weak areas. "
+            f"Keep it encouraging and specific. Address the student as {first_name}."
+        )
+
+        # Build a minimal state for tutor
+        debrief_state = {
+            'activity': 'exam_debrief',
+            'mode': 'practice_exam',
+            'complexity_level': state.get('complexity_level', 3),
+            'questions_done': total_q,
+            'session_limit_reached': False,
+            'chat_history': state.get('chat_history', []),
+            'relevant_chunks': [],
+            'display_is_question': False,
+            'awaiting_next_question': False,
+            'is_resume': False,
+            'no_questions_available': False,
+            'first_name': first_name,
+            'exam_debrief_prompt': debrief_prompt,
+        }
+
+        tutor_result = tutor.respond(
+            user_message=debrief_prompt,
+            lesson_context={'title': f'{course_id} Practice Exam', 'summary': '', 'key_points': [],
+                            'narration_text': '', 'video_transcript': ''},
+            progress=progress,
+            state=debrief_state,
+            first_name=first_name,
+        )
+
+        if isinstance(tutor_result, dict):
+            tutor_response = tutor_result.get('response', '')
+        else:
+            tutor_response = str(tutor_result)
+
+        return {
+            'tutor_response': tutor_response,
+            'display_update': {
+                'type': 'exam_done',
+                'title': f'{course_id} Exam Results',
+                'score': total_correct,
+                'total': total_q,
+                'score_pct': score_pct,
+                'chapter_stats': chapter_lines,
+            },
+            'progress_update': {},
+            'complexity_level': state['complexity_level'],
+            'first_name': first_name,
+            'action': None,
+            'mode': 'practice_exam',
+        }
+
+    # ------------------------------------------------------------------
+    # MC answer evaluation helper
+    # ------------------------------------------------------------------
+
+    def _evaluate_mc_answer(self, message, correct_index):
+        """
+        Returns True if the student's message matches the correct answer index.
+        Handles: 'A'/'a', '1'-'4', 'My answer is B', 'option 2', etc.
+        """
+        import re
+        msg = message.strip().lower()
+
+        # Direct letter: a b c d
+        letter_map = {'a': 0, 'b': 1, 'c': 2, 'd': 3}
+        if msg in letter_map:
+            return letter_map[msg] == correct_index
+
+        # 'my answer is b' or 'i choose c'
+        letter_match = re.search(r'\b([abcd])\b', msg)
+        if letter_match:
+            return letter_map.get(letter_match.group(1), -1) == correct_index
+
+        # 1-4 number
+        num_match = re.search(r'\b([1234])\b', msg)
+        if num_match:
+            return (int(num_match.group(1)) - 1) == correct_index
+
+        return False
 
     # ------------------------------------------------------------------
     # Intent classification

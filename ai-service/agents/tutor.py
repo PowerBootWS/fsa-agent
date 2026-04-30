@@ -14,14 +14,14 @@ PROFANITY_WORDS = [
     'dick', 'cock', 'pussy', 'cunt', 'whore', 'slut', 'retard'
 ]
 
-# Max chat history entries to include in each prompt (12 = 6 exchanges)
-MAX_HISTORY_ENTRIES = 12
+# Max chat history entries to include in each prompt (20 = 10 exchanges rolling window)
+MAX_HISTORY_ENTRIES = 20
 
 
 class TutorAgent:
     def __init__(self):
         self.api_key = os.getenv('OPENROUTER_API_KEY')
-        self.model = os.getenv('OPENROUTER_MODEL', 'anthropic/claude-sonnet-4-6-20250515')
+        self.model = os.getenv('OPENROUTER_MODEL', 'deepseek/deepseek-v4-flash')
         self.base_url = 'https://openrouter.ai/api/v1'
 
         if not self.api_key:
@@ -113,13 +113,29 @@ class TutorAgent:
             return "Something went wrong on my end. Please try again — I'll be right here."
 
     def _sanitize_response(self, text):
-        """Strip artefacts that the LLM occasionally appends (e.g. literal 'undefined')."""
+        """Strip artefacts that the LLM occasionally appends (e.g. literal 'undefined').
+        Also normalise LaTeX delimiters to KaTeX-compatible $...$ / $$...$$ format.
+        """
         import re
         # Remove any standalone occurrence of 'undefined', 'null', or 'None' that leaked
         # from template context — these appear as isolated words, often at the end.
         # Match them at end-of-string, or surrounded by whitespace/punctuation.
         text = re.sub(r'\bundefined\b', '', text)
         text = re.sub(r'\bnull\b', '', text)
+        # Normalise LaTeX delimiters: \[...\] → $$...$$ and \(...\) → $...$
+        # Some models use these despite being instructed to use $ notation.
+        text = re.sub(r'\\\[([\s\S]*?)\\\]', r'$$\1$$', text)
+        text = re.sub(r'\\\((.*?)\\\)', r'$\1$', text)
+        # Wrap bare LaTeX commands that appear outside any $ delimiter.
+        # Matches a \command{...} sequence (possibly chained: \frac{a}{b}) not already
+        # preceded by a $ on the same line.
+        text = re.sub(
+            r'(?<!\$)(\\(?:frac|sqrt|sum|int|prod|lim|infty|partial|cdot|times|div|pm|'
+            r'leq|geq|neq|approx|propto|Delta|alpha|beta|gamma|theta|lambda|mu|pi|sigma|omega)'
+            r'(?:\{[^}]*\})*)',
+            r'$\1$',
+            text
+        )
         # Collapse double spaces/newlines left by removal
         text = re.sub(r'  +', ' ', text)
         text = re.sub(r'\n{3,}', '\n\n', text)

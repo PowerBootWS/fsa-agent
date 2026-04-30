@@ -22,14 +22,27 @@ def build(lesson_context, progress, state, first_name=None):
     raw_name = first_name or state.get('first_name') or ''
     name = str(raw_name).strip() if raw_name and str(raw_name).strip() not in ('None', 'undefined', 'null') else 'there'
     activity = state.get('activity', 'greeting')
+
+    # Exam debrief uses its own pre-built prompt — return minimal identity + the prompt
+    if activity == 'exam_debrief':
+        debrief_prompt = state.get('exam_debrief_prompt', '')
+        return (
+            f"You are a warm, encouraging tutor for Power Engineering students in Canada. "
+            f"The student is named {name}.\n\n"
+            f"## YOUR TASK\n{debrief_prompt}\n\n"
+            "Keep your response to 5-8 sentences. Be specific about chapter names. "
+            "Use **bold** for chapter names. Do not use bullet points — write in natural prose. "
+            "End with an encouraging call to action."
+        )
     complexity_level = state.get('complexity_level', 3)
     questions_done = state.get('questions_done', 0)
     session_limit_reached = state.get('session_limit_reached', False)
     chat_history_len = len(state.get('chat_history', []))
-    near_context_limit = chat_history_len >= 10  # 5 exchanges = approaching 6-exchange cap
+    near_context_limit = chat_history_len >= 36  # 18 exchanges = approaching 20-exchange cap
 
     relevant_chunks = state.get('relevant_chunks') or []
 
+    current_question_difficulty = state.get('current_question_difficulty', None)
     awaiting_next_question = state.get('awaiting_next_question', False)
     is_resume = state.get('is_resume', False)
     # Only true when a question is ACTUALLY being sent to the display panel this turn.
@@ -41,7 +54,7 @@ def build(lesson_context, progress, state, first_name=None):
     sections = [
         _build_identity(name),
         _build_lesson_content(lesson_context, relevant_chunks),
-        _build_session_state(activity, complexity_level, questions_done, session_limit_reached, near_context_limit, progress, awaiting_next_question, is_resume, no_questions_available),
+        _build_session_state(activity, complexity_level, questions_done, session_limit_reached, near_context_limit, progress, awaiting_next_question, is_resume, no_questions_available, current_question_difficulty),
     ]
 
     if question_in_display:
@@ -111,7 +124,7 @@ def _format_chunks(chunks):
     return '\n\n---\n\n'.join(parts)
 
 
-def _build_session_state(activity, complexity_level, questions_done, session_limit_reached, near_context_limit, progress, awaiting_next_question=False, is_resume=False, no_questions_available=False):
+def _build_session_state(activity, complexity_level, questions_done, session_limit_reached, near_context_limit, progress, awaiting_next_question=False, is_resume=False, no_questions_available=False, current_question_difficulty=None):
     prior_session = ''
     if progress:
         prior_score = progress.get('score', 0)
@@ -130,6 +143,8 @@ def _build_session_state(activity, complexity_level, questions_done, session_lim
         'review_concepts': 'Review — student is reviewing the key concepts of this lesson',
         'free_discussion': 'Open discussion — student is discussing the topic freely',
         'chapter_quiz': 'Chapter quiz — student is doing the end-of-chapter assessment',
+        'exam_debrief': 'Exam debrief — generating end-of-exam performance summary',
+        'practice_exam': 'Practice exam — student is working through the adaptive practice exam',
     }
 
     activity_desc = activity_descriptions.get(activity, activity)
@@ -138,7 +153,7 @@ def _build_session_state(activity, complexity_level, questions_done, session_lim
     if no_questions_available:
         limit_note = '\nNO PRACTICE QUESTIONS AVAILABLE: Practice questions for this lesson have not been loaded yet. Do not offer or attempt to present a practice question. Instead, offer to walk through the key concepts, discuss the topic, or explain anything the student found interesting in the lesson.'
     elif session_limit_reached:
-        limit_note = '\nSESSION LIMIT: The student has completed their 2 practice questions for this objective. Do not offer more practice questions — instead offer to review concepts, discuss the topic, or try the chapter quiz.'
+        limit_note = '\nSESSION LIMIT: The student has worked through all 5 available practice questions for this objective — there are no more to offer. Let them know they\'ve covered everything available here, and encourage them to move on to the next objective or try the chapter quiz to reinforce what they\'ve learned.'
 
     context_note = ''
     if near_context_limit:
@@ -161,11 +176,22 @@ def _build_session_state(activity, complexity_level, questions_done, session_lim
             'Do not start from scratch — just pick up where the session was.'
         )
 
+    difficulty_note = ''
+    if current_question_difficulty is not None and activity in ('practice', 'staged_problem') and not awaiting_next_question:
+        d = int(current_question_difficulty)
+        if d <= 2:
+            difficulty_label = 'warm-up / introductory'
+        elif d == 3:
+            difficulty_label = 'moderately challenging'
+        else:
+            difficulty_label = 'exam-level / challenging'
+        difficulty_note = f'\nCURRENT QUESTION DIFFICULTY: {d}/5 ({difficulty_label}). When introducing this question, signal its difficulty naturally in one short phrase (e.g. "This is a good warm-up." / "This one\'s a bit more involved." / "This is the kind of thing you\'ll see on the exam.").'
+
     return f"""## CURRENT SESSION STATE
 Activity: {activity_desc}
 Complexity level: {complexity_level} / 5
 Questions completed this session: {questions_done}
-{prior_session}{limit_note}{context_note}{feedback_note}{resume_note}"""
+{prior_session}{limit_note}{context_note}{feedback_note}{resume_note}{difficulty_note}"""
 
 
 def _build_display_panel_note(activity, awaiting_next_question):
@@ -262,8 +288,9 @@ GREETING (when activity is 'greeting'):
 
 PRACTICE QUESTIONS:
 - Present ONE question at a time
+- When introducing a new question, briefly signal its difficulty in plain language using the CURRENT QUESTION DIFFICULTY note from session state — not a number, but something natural, e.g. "This is a good warm-up." / "This one's a bit more involved." / "This is exam-level — give it your best shot."
 - After each question and answer, check in: "Want to try another one, or would you rather talk through the concepts?"
-- Maximum 2 objective practice questions per session (enforced by orchestrator — session_limit_reached flag will be set)
+- Up to 5 objective practice questions are available per session. When all are done, the session_limit_reached flag will be set — tell the student they've worked through everything available and encourage them to move on or try the chapter quiz.
 
 STAGED PROBLEMS:
 - Present only the current step's prompt — nothing more
@@ -274,13 +301,17 @@ STAGED PROBLEMS:
 FEEDBACK:
 - Correct: Acknowledge specifically what they got right. Add a brief reinforcing note tied to the lesson content.
   Example: "Exactly right, {name}! The 0.005D term is the manufacturing tolerance — and as you can see in the formula, it's added on top of the pressure term, not multiplied. That's an important distinction for the exam."
-- Wrong: Do NOT give the answer. Ask a question that redirects their thinking.
-  Example: "Not quite — think about what the letter 'e' represents in the formula. The note in PG-27.4 is worth checking. Which of those options relates to manufacturing?"
-- Partially correct: Name what's right, then guide toward what's missing.
+- Wrong: NEVER say "wrong", "incorrect", "that's not right", or "you got it wrong". Use warm, redirecting language instead.
+  Examples: "You're close — let's think about this a bit differently.", "Good try! Here's something to consider:", "Almost there — think about what the letter 'e' represents in the formula.", "Not quite, but you're on the right track. The note in PG-27.4 is worth checking — which of those options relates to manufacturing?"
+  Do NOT give the answer away. Ask a guiding question that steers their thinking toward it.
+- Partially correct: Name what's right first, then gently guide toward what's missing.
+  Example: "You've got the right idea with the pressure term — now think about what gets added to account for manufacturing tolerances."
 
 LANGUAGE AND FORMAT:
 - Keep conversational turns to 2-4 sentences. Explanations may be longer when genuinely needed.
-- Use $...$ for inline math and $$...$$ for block math (these will be rendered by KaTeX)
+- ALL math expressions MUST be wrapped in delimiters — never write bare LaTeX commands in prose.
+  Inline: $\frac{{P_1}}{{T_1}} = \frac{{P_2}}{{T_2}}$   Block: $$\frac{{P_1}}{{T_1}} = \frac{{P_2}}{{T_2}}$$
+  Never use \(...\) or \[...\] — only $ and $$ delimiters are supported by the renderer.
 - Use **bold** for emphasis on key terms
 - Do not use numbered lists for activities or options — integrate them naturally into speech
 - Do not refer to yourself as "an AI" or use phrases like "As an AI language model..."

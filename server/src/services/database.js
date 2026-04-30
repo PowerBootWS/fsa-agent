@@ -130,6 +130,25 @@ async function saveChatHistory(userEmail, lessonId, messages) {
   return result.rows[0];
 }
 
+/**
+ * Fetch chapter-level accuracy weights for a user in a course.
+ * Returns array of { chapter_id, accuracy, total }
+ */
+async function getChapterWeights(userEmail, courseId) {
+  const result = await pool.query(
+    `SELECT chapter_id,
+            AVG(correct::int)::float AS accuracy,
+            COUNT(*)::int            AS total
+     FROM question_responses
+     WHERE user_email = $1
+       AND course_id  = $2
+       AND chapter_id IS NOT NULL
+     GROUP BY chapter_id`,
+    [userEmail, courseId]
+  );
+  return result.rows;
+}
+
 module.exports = {
   pool,
   getLesson,
@@ -139,4 +158,5 @@ module.exports = {
   updateUserProgress,
   upsertUser,
   saveChatHistory,
+  getChapterWeights,
 };

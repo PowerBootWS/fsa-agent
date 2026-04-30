@@ -431,6 +431,209 @@ class Researcher:
             print(f'Researcher.get_questions error: {e}')
             return []
 
+    def record_response(self, user_email, question_id, session_type,
+                        course_id, chapter_id, correct):
+        """
+        Persist a single question response for progress tracking.
+        Silently ignores errors (non-critical path).
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO question_responses
+                    (user_email, question_id, session_type, course_id, chapter_id, correct)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (user_email, question_id, session_type, course_id, chapter_id, bool(correct))
+            )
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f'Researcher.record_response error (non-fatal): {e}')
+
+    def get_chapter_weights(self, user_email, course_id):
+        """
+        Return per-chapter accuracy for a user in a course.
+        { chapter_id: {'accuracy': float, 'total': int} }
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT chapter_id,
+                       AVG(correct::int)::float AS accuracy,
+                       COUNT(*)::int             AS total
+                FROM question_responses
+                WHERE user_email = %s
+                  AND course_id  = %s
+                  AND chapter_id IS NOT NULL
+                GROUP BY chapter_id
+                """,
+                (user_email, course_id)
+            )
+            rows = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            return {r['chapter_id']: {'accuracy': r['accuracy'], 'total': r['total']} for r in rows}
+        except Exception as e:
+            print(f'Researcher.get_chapter_weights error: {e}')
+            return {}
+
+    def get_exam_questions(self, course_id, limit=50, weights=None, exclude_ids=None):
+        """
+        Fetch questions for the adaptive practice exam.
+        Draws from both objective_practice and chapter_quiz pools.
+        If weights provided: chapters with lower accuracy get proportionally more questions.
+        weights: { chapter_id: {'accuracy': float, 'total': int} }
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Get all distinct chapters for this course
+            cursor.execute(
+                """
+                SELECT DISTINCT chapter_id FROM questions
+                WHERE course_id = %s AND chapter_id IS NOT NULL
+                  AND options IS NOT NULL AND jsonb_array_length(options) > 0
+                ORDER BY chapter_id
+                """,
+                (course_id,)
+            )
+            chapters = [r['chapter_id'] for r in cursor.fetchall()]
+
+            if not chapters:
+                cursor.close()
+                conn.close()
+                return []
+
+            # Compute per-chapter allocation
+            allocations = self._compute_chapter_allocations(chapters, limit, weights)
+
+            all_questions = []
+            excluded = list(exclude_ids) if exclude_ids else []
+
+            for chapter_id, count in allocations.items():
+                if count <= 0:
+                    continue
+                ex_clause = ''
+                params = [course_id, chapter_id]
+                if excluded:
+                    placeholders = ','.join(['%s'] * len(excluded))
+                    ex_clause = f'AND id NOT IN ({placeholders})'
+                    params += excluded
+
+                params.append(count)
+                cursor.execute(
+                    f"""
+                    SELECT id, question_text, options, correct_answer, explanation,
+                           difficulty, topic, question_type, chapter_id, course_id
+                    FROM questions
+                    WHERE course_id = %s
+                      AND chapter_id = %s
+                      AND options IS NOT NULL
+                      AND jsonb_array_length(options) > 0
+                      {ex_clause}
+                    ORDER BY RANDOM()
+                    LIMIT %s
+                    """,
+                    params
+                )
+                rows = cursor.fetchall()
+                all_questions.extend(rows)
+                excluded += [r['id'] for r in rows]
+
+            cursor.close()
+            conn.close()
+
+            # Shuffle so chapter blocks aren't presented in order
+            import random
+            random.shuffle(all_questions)
+
+            return [
+                {
+                    'id': r['id'],
+                    'question_text': r['question_text'],
+                    'options': r['options'],
+                    'correct_answer': r['correct_answer'],
+                    'explanation': r['explanation'] or '',
+                    'difficulty': r['difficulty'],
+                    'topic': r['topic'] or '',
+                    'question_type': r['question_type'],
+                    'chapter_id': r['chapter_id'],
+                    'course_id': r['course_id'],
+                }
+                for r in all_questions
+            ]
+
+        except Exception as e:
+            print(f'Researcher.get_exam_questions error: {e}')
+            return []
+
+    def _compute_chapter_allocations(self, chapters, total, weights):
+        """
+        Distribute `total` questions across chapters.
+        Chapters with lower accuracy get more questions.
+        chapters without prior data get equal share.
+        Returns { chapter_id: count }
+        """
+        import math
+
+        if not weights:
+            # No prior data — uniform distribution
+            base = total // len(chapters)
+            remainder = total % len(chapters)
+            alloc = {c: base for c in chapters}
+            for i, c in enumerate(chapters):
+                if i < remainder:
+                    alloc[c] += 1
+            return alloc
+
+        # Weight = 1 - accuracy (so low accuracy → high weight)
+        # Chapters with no data get weight = 0.5 (middle of the road)
+        raw_weights = {}
+        for c in chapters:
+            if c in weights:
+                raw_weights[c] = 1.0 - weights[c]['accuracy']
+            else:
+                raw_weights[c] = 0.5  # unknown → neutral
+
+        total_weight = sum(raw_weights.values())
+        if total_weight == 0:
+            total_weight = 1.0
+
+        # Ensure each chapter gets at least 1 question, proportionally distribute rest
+        min_per_chapter = 1
+        reserved = min_per_chapter * len(chapters)
+        distributable = max(0, total - reserved)
+
+        alloc = {c: min_per_chapter for c in chapters}
+        for c in chapters:
+            extra = round(distributable * raw_weights[c] / total_weight)
+            alloc[c] += extra
+
+        # Adjust rounding errors
+        current_total = sum(alloc.values())
+        diff = total - current_total
+        if diff != 0:
+            # Add/remove from highest-weighted chapter
+            sorted_chapters = sorted(chapters, key=lambda c: raw_weights[c], reverse=True)
+            for c in sorted_chapters:
+                if diff == 0:
+                    break
+                if diff > 0:
+                    alloc[c] += 1
+                    diff -= 1
+                elif diff < 0 and alloc[c] > 1:
+                    alloc[c] -= 1
+                    diff += 1
+
+        return alloc
+
     def get_chapter_quiz_questions(self, chapter_id, limit=10):
         """
         Fetch randomized chapter quiz questions for the end-of-chapter assessment.
