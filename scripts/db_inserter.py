@@ -166,7 +166,7 @@ def insert_worked_problem(lesson_code, chapter_id, course_id, worked_problem, dr
         conn.close()
 
 
-def insert_question(lesson_code, chapter_id, course_id, q, dry_run=False):
+def insert_question(lesson_code, chapter_id, course_id, q, dry_run=False, standalone=True):
     """
     Insert a single AI-generated MCQ into the questions table.
 
@@ -185,6 +185,7 @@ def insert_question(lesson_code, chapter_id, course_id, q, dry_run=False):
             topic           str
             question_type   str        ('objective_practice' or 'chapter_quiz')
         dry_run: if True, print instead of executing
+        standalone: bool, whether the question is self-contained (default True)
 
     Returns:
         integer question id, or None on dry_run / skip
@@ -233,8 +234,8 @@ def insert_question(lesson_code, chapter_id, course_id, q, dry_run=False):
             INSERT INTO questions
                 (lesson_id, lesson_code, chapter_id, course_id,
                  question_text, options, correct_answer, explanation,
-                 difficulty, topic, question_type)
-            VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s)
+                 difficulty, topic, question_type, standalone)
+            VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
             (
@@ -246,6 +247,7 @@ def insert_question(lesson_code, chapter_id, course_id, q, dry_run=False):
                 difficulty,
                 topic,
                 question_type,
+                standalone,
             )
         )
         new_row = cur.fetchone()

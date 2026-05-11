@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: fsa-postgres
+    env_file: ../.env
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -18,6 +19,7 @@ services:
     build:
       context: .
       dockerfile: ./server/Dockerfile
+    env_file: ../.env
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -28,6 +30,8 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - PYTHON_SERVICE_URL=http://ai-service:5000
+      - GHL_API_KEY=${GHL_API_KEY}
+      - GHL_LOCATION_ID=${GHL_LOCATION_ID}
     depends_on:
       - ai-service
     networks:
@@ -39,6 +43,7 @@ services:
     build:
       context: ./ai-service
       dockerfile: Dockerfile
+    env_file: ../.env
     environment:
       - FLASK_ENV=production
       - PORT=5000
@@ -48,7 +53,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - OPENROUTER_MODEL=${OPENROUTER_MODEL}
+      - OPENROUTER_MODEL=google/gemini-3-flash-preview
     networks:
       - fsa-network
     restart: unless-stopped

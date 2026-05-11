@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-load_dotenv()
+load_dotenv("../../.env")
 
 app = Flask(__name__)
 CORS(app)
@@ -63,6 +63,24 @@ def get_context(lesson_id):
     """Get lesson context for debugging"""
     context = researcher.get_lesson_context(lesson_id)
     return jsonify(context)
+
+
+@app.route('/agent/demo/exam-debrief', methods=['POST'])
+def demo_seed_exam():
+    """
+    Seed in-memory orchestrator state for demo purposes.
+    Pre-populates a completed exam session so the next chat message
+    triggers the debrief immediately — no need to answer 50 questions.
+
+    Body: { "user": "demo@...", "lessonId": "2A1" }
+    """
+    data = request.json or {}
+    user = data.get('user')
+    lesson_id = data.get('lessonId')
+    if not user or not lesson_id:
+        return jsonify({'error': 'Missing user or lessonId'}), 400
+    result = orchestrator.seed_demo_exam(user, lesson_id, researcher)
+    return jsonify(result)
 
 
 if __name__ == '__main__':

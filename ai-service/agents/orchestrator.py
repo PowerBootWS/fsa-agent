@@ -289,6 +289,8 @@ class Orchestrator:
         activity = state.get('activity', 'greeting')
 
         if activity == 'greeting':
+            # Use LLM classifier only here — this is the one branch where we need to
+            # distinguish between practice / review / discussion mode selection.
             intent = self._classify_intent(message)
 
             if intent == INTENT_SELECT_PRACTICE:
@@ -309,7 +311,8 @@ class Orchestrator:
                 # Limit already enforced; tutor prompt handles the response
                 pass
             else:
-                intent = self._classify_intent(message)
+                # Keyword matching is sufficient here — we only need stop/answer/continue
+                intent = self._keyword_classify(message)
 
                 if intent == INTENT_STOP:
                     state['activity'] = 'greeting'
@@ -336,7 +339,7 @@ class Orchestrator:
                         display_update = self._load_next_question(state, lesson_context, researcher, display)
 
         elif activity == 'staged_problem':
-            intent = self._classify_intent(message)
+            intent = self._keyword_classify(message)
 
             if intent == INTENT_STOP:
                 state['activity'] = 'greeting'
@@ -346,7 +349,7 @@ class Orchestrator:
                 )
 
         elif activity == 'review_concepts':
-            intent = self._classify_intent(message)
+            intent = self._keyword_classify(message)
 
             if intent in (INTENT_CONTINUE, INTENT_SELECT_PRACTICE):
                 if intent == INTENT_SELECT_PRACTICE:
@@ -360,7 +363,7 @@ class Orchestrator:
                 state['activity'] = 'greeting'
 
         elif activity in ('free_discussion', 'chapter_quiz'):
-            intent = self._classify_intent(message)
+            intent = self._keyword_classify(message)
             if intent == INTENT_STOP:
                 state['activity'] = 'greeting'
 
@@ -795,6 +798,10 @@ class Orchestrator:
 
         # ---- Debrief phase ----
         if state.get('exam_done') or state.get('exam_phase') == 'debrief':
+            if self._is_exam_retry(message):
+                return self._reset_and_start_exam(
+                    state, user, course_id, first_name, researcher, display
+                )
             return self._generate_exam_debrief(
                 state, user, course_id, first_name, researcher, tutor, lesson_context, progress
             )
@@ -943,8 +950,10 @@ class Orchestrator:
             f"Chapters needing review: {weak_str}\n\n"
             f"Write a warm, concise debrief (5-8 sentences). Acknowledge their overall score. "
             f"Highlight 1-2 strong chapters by name. Clearly identify weak chapters and recommend "
-            f"going back to review those lessons before re-sitting the exam. "
-            f"Mention that their next exam attempt will be weighted toward their weak areas. "
+            f"going back to review those lessons. "
+            f"Mention that their next attempt will pull more questions from the chapters they missed. "
+            f"End by asking if they'd like to take another practice exam right now — "
+            f"they can just reply 'yes' or 'let's go' and you'll start a fresh one weighted to their weak spots. "
             f"Keep it encouraging and specific. Address the student as {first_name}."
         )
 
@@ -995,6 +1004,218 @@ class Orchestrator:
             'action': None,
             'mode': 'practice_exam',
         }
+
+    # ------------------------------------------------------------------
+    # Exam retry logic
+    # ------------------------------------------------------------------
+
+    def _is_exam_retry(self, message):
+        msg = message.strip().lower()
+        retry_keywords = [
+            'yes', 'yeah', 'yep', 'yup', 'sure', 'ok', 'okay',
+            'again', 'retry', 'another', 'one more', 'go again',
+            "let's go", 'lets go', 'ready', 'start', 'begin',
+            'please', 'do it', 'let\'s do it',
+        ]
+        return any(kw in msg for kw in retry_keywords)
+
+    def _reset_and_start_exam(self, state, user, course_id, first_name, researcher, display):
+        weights = researcher.get_chapter_weights(user, course_id)
+        qs = researcher.get_exam_questions(
+            course_id=course_id,
+            limit=PRACTICE_EXAM_QUESTION_COUNT,
+            weights=weights if weights else None,
+        )
+
+        if not qs:
+            return {
+                'tutor_response': (
+                    f"Sorry {first_name}, I couldn't load new exam questions for {course_id} right now. "
+                    "Please try again in a moment."
+                ),
+                'display_update': None,
+                'progress_update': {},
+                'complexity_level': state.get('complexity_level', 3),
+                'first_name': first_name,
+                'action': None,
+                'mode': 'practice_exam',
+            }
+
+        state['exam_questions'] = qs
+        state['exam_index'] = 0
+        state['exam_results'] = []
+        state['exam_phase'] = 'answering'
+        state['exam_done'] = False
+        state['exam_init_hello'] = True
+
+        display_update = self._build_exam_question_display(qs[0], 0, len(qs))
+        state['exam_index'] = 1
+
+        weak_text = ''
+        if weights:
+            weak_chapters = [cid for cid, w in weights.items() if w['accuracy'] < 0.6]
+            if weak_chapters:
+                weak_text = (
+                    f"This set is weighted toward **{', '.join(sorted(weak_chapters)[:3])}** "
+                    f"based on your last attempt. "
+                )
+
+        intro = (
+            f"Here we go, {first_name}! Fresh {course_id} practice exam — "
+            f"{weak_text}"
+            f"**{len(qs)} questions**, same deal: pick your answer for each one "
+            f"and I'll save the feedback for the end. Good luck!"
+        )
+
+        return {
+            'tutor_response': intro,
+            'display_update': display_update,
+            'progress_update': {},
+            'complexity_level': state.get('complexity_level', 3),
+            'first_name': first_name,
+            'action': None,
+            'mode': 'practice_exam',
+            'exam_progress': {'current': 1, 'total': len(qs)},
+        }
+
+    # ------------------------------------------------------------------
+    # Exam retry logic
+    # ------------------------------------------------------------------
+
+    def _is_exam_retry(self, message):
+        msg = message.strip().lower()
+        retry_keywords = [
+            'yes', 'yeah', 'yep', 'yup', 'sure', 'ok', 'okay',
+            'again', 'retry', 'another', 'one more', 'go again',
+            "let's go", 'lets go', 'ready', 'start', 'begin',
+            'please', 'do it', 'let\'s do it',
+        ]
+        return any(kw in msg for kw in retry_keywords)
+
+    def _reset_and_start_exam(self, state, user, course_id, first_name, researcher, display):
+        weights = researcher.get_chapter_weights(user, course_id)
+        qs = researcher.get_exam_questions(
+            course_id=course_id,
+            limit=PRACTICE_EXAM_QUESTION_COUNT,
+            weights=weights if weights else None,
+        )
+
+        if not qs:
+            return {
+                'tutor_response': (
+                    f"Sorry {first_name}, I couldn't load new exam questions for {course_id} right now. "
+                    "Please try again in a moment."
+                ),
+                'display_update': None,
+                'progress_update': {},
+                'complexity_level': state.get('complexity_level', 3),
+                'first_name': first_name,
+                'action': None,
+                'mode': 'practice_exam',
+            }
+
+        state['exam_questions'] = qs
+        state['exam_index'] = 0
+        state['exam_results'] = []
+        state['exam_phase'] = 'answering'
+        state['exam_done'] = False
+        state['exam_init_hello'] = True
+
+        display_update = self._build_exam_question_display(qs[0], 0, len(qs))
+        state['exam_index'] = 1
+
+        weak_text = ''
+        if weights:
+            weak_chapters = [cid for cid, w in weights.items() if w['accuracy'] < 0.6]
+            if weak_chapters:
+                weak_text = (
+                    f"This set is weighted toward **{', '.join(sorted(weak_chapters)[:3])}** "
+                    f"based on your last attempt. "
+                )
+
+        intro = (
+            f"Here we go, {first_name}! Fresh {course_id} practice exam — "
+            f"{weak_text}"
+            f"**{len(qs)} questions**, same deal: pick your answer for each one "
+            f"and I'll save the feedback for the end. Good luck!"
+        )
+
+        return {
+            'tutor_response': intro,
+            'display_update': display_update,
+            'progress_update': {},
+            'complexity_level': state.get('complexity_level', 3),
+            'first_name': first_name,
+            'action': None,
+            'mode': 'practice_exam',
+            'exam_progress': {'current': 1, 'total': len(qs)},
+        }
+
+    # ------------------------------------------------------------------
+    # Demo helpers
+    # ------------------------------------------------------------------
+
+    def seed_demo_exam(self, user, lesson_id, researcher):
+        """
+        Pre-seed orchestrator state for a demo: loads real exam questions and
+        marks them with a realistic 38/50 (76%) result pattern so that the very
+        next chat message triggers the debrief immediately.
+
+        Call this once via the /agent/demo/exam-debrief endpoint before opening
+        the exam URL in the browser.
+        """
+        state_key = f'{user}:{lesson_id}'
+        course_id = lesson_id
+
+        user_info = researcher.get_user_by_email(user)
+        first_name = user_info.get('first_name', 'Jordan')
+
+        questions = researcher.get_exam_questions(course_id=course_id, limit=PRACTICE_EXAM_QUESTION_COUNT)
+        if not questions:
+            return {'ok': False, 'error': f'No questions found for {course_id}'}
+
+        total = len(questions)
+
+        # Build a realistic result set: 76% correct spread across chapters.
+        # Mark the last question in each chapter group as incorrect so weak
+        # chapters are visible in the debrief table.
+        results = []
+        chapter_seen = {}
+        for i, q in enumerate(questions):
+            cid = q.get('chapter_id', 'Unknown')
+            chapter_seen[cid] = chapter_seen.get(cid, 0) + 1
+            # Mark roughly every 4th question wrong (gives ~75% overall)
+            correct = (i % 4 != 3)
+            results.append({'chapter_id': cid, 'question_id': q['id'], 'correct': correct})
+
+        self.conversation_state[state_key] = {
+            'user': user,
+            'lesson_id': lesson_id,
+            'mode': 'practice_exam',
+            'first_name': first_name,
+            'initialized': True,
+            'exchange_count': total,
+            'complexity_level': 3,
+            'activity': 'exam_debrief',
+            'chat_history': [],
+            'session_limit_reached': False,
+            'questions_done': 0,
+            'relevant_chunks': [],
+            'display_is_question': False,
+            'awaiting_next_question': False,
+            'is_resume': False,
+            'no_questions_available': False,
+            # Exam-specific state
+            'exam_questions': questions,
+            'exam_index': total,
+            'exam_results': results,
+            'exam_phase': 'debrief',
+            'exam_done': True,
+            'exam_init_hello': False,
+        }
+
+        correct_count = sum(1 for r in results if r['correct'])
+        return {'ok': True, 'total': total, 'correct': correct_count, 'state_key': state_key}
 
     # ------------------------------------------------------------------
     # MC answer evaluation helper

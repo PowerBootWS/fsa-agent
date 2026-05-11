@@ -350,8 +350,8 @@ body {
 }
 
 .message {
-  margin-bottom: 12px;
-  padding: 10px 14px;
+  margin-bottom: 6px;
+  padding: 7px 10px;
   border-radius: 8px;
   max-width: 80%;
 }
@@ -367,7 +367,7 @@ body {
 }
 
 .message-content {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 /* Thinking animation */
@@ -395,17 +395,17 @@ body {
 
 .chat-input {
   display: flex;
-  padding: 12px;
+  padding: 8px;
   border-top: 1px solid #e0e0e0;
   background: #fff;
 }
 
 .chat-input input {
   flex: 1;
-  padding: 10px 14px;
+  padding: 7px 10px;
   border: 1px solid #ddd;
   border-radius: 20px;
-  font-size: 14px;
+  font-size: 13px;
   outline: none;
 }
 
@@ -415,7 +415,7 @@ body {
 
 .chat-input button {
   margin-left: 10px;
-  padding: 10px 20px;
+  padding: 7px 14px;
   background: #2196f3;
   color: white;
   border: none;
@@ -691,11 +691,11 @@ body {
 .quizexam-chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 10px;
   background: #fafafa;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 /* Results panel */
@@ -743,6 +743,39 @@ body {
 .results-row--strong td { background: #f0fdf4; }
 .results-row--weak td   { background: #fff7f7; }
 .results-row--mid td    { background: #fffbeb; }
+
+.results-retry-block {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.results-retry-btn {
+  display: inline-block;
+  background: #1a56db;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 12px 28px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.results-retry-btn:hover:not(:disabled) {
+  background: #1447c0;
+}
+
+.results-retry-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.results-retry-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7a8d;
+}
 
 /* Mobile adjustments */
 @media (max-width: 600px) {
@@ -794,5 +827,336 @@ body {
 
   .message {
     max-width: 95%;
+  }
+}
+
+/* =========================================================
+   Diagnostic lead magnet flow
+   ========================================================= */
+
+.diagnostic-page {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 40px 16px;
+  background: #f0f4f8;
+  overflow-y: auto;
+}
+
+.diagnostic-card,
+.diagnostic-results-card {
+  background: #fff;
+  border: 1px solid #c8d8e8;
+  border-radius: 16px;
+  padding: 36px 32px;
+  max-width: 640px;
+  width: 100%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.diagnostic-badge {
+  display: inline-block;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+}
+
+.diagnostic-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #1a2e42;
+  margin-bottom: 12px;
+}
+
+.diagnostic-subtitle {
+  font-size: 15px;
+  color: #5a6c7d;
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+
+.diagnostic-count-options {
+  display: flex;
+  gap: 14px;
+  flex-direction: column;
+}
+
+.diagnostic-count-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 18px 22px;
+  background: #f8fafc;
+  border: 2px solid #d1dde8;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: left;
+  width: 100%;
+}
+.diagnostic-count-btn:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.diagnostic-count-num {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a2e42;
+}
+.diagnostic-count-label {
+  font-size: 13px;
+  color: #7a8fa6;
+  margin-top: 3px;
+}
+
+/* Signup form */
+.diagnostic-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.diagnostic-form input {
+  padding: 12px 16px;
+  border: 1.5px solid #d1dde8;
+  border-radius: 8px;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+.diagnostic-form input:focus {
+  border-color: #2563eb;
+}
+.diagnostic-error {
+  color: #dc2626;
+  font-size: 13px;
+}
+.diagnostic-submit-btn {
+  padding: 14px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-family: inherit;
+}
+.diagnostic-submit-btn:hover {
+  background: #1d4ed8;
+}
+.diagnostic-submit-btn:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+.diagnostic-fine-print {
+  font-size: 12px;
+  color: #9ba8b5;
+  text-align: center;
+  margin-top: 8px;
+}
+
+/* Loading */
+.diagnostic-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 16px;
+  color: #5a6c7d;
+}
+
+/* Quiz body */
+.diagnostic-quiz-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 20px;
+  background: #fafbfc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.diagnostic-quiz-body .quizexam-question-card {
+  max-width: 680px;
+  width: 100%;
+}
+
+/* Answer feedback option states */
+.quizexam-option.option-correct {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+.quizexam-option.option-wrong {
+  border-color: #dc2626;
+  background: #fff7f7;
+}
+.quizexam-option.option-dimmed {
+  opacity: 0.45;
+}
+.quizexam-option:disabled {
+  cursor: default;
+}
+
+/* Feedback row */
+.diagnostic-feedback {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.feedback-correct {
+  font-size: 15px;
+  font-weight: 700;
+  color: #16a34a;
+}
+.feedback-wrong {
+  font-size: 15px;
+  font-weight: 600;
+  color: #dc2626;
+}
+.diagnostic-next-btn {
+  padding: 10px 24px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-family: inherit;
+}
+.diagnostic-next-btn:hover {
+  background: #1d4ed8;
+}
+.diagnostic-finishing {
+  font-size: 13px;
+  color: #9ba8b5;
+  font-style: italic;
+}
+
+/* Results page */
+.diagnostic-results-page {
+  padding-top: 40px;
+}
+.diagnostic-overall-score {
+  font-size: 28px;
+  font-weight: 800;
+  color: #2563eb;
+  text-align: center;
+  margin: 8px 0 28px;
+}
+.diagnostic-section-heading {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2d4a6b;
+  margin: 24px 0 12px;
+}
+.diagnostic-scores-table {
+  margin-bottom: 8px;
+}
+.diagnostic-attack-desc {
+  font-size: 13px;
+  color: #7a8fa6;
+  margin-bottom: 12px;
+}
+.diagnostic-attack-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.diagnostic-attack-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1px solid #d1dde8;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.diagnostic-attack-item.attack-item-warning {
+  background: #fff7f0;
+  border-color: #fed7aa;
+}
+.attack-rank {
+  font-weight: 700;
+  color: #2563eb;
+  min-width: 20px;
+}
+.attack-paper {
+  font-weight: 700;
+  color: #1a2e42;
+}
+.attack-pct {
+  color: #5a6c7d;
+  margin-left: auto;
+}
+.attack-flag {
+  font-size: 11px;
+  background: #fff0e0;
+  color: #c45e08;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* CTA block */
+.diagnostic-cta-block {
+  margin-top: 32px;
+  padding: 24px;
+  background: #f0f7ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  text-align: center;
+}
+.diagnostic-cta-block p {
+  font-size: 15px;
+  color: #1e3a5f;
+  margin-bottom: 16px;
+}
+.diagnostic-cta-btn {
+  display: inline-block;
+  padding: 14px 32px;
+  background: #2563eb;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+.diagnostic-cta-btn:hover {
+  background: #1d4ed8;
+}
+.diagnostic-cta-fine {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 10px;
+}
+
+@media (max-width: 600px) {
+  .diagnostic-card,
+  .diagnostic-results-card {
+    padding: 24px 18px;
+  }
+  .diagnostic-title {
+    font-size: 22px;
+  }
+  .attack-flag {
+    display: none;
   }
 }

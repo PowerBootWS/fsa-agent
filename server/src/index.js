@@ -55,6 +55,7 @@ const progressRouter = require('./routes/progress');
 const chatHistoryRouter = require('./routes/chat-history');
 const enrollRouter = require('./routes/enroll');
 const responsesRouter = require('./routes/responses');
+const demoRouter = require('./routes/demo');
 
 app.use('/api/validate', validateRouter);
 app.use('/api/lesson', lessonRouter);
@@ -63,13 +64,17 @@ app.use('/api/progress', progressRouter);
 app.use('/api/chat-history', chatHistoryRouter);
 app.use('/api/enroll', enrollRouter);
 app.use('/api/responses', responsesRouter);
+app.use('/api/demo', demoRouter);
+
+const diagnosticRouter = require('./routes/diagnostic');
+app.use('/api/diagnostic', diagnosticRouter);
 
 // Serve React app from client build
 app.use(express.static(path.join(__dirname, '../client/build')));
 
 // Handle React routing - return index.html for all non-API routes
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../client/build/index.html'));
+  res.sendFile(path.join(__dirname, '../client/build/index.html'));
 });
 
 // Error handler

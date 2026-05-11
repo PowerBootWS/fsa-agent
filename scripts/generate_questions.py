@@ -51,7 +51,7 @@ PROJECT_DIR = SCRIPT_DIR.parent
 AGGREGATED_PATH = PROJECT_DIR / "docs" / "source" / "lesson_content_aggregated.json"
 EXAM_SAMPLES_DIR = PROJECT_DIR / "docs" / "source" / "exam_samples"
 ERROR_LOG = SCRIPT_DIR / "generation_errors.log"
-DOTENV_PATH = PROJECT_DIR / ".env"
+DOTENV_PATH = PROJECT_DIR.parent / ".env"
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
@@ -171,7 +171,12 @@ def build_system_prompt(paper: str, style_guides: dict[str, str]) -> str:
         "You are an expert exam question writer for the Second Class Power Engineering "
         "certification program in Canada (ABSA / BC Safety Authority).\n\n"
         "Your task is to write multiple-choice questions strictly grounded in the lesson "
-        "content provided. Do not introduce concepts not covered in the lesson.\n"
+        "content provided. Do not introduce concepts not covered in the lesson.\n\n"
+        "CRITICAL: Write questions that work as stand-alone practice exam questions. "
+        "Students may not have seen the lesson. Do NOT reference 'the lesson', "
+        "'this lesson', 'as shown in the lesson', 'in the video', 'in the transcript', "
+        "or equation numbers (e.g., 'Equation 1.1') without providing the formula text. "
+        "Every question must be fully answerable from the question text and options alone.\n"
         f"{style_block}\n"
         f"{DISTRACTOR_RULES}\n"
         "Output ONLY a valid JSON array — no markdown fences, no preamble, no trailing text.\n"

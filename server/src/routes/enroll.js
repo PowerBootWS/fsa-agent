@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../services/database');
+const ghl = require('../services/gohighlevel');
 
 /**
  * POST /api/enroll
@@ -38,6 +39,14 @@ router.post('/', async (req, res) => {
 
   try {
     const { user, created } = await db.upsertUser({ email, first_name, last_name });
+
+    const tags = req.body.tags || [];
+
+    // Fire-and-forget: sync contact to GoHighLevel
+    ghl.upsertContact({ email, firstName: first_name, tags }).catch(err => {
+      console.error('GHL upsert error (non-fatal):', err.message);
+    });
+
     return res.status(created ? 201 : 200).json({ success: true, user });
   } catch (err) {
     console.error('Error in /api/enroll:', err);

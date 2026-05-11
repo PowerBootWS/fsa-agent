@@ -383,13 +383,17 @@ class Researcher:
             else:
                 lesson_filter = 'lesson_id = %s'
 
+            # Question bank starts at difficulty 2; clamp so complexity_level=1
+            # doesn't produce an empty result set.
+            effective_difficulty = max(complexity_level, 2)
+
             exclude_clause = ''
-            params = [str(lesson_id), complexity_level, question_type, limit]
+            params = [str(lesson_id), effective_difficulty, question_type, limit]
 
             if exclude_ids:
                 placeholders = ','.join(['%s'] * len(exclude_ids))
                 exclude_clause = f'AND id NOT IN ({placeholders})'
-                params = [str(lesson_id), complexity_level, question_type] + list(exclude_ids) + [limit]
+                params = [str(lesson_id), effective_difficulty, question_type] + list(exclude_ids) + [limit]
 
             cursor.execute(
                 f"""
@@ -499,6 +503,7 @@ class Researcher:
                 """
                 SELECT DISTINCT chapter_id FROM questions
                 WHERE course_id = %s AND chapter_id IS NOT NULL
+                  AND standalone = TRUE
                   AND options IS NOT NULL AND jsonb_array_length(options) > 0
                 ORDER BY chapter_id
                 """,
@@ -535,6 +540,7 @@ class Researcher:
                     FROM questions
                     WHERE course_id = %s
                       AND chapter_id = %s
+                      AND standalone = TRUE
                       AND options IS NOT NULL
                       AND jsonb_array_length(options) > 0
                       {ex_clause}

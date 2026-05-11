@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS questions (
     question_type  VARCHAR(30) NOT NULL DEFAULT 'objective_practice'
                      CHECK (question_type IN ('objective_practice', 'chapter_quiz')),
     step_data      JSONB,                      -- For staged multi-step problems
+    lesson_code    VARCHAR(20),               -- Lesson code key (e.g. '2B1-3-2'), used for chunk-based retrieval
+    standalone     BOOLEAN NOT NULL DEFAULT TRUE, -- TRUE = question is self-contained (eligible for diagnostic/exam)
     created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -100,6 +102,8 @@ CREATE INDEX IF NOT EXISTS idx_questions_lesson        ON questions(lesson_id);
 CREATE INDEX IF NOT EXISTS idx_questions_chapter       ON questions(chapter_id);
 CREATE INDEX IF NOT EXISTS idx_questions_type          ON questions(question_type);
 CREATE INDEX IF NOT EXISTS idx_questions_difficulty    ON questions(difficulty);
+CREATE INDEX IF NOT EXISTS idx_questions_standalone    ON questions(standalone);
+CREATE INDEX IF NOT EXISTS idx_questions_code          ON questions(lesson_code);
 
 -- ============================================================
 -- Sample data

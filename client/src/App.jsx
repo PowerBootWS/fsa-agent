@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -33,6 +33,22 @@ function sanitizeText(text) {
     .replace(/\bnull\b/g, '')
     .replace(/  +/g, ' ')
     .trim();
+}
+
+function ThinkingDots() {
+  return (
+    <>
+      <span className="thinking-dot"></span>
+      <span className="thinking-dot"></span>
+      <span className="thinking-dot"></span>
+    </>
+  );
+}
+
+function readinessInfo(pct) {
+  if (pct >= 70) return { cls: 'results-row--strong', label: 'Strong' };
+  if (pct >= 40) return { cls: 'results-row--mid',    label: 'Building' };
+  return              { cls: 'results-row--weak',   label: 'Needs Foundation' };
 }
 
 // ---------------------------------------------------------------------------
@@ -82,6 +98,14 @@ function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const modeParam = params.get('mode');
+
+    if (modeParam === 'diagnostic') {
+      setMode('diagnostic');
+      setLoading(false);
+      return;
+    }
+
     const userEmail = params.get('user');
     const lessonParam = params.get('lesson');
 
@@ -120,6 +144,17 @@ function App() {
 
   if (loading) return <div className="loading">Loading…</div>;
   if (error)   return <div className="error">{error}</div>;
+
+  // Diagnostic lead magnet mode
+  if (mode === 'diagnostic') {
+    return (
+      <ErrorBoundary>
+        <div className="app-container app-fullpage">
+          <DiagnosticFlow />
+        </div>
+      </ErrorBoundary>
+    );
+  }
 
   // Quiz and exam modes: no tabs, full page
   if (mode === 'chapter_quiz' || mode === 'practice_exam') {
@@ -229,15 +264,13 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState })
   const isDone = displayContent?.type === 'exam_done' || displayContent?.type === 'quiz_done';
 
   const sendAnswer = (answer) => {
-    // During a practice exam (before results), suppress chat bubbles entirely —
-    // no "My answer is X" from the user, no thinking dots. The question panel
-    // advances on its own. Dialogue resumes once the exam is done.
-    const suppressChat = isExam && !isDone;
+    const isLastQuestion = isExam && !isDone && examProgress && examProgress.current === examProgress.total;
+    const suppressChat = isExam && !isDone && !isLastQuestion;
 
     if (!suppressChat) {
       setChatState(prev => ({
         ...prev,
-        messages: [...prev.messages, { role: 'user', content: answer }, { role: 'tutor', content: '...thinking...' }],
+        messages: [...prev.messages, { role: 'user', content: answer }, { role: 'tutor', content: isLastQuestion ? 'Compiling results…' : '...thinking...' }],
       }));
     }
 
@@ -316,6 +349,320 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState })
   );
 }
 
+// ---------------------------------------------------------------------------
+// Diagnostic lead magnet flow
+// ---------------------------------------------------------------------------
+
+function DiagnosticFlow() {
+  const [phase, setPhase] = useState('intro');
+  const [quizCount, setQuizCount] = useState(30);
+  const [user, setUser] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [results, setResults] = useState(null);
+  const [loadError, setLoadError] = useState(null);
+
+  const handleCountSelect = (count) => {
+    setQuizCount(count);
+    setPhase('signup');
+  };
+
+  const handleSignup = async ({ email, first_name }) => {
+    setUser({ email, first_name });
+    setPhase('loading');
+
+    const [, questionsRes] = await Promise.all([
+      fetch('/api/enroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, first_name, tags: ["Paper_Planner"] }),
+      }),
+      fetch(`/api/diagnostic/questions?count=${quizCount}`),
+    ]);
+
+    if (!questionsRes.ok) throw new Error('Failed to load questions');
+    const data = await questionsRes.json();
+    if (!data.length) throw new Error('No questions available');
+    setQuestions(data);
+    setPhase('quiz');
+  };
+
+  const handleQuizComplete = async (finalResponses) => {
+    try {
+      const res = await fetch('/api/diagnostic/results', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_email: user.email, responses: finalResponses }),
+      });
+      const data = await res.json();
+      setResults(data);
+      setPhase('results');
+    } catch (err) {
+      setLoadError('Something went wrong calculating your results. Please try again.');
+    }
+  };
+
+  if (loadError) {
+    return (
+      <div className="diagnostic-page">
+        <div className="diagnostic-card">
+          <p className="diagnostic-error">{loadError}</p>
+          <button className="diagnostic-submit-btn" onClick={() => window.location.reload()}>
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === 'intro')   return <DiagnosticIntro onSelectCount={handleCountSelect} />;
+  if (phase === 'signup')  return <DiagnosticSignup quizCount={quizCount} onSubmit={handleSignup} />;
+  if (phase === 'loading') return <div className="diagnostic-loading">Preparing your diagnostic…</div>;
+  if (phase === 'quiz')    return <DiagnosticQuiz questions={questions} onComplete={handleQuizComplete} />;
+  if (phase === 'results') return <DiagnosticResults results={results} firstName={user?.first_name} />;
+  return null;
+}
+
+function DiagnosticIntro({ onSelectCount }) {
+  return (
+    <div className="diagnostic-page">
+      <div className="diagnostic-card">
+        <div className="diagnostic-badge">Free — No Credit Card Required</div>
+        <h1 className="diagnostic-title">Paper Planner Diagnostic</h1>
+        <p className="diagnostic-subtitle">
+          Not sure which 2nd Class papers to tackle first? Answer questions from all six
+          papers — we'll score your readiness and give you a personalized attack order.
+        </p>
+        <div className="diagnostic-count-options">
+          <button className="diagnostic-count-btn" onClick={() => onSelectCount(30)}>
+            <span className="diagnostic-count-num">30 Questions</span>
+            <span className="diagnostic-count-label">Quick — 5 per paper · ~15 minutes</span>
+          </button>
+          <button className="diagnostic-count-btn" onClick={() => onSelectCount(60)}>
+            <span className="diagnostic-count-num">60 Questions</span>
+            <span className="diagnostic-count-label">Deep — 10 per paper · ~30 minutes</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DiagnosticSignup({ quizCount, onSubmit }) {
+  const [firstName, setFirstName] = useState('');
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!firstName.trim() || !email.trim()) {
+      setError('Please fill in both fields.');
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onSubmit({ email: email.trim().toLowerCase(), first_name: firstName.trim() });
+    } catch (err) {
+      setError('Something went wrong. Please try again.');
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="diagnostic-page">
+      <div className="diagnostic-card">
+        <h2 className="diagnostic-title">Create Your Free Account</h2>
+        <p className="diagnostic-subtitle">
+          Your results will be saved and you'll get a personalized paper order recommendation.
+          {quizCount === 60
+            ? ' Deep diagnostic: 60 questions, 10 per paper.'
+            : ' Quick diagnostic: 30 questions, 5 per paper.'}
+        </p>
+        <form className="diagnostic-form" onSubmit={handleSubmit}>
+          <input
+            type="text"
+            placeholder="First name"
+            value={firstName}
+            onChange={e => setFirstName(e.target.value)}
+            required
+          />
+          <input
+            type="email"
+            placeholder="Email address"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+          />
+          {error && <div className="diagnostic-error">{error}</div>}
+          <button type="submit" className="diagnostic-submit-btn" disabled={submitting}>
+            {submitting ? 'Starting…' : 'Start Diagnostic →'}
+          </button>
+        </form>
+        <p className="diagnostic-fine-print">No spam. No credit card. Cancel anytime.</p>
+      </div>
+    </div>
+  );
+}
+
+const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E'];
+
+function DiagnosticQuiz({ questions, onComplete }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(null);
+  const [allResponses, setAllResponses] = useState([]);
+
+  const question = questions[currentIndex];
+  const total = questions.length;
+  const isAnswered = selectedIndex !== null;
+  const isLast = currentIndex === total - 1;
+
+  const { posInPaper, perPaper } = useMemo(() => {
+    const pq = questions.filter(q => q.course_id === question.course_id);
+    return { posInPaper: pq.findIndex(q => q.id === question.id) + 1, perPaper: pq.length };
+  }, [questions, currentIndex]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Trigger completion after showing feedback on the last question
+  useEffect(() => {
+    if (!isLast || !isAnswered) return;
+    const id = setTimeout(() => onComplete(allResponses), 1400);
+    return () => clearTimeout(id);
+  }, [isLast, isAnswered]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSelect = (idx) => {
+    if (isAnswered) return;
+    setSelectedIndex(idx);
+    setAllResponses(prev => [...prev, { question_id: question.id, selected_index: idx }]);
+  };
+
+  const handleNext = () => {
+    setSelectedIndex(null);
+    setCurrentIndex(i => i + 1);
+  };
+
+  return (
+    <div className="quizexam-container">
+      <div className="quizexam-header">
+        <span className="quizexam-title">
+          Paper {question.course_id} — Question {posInPaper} of {perPaper}
+        </span>
+        <ExamProgressBar current={currentIndex + 1} total={total} />
+      </div>
+      <div className="diagnostic-quiz-body">
+        <div className="quizexam-question-card">
+          <div className="quizexam-question-text">
+            <MathContent text={question.question_text} />
+          </div>
+          <div className="quizexam-options">
+            {question.options.map((optText, idx) => {
+              let cls = 'quizexam-option';
+              if (isAnswered) {
+                if (idx === question.correct_answer) cls += ' option-correct';
+                else if (idx === selectedIndex) cls += ' option-wrong';
+                else cls += ' option-dimmed';
+              }
+              return (
+                <button
+                  key={idx}
+                  className={cls}
+                  onClick={() => handleSelect(idx)}
+                  disabled={isAnswered}
+                >
+                  <span className="quizexam-option-label">{OPTION_LABELS[idx]}.</span>
+                  <span className="quizexam-option-text"><MathContent text={optText} /></span>
+                </button>
+              );
+            })}
+          </div>
+          {isAnswered && (
+            <div className="diagnostic-feedback">
+              {selectedIndex === question.correct_answer
+                ? <span className="feedback-correct">Correct!</span>
+                : <span className="feedback-wrong">
+                    Incorrect — the correct answer was {OPTION_LABELS[question.correct_answer]}.
+                  </span>
+              }
+              {isLast
+                ? <div className="diagnostic-finishing">Calculating your results…</div>
+                : <button className="diagnostic-next-btn" onClick={handleNext}>Next →</button>
+              }
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DiagnosticResults({ results, firstName }) {
+  const { paper_scores, attack_order, total_correct, total_questions } = results;
+  const overallPct = Math.round((total_correct / total_questions) * 100);
+
+  return (
+    <div className="diagnostic-page diagnostic-results-page">
+      <div className="diagnostic-results-card">
+        <h1 className="diagnostic-title">
+          {firstName ? `${firstName}'s` : 'Your'} Paper Diagnostic Results
+        </h1>
+        <div className="diagnostic-overall-score">
+          {total_correct}/{total_questions} overall ({overallPct}%)
+        </div>
+
+        <h2 className="diagnostic-section-heading">Scores by Paper</h2>
+        <table className="results-table diagnostic-scores-table">
+          <thead>
+            <tr><th>Paper</th><th>Score</th><th>Readiness</th></tr>
+          </thead>
+          <tbody>
+            {paper_scores.map(p => {
+              const { cls, label } = readinessInfo(p.pct);
+              return (
+                <tr key={p.course_id} className={cls}>
+                  <td>{p.course_id}</td>
+                  <td>{p.correct}/{p.total} ({p.pct}%)</td>
+                  <td>{label}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <h2 className="diagnostic-section-heading">Recommended Attack Order</h2>
+        <p className="diagnostic-attack-desc">
+          Start with your strongest papers to build momentum, then tackle those needing more foundation work.
+        </p>
+        <ol className="diagnostic-attack-list">
+          {attack_order.map((p, i) => (
+            <li
+              key={p.course_id}
+              className={`diagnostic-attack-item${p.flag === 'needs_foundation' ? ' attack-item-warning' : ''}`}
+            >
+              <span className="attack-rank">{i + 1}.</span>
+              <span className="attack-paper">{p.course_id}</span>
+              <span className="attack-pct">{p.pct}%</span>
+              {p.flag === 'needs_foundation' && (
+                <span className="attack-flag">Foundation work recommended</span>
+              )}
+            </li>
+          ))}
+        </ol>
+
+        <div className="diagnostic-cta-block">
+          <p>Ready to close the gaps? Full Steam Ahead covers all six papers with step-by-step coaching and AI tutoring.</p>
+          <a href="https://enrollment.fullsteamahead.ca" className="diagnostic-cta-btn">
+            Start Your Subscription →
+          </a>
+          <p className="diagnostic-cta-fine">$149/month — all 6 papers — cancel anytime</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Exam progress bar
+// ---------------------------------------------------------------------------
+
 function ExamProgressBar({ current, total, correct }) {
   const pct = Math.round((current / total) * 100);
   return (
@@ -346,7 +693,7 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode }) {
 
   // Done screen — show results table
   if (type === 'exam_done' || type === 'quiz_done') {
-    return <ResultsPanel displayContent={displayContent} isExam={isExam} />;
+    return <ResultsPanel displayContent={displayContent} isExam={isExam} onRetry={isExam ? () => onAnswer('yes') : null} />;
   }
 
   // Question (quiz or exam)
@@ -395,9 +742,15 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode }) {
   return null;
 }
 
-function ResultsPanel({ displayContent, isExam }) {
+function ResultsPanel({ displayContent, isExam, onRetry }) {
   const { score, total, score_pct, chapter_stats } = displayContent;
   const scoreColor = score_pct >= 75 ? '#16a34a' : score_pct >= 55 ? '#d97706' : '#dc2626';
+  const [retrying, setRetrying] = React.useState(false);
+
+  const handleRetry = () => {
+    setRetrying(true);
+    onRetry();
+  };
 
   return (
     <div className="results-panel">
@@ -424,6 +777,21 @@ function ResultsPanel({ displayContent, isExam }) {
             ))}
           </tbody>
         </table>
+      )}
+
+      {onRetry && (
+        <div className="results-retry-block">
+          <button
+            className="results-retry-btn"
+            onClick={handleRetry}
+            disabled={retrying}
+          >
+            {retrying ? 'Loading next exam…' : 'Retake Exam (Adaptive)'}
+          </button>
+          <p className="results-retry-hint">
+            Your next exam will pull more questions from chapters you struggled with.
+          </p>
+        </div>
       )}
     </div>
   );
@@ -490,12 +858,15 @@ function QuizExamChatSection({ messages, setMessages, user, lessonId, setChatSta
       <div className="quizexam-chat-messages" ref={messagesEndRef}>
         {allMessages.map((msg, idx) => {
           const isLatest = msg.role === 'tutor' && msg.content !== '...thinking...' && idx === allMessages.length - 1;
+          const isThinking = msg.content === '...thinking...';
           return (
             <div key={idx} className={`message ${msg.role}`}>
-              <div className={`message-content ${msg.content === '...thinking...' ? 'thinking' : ''}`}>
-                {msg.role === 'tutor'
-                  ? <TutorMessage content={msg.content} animate={isLatest} />
-                  : <span>{msg.content}</span>
+              <div className={`message-content ${isThinking ? 'thinking' : ''}`}>
+                {isThinking
+                  ? <ThinkingDots />
+                  : msg.role === 'tutor'
+                    ? <TutorMessage content={msg.content} animate={isLatest} />
+                    : <span>{msg.content}</span>
                 }
               </div>
             </div>
@@ -587,7 +958,10 @@ function LessonView({ lesson, user, lessonId, chatState, setChatState, layoutMod
         .then(data => {
           setChatState(prev => ({
             ...prev,
-            messages: [{ role: 'tutor', content: extractResponse(data.tutor_response) }],
+            // Only set the greeting if the user hasn't already started chatting
+            messages: prev.messages.length === 0
+              ? [{ role: 'tutor', content: extractResponse(data.tutor_response) }]
+              : prev.messages,
             displayContent: data.display_update ?? prev.displayContent,
           }));
         })
@@ -798,13 +1172,7 @@ function TutorMessage({ content, animate = false }) {
   }, [safeContent, animate]);
 
   if (safeContent === '...thinking...') {
-    return (
-      <div className="thinking-dots">
-        <span className="thinking-dot"></span>
-        <span className="thinking-dot"></span>
-        <span className="thinking-dot"></span>
-      </div>
-    );
+    return <div className="thinking-dots"><ThinkingDots /></div>;
   }
 
   return (
@@ -889,12 +1257,15 @@ function ChatSection({ user, lessonId, messages, setMessages, setDisplayContent 
         {displayMessages.map((msg, idx) => {
           const globalIdx = showHistory ? idx : allMessages.length - displayMessages.length + idx;
           const isLatestTutor = msg.role === 'tutor' && msg.content !== '...thinking...' && globalIdx === allMessages.length - 1;
+          const isThinking = msg.content === '...thinking...';
           return (
             <div key={globalIdx} className={`message ${msg.role}`}>
-              <div className={`message-content ${msg.content === '...thinking...' ? 'thinking' : ''}`}>
-                {msg.role === 'tutor'
-                  ? <TutorMessage content={msg.content} animate={isLatestTutor} />
-                  : <span>{msg.content}</span>
+              <div className={`message-content ${isThinking ? 'thinking' : ''}`}>
+                {isThinking
+                  ? <ThinkingDots />
+                  : msg.role === 'tutor'
+                    ? <TutorMessage content={msg.content} animate={isLatestTutor} />
+                    : <span>{msg.content}</span>
                 }
               </div>
             </div>
