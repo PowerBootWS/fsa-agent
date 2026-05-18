@@ -23,10 +23,19 @@ Not `localhost` or container IPs.
 
 ## Docker Compose
 
-- `docker compose build <service>` then `docker compose up -d <service>` to deploy changes.
 - Both `api` and `ai-service` are built images (not bind-mounted volumes), so any code change requires a rebuild.
-- Python AI service: `docker compose build ai-service && docker compose up -d ai-service`
-- Node API + React client: build React first (`cd client && npm run build`), then `docker compose build api && docker compose up -d api`
+- **Always pass `--env-file /home/debian/projects/fsa/.env`** to every `docker compose` command. The compose file uses `${POSTGRES_DB}` etc. in the `environment:` section, which overrides `env_file:` — without this flag those vars resolve to blank and DB connections fail.
+- Python AI service:
+  ```
+  docker compose --env-file /home/debian/projects/fsa/.env build ai-service && \
+  docker compose --env-file /home/debian/projects/fsa/.env up -d ai-service
+  ```
+- Node API + React client: build React first, then deploy:
+  ```
+  cd client && npm run build && cd .. && \
+  docker compose --env-file /home/debian/projects/fsa/.env build api && \
+  docker compose --env-file /home/debian/projects/fsa/.env up -d api
+  ```
 
 ## Database
 
