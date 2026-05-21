@@ -680,6 +680,40 @@ class Researcher:
             print(f'Researcher.get_chapter_quiz_questions error: {e}')
             return []
 
+    def get_questions_by_ids(self, ids):
+        """
+        Fetch lesson_code, topic, explanation for a list of question IDs.
+        Fallback used when exam_results are missing enrichment fields.
+        Returns dict keyed by question id: {id: {lesson_code, topic, explanation}}
+        """
+        if not ids:
+            return {}
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, lesson_code, topic, explanation
+                FROM questions
+                WHERE id = ANY(%s)
+                """,
+                (list(ids),)
+            )
+            rows = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            return {
+                row['id']: {
+                    'lesson_code': row['lesson_code'] or '',
+                    'topic': row['topic'] or '',
+                    'explanation': row['explanation'] or '',
+                }
+                for row in rows
+            }
+        except Exception as e:
+            print(f'Researcher.get_questions_by_ids error: {e}')
+            return {}
+
     # ------------------------------------------------------------------
     # Key point extraction (used for initial display)
     # ------------------------------------------------------------------
