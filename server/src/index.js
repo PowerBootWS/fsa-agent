@@ -69,6 +69,9 @@ app.use('/api/demo', demoRouter);
 const diagnosticRouter = require('./routes/diagnostic');
 app.use('/api/diagnostic', diagnosticRouter);
 
+const examRouter = require('./routes/exam');
+app.use('/api/exam', examRouter);
+
 // Serve React app from client build
 app.use(express.static(path.join(__dirname, '../client/build')));
 
