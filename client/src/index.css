@@ -1160,3 +1160,14 @@ body {
     display: none;
   }
 }
+
+/* ── Countdown Timer ──────────────────────────────────────── */
+.exam-timer {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.03em;
+  color: #374151;
+}
+.exam-timer--warn { color: #d97706; }
+.exam-timer--over { color: #dc2626; }
