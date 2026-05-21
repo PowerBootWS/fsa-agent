@@ -51,7 +51,7 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def process(self, user, lesson_id, message, lesson_context, progress,
-                tutor, display, researcher):
+                tutor, display, researcher, exam_config=None):
         """
         Main entry point — coordinates the full agent pipeline.
 
