@@ -833,6 +833,10 @@ class Orchestrator:
                 'chapter_id': prev_q['chapter_id'],
                 'question_id': prev_q['id'],
                 'correct': correct,
+                # Objective enrichment — already in memory, needed for debrief
+                'lesson_code': prev_q.get('lesson_code', ''),
+                'topic': prev_q.get('topic', ''),
+                'explanation': prev_q.get('explanation', ''),
             })
             researcher.record_response(
                 user_email=user,
