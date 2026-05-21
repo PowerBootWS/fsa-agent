@@ -1279,3 +1279,87 @@ body {
   color: #374151;
 }
 .lobby-chapter-btn:hover { border-color: #6366f1; background: #eef2ff; color: #4f46e5; }
+
+/* ── Teaching Notes ───────────────────────────────────────── */
+.teaching-notes { margin-top: 1.5rem; }
+.teaching-notes-heading {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 0.75rem;
+}
+.teaching-card {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+}
+.teaching-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.teaching-card-location {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: #92400e;
+}
+.teaching-card-topic {
+  font-size: 0.8rem;
+  color: #b45309;
+  background: #fef3c7;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.teaching-card-tip {
+  font-size: 0.9rem;
+  color: #374151;
+  line-height: 1.6;
+  margin: 0 0 0.75rem;
+}
+.teaching-card-quiz-btn {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4f46e5;
+  background: none;
+  border: 1px solid #c7d2fe;
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.teaching-card-quiz-btn:hover { background: #eef2ff; }
+
+/* ── Next Attempt Preview ─────────────────────────────────── */
+.next-attempt-preview { margin-top: 1.5rem; }
+.next-attempt-heading {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 0.75rem;
+}
+.next-attempt-rows { display: flex; flex-direction: column; gap: 0.4rem; }
+.next-attempt-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 36px auto;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+.next-attempt-label { color: #374151; font-weight: 500; }
+.next-attempt-bar-wrap {
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.next-attempt-bar {
+  height: 100%;
+  background: #6366f1;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.next-attempt-count { color: #6b7280; text-align: right; }
+.next-attempt-flag { font-size: 0.75rem; color: #dc2626; font-weight: 600; white-space: nowrap; }
