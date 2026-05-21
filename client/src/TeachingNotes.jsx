@@ -1,4 +1,5 @@
 import React from 'react';
+import { MathContent } from './MathContent.jsx';
 
 /**
  * TeachingNotes
@@ -33,7 +34,7 @@ export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapt
                 <span className="teaching-card-topic">{obj.topic}</span>
               )}
             </div>
-            <p className="teaching-card-tip">{obj.teaching_tip}</p>
+            <p className="teaching-card-tip"><MathContent text={obj.teaching_tip} /></p>
             {showQuizBtn && onSelectChapter && (
               <button
                 className="teaching-card-quiz-btn"
