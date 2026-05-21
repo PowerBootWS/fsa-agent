@@ -536,7 +536,7 @@ class Researcher:
                 cursor.execute(
                     f"""
                     SELECT id, question_text, options, correct_answer, explanation,
-                           difficulty, topic, question_type, chapter_id, course_id
+                           difficulty, topic, question_type, chapter_id, course_id, lesson_code
                     FROM questions
                     WHERE course_id = %s
                       AND chapter_id = %s
@@ -572,6 +572,7 @@ class Researcher:
                     'question_type': r['question_type'],
                     'chapter_id': r['chapter_id'],
                     'course_id': r['course_id'],
+                    'lesson_code': r['lesson_code'] or '',
                 }
                 for r in all_questions
             ]
