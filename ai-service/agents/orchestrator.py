@@ -3,6 +3,7 @@ Orchestrator - Central coordinator for the multi-agent system.
 Manages conversation state, routes activity flow, persists progress to DB.
 """
 import os
+import re
 import requests
 
 
@@ -28,7 +29,6 @@ def _detect_mode(lesson_id):
     Detect session mode from the lesson_id string.
     Returns 'lesson', 'chapter_quiz', or 'practice_exam'.
     """
-    import re
     lid = str(lesson_id)
     if re.match(r'^[A-Z0-9]{2,5}-\d{1,3}-\d{1,3}$', lid, re.IGNORECASE):
         return 'lesson'
@@ -941,7 +941,6 @@ class Orchestrator:
         Returns dict {1: 'tip text', 2: 'tip text', ...}.
         Falls back to empty dict on any error.
         """
-        import re
         if not self._api_key or expected_count == 0:
             return {}
         try:
@@ -988,8 +987,6 @@ class Orchestrator:
         Chapters with lower accuracy get more questions.
         Returns { chapter_id: count }
         """
-        import math
-
         if not weights:
             base = total // len(chapters)
             remainder = total % len(chapters)
@@ -1354,7 +1351,6 @@ class Orchestrator:
         Returns True if the student's message matches the correct answer index.
         Handles: 'A'/'a', '1'-'4', 'My answer is B', 'option 2', etc.
         """
-        import re
         msg = message.strip().lower()
 
         # Direct letter: a b c d
