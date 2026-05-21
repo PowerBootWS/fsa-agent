@@ -39,7 +39,7 @@ export function PracticeExamLobby({ courseId, lessonTitle, onStartExam, onSelect
   return (
     <div className="lobby-page">
       <h1 className="lobby-title">{lessonTitle || courseId}</h1>
-      <p className="lobby-subtitle">Choose how you want to practise</p>
+      <p className="lobby-subtitle">Choose how you want to practice</p>
 
       <div className="lobby-panels">
         {/* ── Practice Exam panel ── */}
