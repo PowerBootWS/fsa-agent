@@ -4,6 +4,9 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { InlineMath, BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css';
+import { CountdownTimer } from './CountdownTimer.jsx';
+import { PracticeExamLobby } from './PracticeExamLobby.jsx';
+import { TeachingNotes, NextAttemptPreview } from './TeachingNotes.jsx';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -156,8 +159,8 @@ function App() {
     );
   }
 
-  // Quiz and exam modes: no tabs, full page
-  if (mode === 'chapter_quiz' || mode === 'practice_exam') {
+  // Chapter quiz mode (direct URL, not from lobby): no tabs, full page
+  if (mode === 'chapter_quiz') {
     return (
       <ErrorBoundary>
         <div className="app-container app-fullpage">
@@ -166,6 +169,25 @@ function App() {
             user={user}
             lessonId={lessonId}
             mode={mode}
+            chatState={chatState}
+            setChatState={setChatState}
+            examConfig={null}
+            onSelectChapter={null}
+          />
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
+  // Practice exam mode: show lobby first, then exam or inline chapter quiz
+  if (mode === 'practice_exam') {
+    return (
+      <ErrorBoundary>
+        <div className="app-container app-fullpage">
+          <PracticeExamRouter
+            lesson={lesson}
+            user={user}
+            lessonId={lessonId}
             chatState={chatState}
             setChatState={setChatState}
           />
@@ -221,10 +243,92 @@ function App() {
 }
 
 // ---------------------------------------------------------------------------
+// Practice exam routing (lobby → exam or chapter quiz)
+// ---------------------------------------------------------------------------
+
+function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState }) {
+  // phase: 'lobby' | 'exam' | 'chapter_quiz'
+  const [phase, setPhase] = React.useState('lobby');
+  const [examConfig, setExamConfig] = React.useState(null);       // {count, timed}
+  const [activeChapterId, setActiveChapterId] = React.useState(null);
+  const [returnPhase, setReturnPhase] = React.useState('lobby');  // where Back goes
+
+  const handleStartExam = (config) => {
+    setExamConfig(config);
+    setPhase('exam');
+  };
+
+  const handleSelectChapter = (chapterId) => {
+    // Remember where to return when Back is pressed
+    setReturnPhase(phase);
+    setActiveChapterId(chapterId);
+    setPhase('chapter_quiz');
+    // Reset chat state so the chapter quiz initialises cleanly
+    setChatState({ messages: [], displayContent: null, complexityLevel: 3, examProgress: null });
+  };
+
+  const handleBack = () => {
+    setPhase(returnPhase);
+    setActiveChapterId(null);
+    // Reset chat state when returning to lobby so a fresh exam can start
+    if (returnPhase === 'lobby') {
+      setChatState({ messages: [], displayContent: null, complexityLevel: 3, examProgress: null });
+    }
+  };
+
+  if (phase === 'lobby') {
+    return (
+      <PracticeExamLobby
+        courseId={lessonId}
+        lessonTitle={lesson?.title}
+        onStartExam={handleStartExam}
+        onSelectChapter={handleSelectChapter}
+      />
+    );
+  }
+
+  if (phase === 'chapter_quiz') {
+    return (
+      <div className="quizexam-with-back">
+        <div className="quizexam-back-bar">
+          <button className="quizexam-back-btn" onClick={handleBack}>
+            ← Back to Exam
+          </button>
+        </div>
+        <QuizExamView
+          lesson={lesson}
+          user={user}
+          lessonId={activeChapterId}
+          mode="chapter_quiz"
+          chatState={chatState}
+          setChatState={setChatState}
+          examConfig={null}
+          onSelectChapter={null}
+        />
+      </div>
+    );
+  }
+
+  // phase === 'exam'
+  return (
+    <QuizExamView
+      lesson={lesson}
+      user={user}
+      lessonId={lessonId}
+      mode="practice_exam"
+      chatState={chatState}
+      setChatState={setChatState}
+      examConfig={examConfig}
+      onSelectChapter={handleSelectChapter}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Quiz / Exam full-page view
 // ---------------------------------------------------------------------------
 
-function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState }) {
+function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter }) {
   const isExam = mode === 'practice_exam';
   const examProgress = chatState.examProgress;
 
@@ -241,7 +345,12 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState })
       fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user, lessonId, message: 'hello' }),
+        body: JSON.stringify({
+          user,
+          lessonId,
+          message: 'hello',
+          ...(examConfig ? { examConfig } : {}),
+        }),
       })
         .then(r => r.json())
         .then(data => {
@@ -311,16 +420,24 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState })
       {/* Header bar */}
       <div className="quizexam-header">
         <span className="quizexam-title">{lesson?.title || lessonId}</span>
-        {isExam && examProgress && !isDone && (
-          <ExamProgressBar current={examProgress.current} total={examProgress.total} />
-        )}
-        {!isExam && displayContent?.type === 'quiz_progress' && !isDone && (
-          <ExamProgressBar
-            current={displayContent.questions_done}
-            total={displayContent.total}
-            correct={displayContent.correct}
-          />
-        )}
+        <div className="quizexam-header-right">
+          {isExam && examProgress && !isDone && (
+            <ExamProgressBar current={examProgress.current} total={examProgress.total} />
+          )}
+          {!isExam && displayContent?.type === 'quiz_progress' && !isDone && (
+            <ExamProgressBar
+              current={displayContent.questions_done}
+              total={displayContent.total}
+              correct={displayContent.correct}
+            />
+          )}
+          {isExam && examConfig?.timed && examProgress && !isDone && (
+            <CountdownTimer
+              totalSeconds={{ 25: 2700, 50: 5400, 100: 10800 }[examConfig.count] ?? 5400}
+              stopped={isDone}
+            />
+          )}
+        </div>
       </div>
 
       {/* Main split: question panel + chat */}
@@ -331,6 +448,7 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState })
             onAnswer={sendAnswer}
             mode={mode}
             isExam={isExam}
+            onSelectChapter={onSelectChapter}
           />
         </div>
         <div className="quizexam-chat-panel">
@@ -680,7 +798,7 @@ function ExamProgressBar({ current, total, correct }) {
   );
 }
 
-function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode }) {
+function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSelectChapter }) {
   if (!displayContent) {
     return (
       <div className="quizexam-display-empty">
@@ -693,7 +811,14 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode }) {
 
   // Done screen — show results table
   if (type === 'exam_done' || type === 'quiz_done') {
-    return <ResultsPanel displayContent={displayContent} isExam={isExam} onRetry={isExam ? () => onAnswer('yes') : null} />;
+    return (
+      <ResultsPanel
+        displayContent={displayContent}
+        isExam={isExam}
+        onRetry={isExam ? () => onAnswer('yes') : null}
+        onSelectChapter={onSelectChapter}
+      />
+    );
   }
 
   // Question (quiz or exam)
@@ -742,8 +867,9 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode }) {
   return null;
 }
 
-function ResultsPanel({ displayContent, isExam, onRetry }) {
-  const { score, total, score_pct, chapter_stats } = displayContent;
+function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter }) {
+  const { score, total, score_pct, chapter_stats,
+          objective_breakdowns, next_attempt_allocation } = displayContent;
   const scoreColor = score_pct >= 75 ? '#16a34a' : score_pct >= 55 ? '#d97706' : '#dc2626';
   const [retrying, setRetrying] = React.useState(false);
 
@@ -761,11 +887,7 @@ function ResultsPanel({ displayContent, isExam, onRetry }) {
       {chapter_stats && chapter_stats.length > 0 && (
         <table className="results-table">
           <thead>
-            <tr>
-              <th>Chapter</th>
-              <th>Score</th>
-              <th>Status</th>
-            </tr>
+            <tr><th>Chapter</th><th>Score</th><th>Status</th></tr>
           </thead>
           <tbody>
             {chapter_stats.map(row => (
@@ -777,6 +899,21 @@ function ResultsPanel({ displayContent, isExam, onRetry }) {
             ))}
           </tbody>
         </table>
+      )}
+
+      {objective_breakdowns && objective_breakdowns.length > 0 && (
+        <TeachingNotes
+          objectiveBreakdowns={objective_breakdowns}
+          chapterStats={chapter_stats}
+          onSelectChapter={onSelectChapter}
+        />
+      )}
+
+      {next_attempt_allocation && (
+        <NextAttemptPreview
+          nextAttemptAllocation={next_attempt_allocation}
+          totalCount={total}
+        />
       )}
 
       {onRetry && (

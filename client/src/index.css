@@ -1363,3 +1363,28 @@ body {
 }
 .next-attempt-count { color: #6b7280; text-align: right; }
 .next-attempt-flag { font-size: 0.75rem; color: #dc2626; font-weight: 600; white-space: nowrap; }
+/* ── Chapter quiz back bar ────────────────────────────────── */
+.quizexam-with-back { display: flex; flex-direction: column; height: 100%; }
+.quizexam-back-bar {
+  padding: 0.5rem 1rem;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+.quizexam-back-btn {
+  background: none;
+  border: none;
+  color: #6366f1;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+.quizexam-back-btn:hover { color: #4f46e5; }
+
+/* ── Exam header right-side group ─────────────────────────── */
+.quizexam-header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
