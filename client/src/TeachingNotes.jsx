@@ -34,7 +34,7 @@ export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapt
               )}
             </div>
             <p className="teaching-card-tip">{obj.teaching_tip}</p>
-            {showQuizBtn && (
+            {showQuizBtn && onSelectChapter && (
               <button
                 className="teaching-card-quiz-btn"
                 onClick={() => onSelectChapter(obj.chapter_id)}
