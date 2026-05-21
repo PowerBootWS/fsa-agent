@@ -121,6 +121,9 @@ class Orchestrator:
                 'exam_index': 0,
                 'exam_results': [],         # list of {chapter_id, correct}
                 'exam_phase': 'answering',  # 'answering' or 'debrief'
+                # Exam configuration (set once on session init from client)
+                'exam_question_count': (exam_config or {}).get('count', PRACTICE_EXAM_QUESTION_COUNT),
+                'exam_timed': (exam_config or {}).get('timed', False),
             }
 
         state = self.conversation_state[state_key]
@@ -782,9 +785,10 @@ class Orchestrator:
         # Load questions on first message
         if not state['exam_questions'] and not state.get('exam_done'):
             weights = researcher.get_chapter_weights(user, course_id)
+            count = state.get('exam_question_count', PRACTICE_EXAM_QUESTION_COUNT)
             qs = researcher.get_exam_questions(
                 course_id=course_id,
-                limit=PRACTICE_EXAM_QUESTION_COUNT,
+                limit=count,
                 weights=weights if weights else None,
             )
             state['exam_questions'] = qs
@@ -1021,9 +1025,10 @@ class Orchestrator:
 
     def _reset_and_start_exam(self, state, user, course_id, first_name, researcher, display):
         weights = researcher.get_chapter_weights(user, course_id)
+        count = state.get('exam_question_count', PRACTICE_EXAM_QUESTION_COUNT)
         qs = researcher.get_exam_questions(
             course_id=course_id,
-            limit=PRACTICE_EXAM_QUESTION_COUNT,
+            limit=count,
             weights=weights if weights else None,
         )
 
