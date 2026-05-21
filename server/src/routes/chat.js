@@ -7,18 +7,17 @@ const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:5
 // Send message to Tutor Agent
 router.post('/', async (req, res) => {
   try {
-    const { user, lessonId, message } = req.body;
+    const { user, lessonId, message, examConfig } = req.body;
 
     if (!user || !lessonId || !message) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
-    // Forward to Python AI service
-    const response = await axios.post(`${PYTHON_SERVICE_URL}/agent/chat`, {
-      user,
-      lessonId,
-      message,
-    });
+    // Forward to Python AI service — include examConfig when present
+    const payload = { user, lessonId, message };
+    if (examConfig) payload.examConfig = examConfig;
+
+    const response = await axios.post(`${PYTHON_SERVICE_URL}/agent/chat`, payload);
 
     res.json(response.data);
   } catch (error) {

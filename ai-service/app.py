@@ -33,6 +33,7 @@ def chat():
     user = data.get('user')
     lesson_id = data.get('lessonId')
     message = data.get('message')
+    exam_config = data.get('examConfig')  # optional: {count: int, timed: bool}
 
     if not all([user, lesson_id, message]):
         return jsonify({'error': 'Missing required parameters'}), 400
@@ -44,7 +45,7 @@ def chat():
     progress = researcher.get_user_progress(user, lesson_id)
 
     # Process through Orchestrator
-    response = orchestrator.process(
+    kwargs = dict(
         user=user,
         lesson_id=lesson_id,
         message=message,
@@ -52,8 +53,11 @@ def chat():
         progress=progress,
         tutor=tutor,
         display=display,
-        researcher=researcher
+        researcher=researcher,
     )
+    if exam_config is not None:
+        kwargs['exam_config'] = exam_config
+    response = orchestrator.process(**kwargs)
 
     return jsonify(response)
 
