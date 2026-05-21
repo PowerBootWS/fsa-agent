@@ -158,3 +158,43 @@ def test_exam_results_include_objective_enrichment():
     assert result['lesson_code'] == '2B1-3-2'
     assert result['topic'] == 'thickness_formula'
     assert result['explanation'] == 'Use Barlow formula.'
+
+
+def test_parse_lesson_code_extracts_chapter_and_objective():
+    orch = Orchestrator()
+    ch, obj = orch._parse_lesson_code('2B1-3-2', '')
+    assert ch == '3'
+    assert obj == '2'
+
+
+def test_parse_lesson_code_falls_back_gracefully():
+    orch = Orchestrator()
+    ch, obj = orch._parse_lesson_code('', '2B1-3')
+    assert ch == '3'
+    assert obj == '?'
+
+
+def test_group_wrong_by_objective():
+    orch = Orchestrator()
+    results = [
+        {'correct': False, 'lesson_code': '2B1-3-2', 'chapter_id': '2B1-3',
+         'topic': 'thickness', 'explanation': 'Use Barlow.', 'question_id': 1},
+        {'correct': True,  'lesson_code': '2B1-1-1', 'chapter_id': '2B1-1',
+         'topic': 'scope',     'explanation': 'Scope def.',   'question_id': 2},
+        {'correct': False, 'lesson_code': '2B1-3-2', 'chapter_id': '2B1-3',
+         'topic': 'thickness', 'explanation': 'Use Barlow.', 'question_id': 3},
+    ]
+    grouped = orch._group_wrong_by_objective(results)
+    assert len(grouped) == 1
+    assert '2B1-3-2' in grouped
+    assert grouped['2B1-3-2']['count'] == 2
+
+
+def test_group_wrong_falls_back_to_chapter_id_key():
+    orch = Orchestrator()
+    results = [
+        {'correct': False, 'lesson_code': '', 'chapter_id': '2B1-3',
+         'topic': 'pressure', 'explanation': 'P formula.', 'question_id': 5},
+    ]
+    grouped = orch._group_wrong_by_objective(results)
+    assert '2B1-3' in grouped

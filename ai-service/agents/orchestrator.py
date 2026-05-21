@@ -898,9 +898,146 @@ class Orchestrator:
             'progress': {'current': idx + 1, 'total': total},
         }
 
+    def _parse_lesson_code(self, lesson_code, fallback_chapter_id=''):
+        """
+        Parse '2B1-3-2' → ('3', '2').  Returns ('?', '?') if unparseable.
+        Falls back to chapter_id suffix if lesson_code is empty.
+        """
+        parts = lesson_code.split('-') if lesson_code else []
+        if len(parts) == 3:
+            return parts[1], parts[2]
+        # Fallback: derive chapter number from chapter_id tail
+        fb_parts = fallback_chapter_id.split('-') if fallback_chapter_id else []
+        chap = fb_parts[-1] if len(fb_parts) >= 2 else '?'
+        return chap, '?'
+
+    def _group_wrong_by_objective(self, results):
+        """
+        Group wrong answers by objective key (lesson_code, or chapter_id as fallback).
+        Returns {key: {lesson_code, chapter_id, topic, explanation, count}}
+        """
+        by_objective = {}
+        for r in results:
+            if r['correct']:
+                continue
+            key = r.get('lesson_code') or r.get('chapter_id', 'unknown')
+            if key not in by_objective:
+                by_objective[key] = {
+                    'lesson_code': r.get('lesson_code', ''),
+                    'chapter_id': r.get('chapter_id', ''),
+                    'topic': r.get('topic', ''),
+                    'explanation': r.get('explanation', ''),
+                    'count': 0,
+                }
+            by_objective[key]['count'] += 1
+            # Keep first non-empty explanation
+            if not by_objective[key]['explanation'] and r.get('explanation'):
+                by_objective[key]['explanation'] = r['explanation']
+        return by_objective
+
+    def _call_llm_for_teaching_tips(self, prompt, expected_count):
+        """
+        Single batched LLM call that returns teaching tips for all missed objectives.
+        Returns dict {1: 'tip text', 2: 'tip text', ...}.
+        Falls back to empty dict on any error.
+        """
+        import re
+        if not self._api_key or expected_count == 0:
+            return {}
+        try:
+            session = requests.Session()
+            session.headers.update({
+                'Authorization': f'Bearer {self._api_key}',
+                'Content-Type': 'application/json',
+            })
+            response = session.post(
+                f'{self._base_url}/chat/completions',
+                json={
+                    'model': self._model,
+                    'max_tokens': max(150, 100 * expected_count),
+                    'messages': [
+                        {
+                            'role': 'system',
+                            'content': 'You are an expert 2nd Class Power Engineering instructor.',
+                        },
+                        {'role': 'user', 'content': prompt},
+                    ],
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            content = response.json()['choices'][0]['message']['content'].strip()
+
+            # Parse numbered list: "1. tip\n\n2. tip"
+            tips = {}
+            pattern = re.compile(
+                r'^\s*(\d+)\.\s+(.+?)(?=^\s*\d+\.|\Z)',
+                re.MULTILINE | re.DOTALL,
+            )
+            for m in pattern.finditer(content):
+                tips[int(m.group(1))] = m.group(2).strip()
+            return tips
+
+        except Exception as e:
+            print(f'Orchestrator._call_llm_for_teaching_tips error: {e}')
+            return {}
+
+    def _compute_chapter_allocations(self, chapters, total, weights):
+        """
+        Distribute `total` questions across chapters.
+        Chapters with lower accuracy get more questions.
+        Returns { chapter_id: count }
+        """
+        import math
+
+        if not weights:
+            base = total // len(chapters)
+            remainder = total % len(chapters)
+            alloc = {c: base for c in chapters}
+            for i, c in enumerate(chapters):
+                if i < remainder:
+                    alloc[c] += 1
+            return alloc
+
+        raw_weights = {}
+        for c in chapters:
+            if c in weights:
+                raw_weights[c] = 1.0 - weights[c]['accuracy']
+            else:
+                raw_weights[c] = 0.5
+
+        total_weight = sum(raw_weights.values())
+        if total_weight == 0:
+            total_weight = 1.0
+
+        min_per_chapter = 1
+        reserved = min_per_chapter * len(chapters)
+        distributable = max(0, total - reserved)
+
+        alloc = {c: min_per_chapter for c in chapters}
+        for c in chapters:
+            extra = round(distributable * raw_weights[c] / total_weight)
+            alloc[c] += extra
+
+        current_total = sum(alloc.values())
+        diff = total - current_total
+        if diff != 0:
+            sorted_chapters = sorted(chapters, key=lambda c: raw_weights[c], reverse=True)
+            for c in sorted_chapters:
+                if diff == 0:
+                    break
+                if diff > 0:
+                    alloc[c] += 1
+                    diff -= 1
+                elif diff < 0 and alloc[c] > 1:
+                    alloc[c] -= 1
+                    diff += 1
+
+        return alloc
+
     def _generate_exam_debrief(self, state, user, course_id, first_name,
                                 researcher, tutor, lesson_context, progress):
-        """Generate the end-of-exam chapter-level debrief using the tutor LLM."""
+        """Generate the end-of-exam debrief with objective-level teaching tips."""
         results = state.get('exam_results', [])
         if not results:
             return {
@@ -913,59 +1050,116 @@ class Orchestrator:
                 'mode': 'practice_exam',
             }
 
-        # Aggregate by chapter
+        # --- Enrich any wrong answers missing lesson_code (edge case fallback) ---
+        wrong_missing = [
+            r['question_id'] for r in results
+            if not r['correct'] and not r.get('lesson_code')
+        ]
+        if wrong_missing:
+            enrichment = researcher.get_questions_by_ids(wrong_missing)
+            for r in results:
+                if not r['correct'] and not r.get('lesson_code') and r['question_id'] in enrichment:
+                    r.update(enrichment[r['question_id']])
+
+        # --- Group wrong answers by objective ---
+        by_objective = self._group_wrong_by_objective(results)
+
+        # --- Generate teaching tips via single batched LLM call ---
+        objective_breakdowns = []
+        if by_objective:
+            objectives_list = list(by_objective.values())
+            numbered_lines = []
+            for i, obj in enumerate(objectives_list, 1):
+                chap_num, obj_num = self._parse_lesson_code(obj['lesson_code'], obj['chapter_id'])
+                topic_label = obj['topic'].replace('_', ' ') if obj['topic'] else 'general concept'
+                explanation = obj['explanation'] or 'No additional context available.'
+                numbered_lines.append(
+                    f"{i}. Chapter {chap_num} Objective {obj_num} (topic: {topic_label})\n"
+                    f"   Explanation: {explanation}"
+                )
+
+            batch_prompt = (
+                f"A student studying for the 2nd Class Power Engineering exam missed questions "
+                f"on the following objectives. For each, write a 2-3 sentence teaching tip "
+                f"that identifies what the student needs to remember or watch for — concrete "
+                f"guidance specific to power engineering that helps them get it right next time. "
+                f"Format your response as a numbered list matching the objective numbers.\n\n"
+                + '\n\n'.join(numbered_lines)
+            )
+            tips = self._call_llm_for_teaching_tips(batch_prompt, len(objectives_list))
+
+            for i, obj in enumerate(objectives_list):
+                chap_num, obj_num = self._parse_lesson_code(obj['lesson_code'], obj['chapter_id'])
+                topic_label = obj['topic'].replace('_', ' ') if obj['topic'] else 'general concept'
+                objective_breakdowns.append({
+                    'lesson_code': obj['lesson_code'],
+                    'chapter_id': obj['chapter_id'],
+                    'chapter_num': chap_num,
+                    'objective_num': obj_num,
+                    'topic': topic_label,
+                    'teaching_tip': tips.get(i + 1, obj['explanation'] or ''),
+                    'wrong_count': obj['count'],
+                })
+
+        # --- Aggregate chapter stats ---
         chapter_stats = {}
         for r in results:
             cid = r['chapter_id'] or 'Unknown'
-            if cid not in chapter_stats:
-                chapter_stats[cid] = {'correct': 0, 'total': 0}
+            chapter_stats.setdefault(cid, {'correct': 0, 'total': 0})
             chapter_stats[cid]['total'] += 1
             if r['correct']:
                 chapter_stats[cid]['correct'] += 1
 
         total_q = len(results)
-        total_correct = sum(r['correct'] for r in results)
+        total_correct = sum(1 for r in results if r['correct'])
         score_pct = int(total_correct / total_q * 100) if total_q else 0
 
-        # Build debrief summary for display panel
         chapter_lines = []
-        weak_chapters = []
-        strong_chapters = []
+        weak_chapters, strong_chapters = [], []
         for cid, s in sorted(chapter_stats.items()):
             pct = int(s['correct'] / s['total'] * 100) if s['total'] else 0
             status = 'Strong' if pct >= 70 else ('Needs review' if pct < 50 else 'Developing')
-            chapter_lines.append({'chapter': cid, 'correct': s['correct'],
-                                   'total': s['total'], 'pct': pct, 'status': status})
+            chapter_lines.append({
+                'chapter': cid, 'correct': s['correct'],
+                'total': s['total'], 'pct': pct, 'status': status,
+            })
             if pct < 60:
                 weak_chapters.append(cid)
             elif pct >= 75:
                 strong_chapters.append(cid)
 
-        # Build a text summary for the tutor LLM to elaborate on
-        stats_text = '\n'.join(
-            f"  {cl['chapter']}: {cl['correct']}/{cl['total']} ({cl['pct']}%) — {cl['status']}"
-            for cl in chapter_lines
-        )
+        # --- Compute next-attempt allocation ---
+        fresh_weights = {
+            cid: {'accuracy': s['correct'] / s['total'] if s['total'] else 0.5, 'total': s['total']}
+            for cid, s in chapter_stats.items()
+        }
+        exam_count = state.get('exam_question_count', PRACTICE_EXAM_QUESTION_COUNT)
+        all_chapters = list(chapter_stats.keys())
+        next_allocation = self._compute_chapter_allocations(all_chapters, exam_count, fresh_weights)
+
+        # --- Build tutor debrief message ---
+        missed_obj_mentions = []
+        for obj in objective_breakdowns[:3]:
+            missed_obj_mentions.append(
+                f"Chapter {obj['chapter_num']} Objective {obj['objective_num']} ({obj['topic']})"
+            )
         weak_str = ', '.join(weak_chapters) if weak_chapters else 'none'
         strong_str = ', '.join(strong_chapters) if strong_chapters else 'none'
+        missed_str = ', '.join(missed_obj_mentions) if missed_obj_mentions else ''
 
-        # Use LLM to generate warm, specific debrief
         debrief_prompt = (
             f"The student {first_name} just completed a {total_q}-question practice exam for {course_id}.\n"
-            f"Overall: {total_correct}/{total_q} ({score_pct}%)\n\n"
-            f"Per-chapter results:\n{stats_text}\n\n"
+            f"Overall: {total_correct}/{total_q} ({score_pct}%)\n"
             f"Strong chapters: {strong_str}\n"
-            f"Chapters needing review: {weak_str}\n\n"
-            f"Write a warm, concise debrief (5-8 sentences). Acknowledge their overall score. "
-            f"Highlight 1-2 strong chapters by name. Clearly identify weak chapters and recommend "
-            f"going back to review those lessons. "
-            f"Mention that their next attempt will pull more questions from the chapters they missed. "
-            f"End by asking if they'd like to take another practice exam right now — "
-            f"they can just reply 'yes' or 'let's go' and you'll start a fresh one weighted to their weak spots. "
-            f"Keep it encouraging and specific. Address the student as {first_name}."
+            f"Chapters needing review: {weak_str}\n"
+            + (f"Missed objectives: {missed_str}\n" if missed_str else '')
+            + f"\nWrite a warm, concise debrief (4-6 sentences). Acknowledge their score. "
+            f"Highlight 1-2 strong chapters if any. "
+            + (f"Reference the specific missed objectives by name ({missed_str}) and say you've added teaching notes below. " if missed_str else '')
+            + f"Mention the next exam will be weighted to their weak areas. "
+            f"End by asking if they'd like to try again. Address them as {first_name}."
         )
 
-        # Build a minimal state for tutor
         debrief_state = {
             'activity': 'exam_debrief',
             'mode': 'practice_exam',
@@ -990,11 +1184,7 @@ class Orchestrator:
             state=debrief_state,
             first_name=first_name,
         )
-
-        if isinstance(tutor_result, dict):
-            tutor_response = tutor_result.get('response', '')
-        else:
-            tutor_response = str(tutor_result)
+        tutor_response = tutor_result.get('response', '') if isinstance(tutor_result, dict) else str(tutor_result)
 
         return {
             'tutor_response': tutor_response,
@@ -1005,6 +1195,8 @@ class Orchestrator:
                 'total': total_q,
                 'score_pct': score_pct,
                 'chapter_stats': chapter_lines,
+                'objective_breakdowns': objective_breakdowns,
+                'next_attempt_allocation': next_allocation,
             },
             'progress_update': {},
             'complexity_level': state['complexity_level'],
