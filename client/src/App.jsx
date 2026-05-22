@@ -248,14 +248,17 @@ function App() {
 // ---------------------------------------------------------------------------
 
 function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState }) {
-  // phase: 'lobby' | 'exam' | 'chapter_quiz'
+  // phase: 'lobby' | 'exam' | 'chapter_quiz' | 'results'
   const [phase, setPhase] = React.useState('lobby');
   const [examConfig, setExamConfig] = React.useState(null);       // {count, timed}
   const [activeChapterId, setActiveChapterId] = React.useState(null);
   const [returnPhase, setReturnPhase] = React.useState('lobby');  // where Back goes
+  const [reviewDebrief, setReviewDebrief] = React.useState(null); // cached debrief for review
 
   const handleStartExam = (config) => {
     setExamConfig(config);
+    // Reset chat state so QuizExamView's useEffect fires the init 'hello' with fresh examConfig
+    setChatState({ messages: [], displayContent: null, complexityLevel: 3, examProgress: null });
     setPhase('exam');
   };
 
@@ -277,14 +280,61 @@ function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState })
     }
   };
 
+  const handleViewLastResults = (debrief) => {
+    setReviewDebrief(debrief);
+    setPhase('results');
+  };
+
+  const handleBackToLobby = () => {
+    setPhase('lobby');
+  };
+
   if (phase === 'lobby') {
     return (
       <PracticeExamLobby
         courseId={lessonId}
+        user={user}
         lessonTitle={lesson?.title}
         onStartExam={handleStartExam}
         onSelectChapter={handleSelectChapter}
+        onViewLastResults={handleViewLastResults}
       />
+    );
+  }
+
+  if (phase === 'results') {
+    return (
+      <div className="quizexam-container">
+        <div className="quizexam-header">
+          <span className="quizexam-title">{lesson?.title || lessonId} — Most Recent Results</span>
+        </div>
+        <div className="quizexam-body">
+          <div className="quizexam-question-panel">
+            <div className="results-review-back">
+              <button className="quizexam-back-btn" onClick={handleBackToLobby}>← Back to Lobby</button>
+            </div>
+            {reviewDebrief?.display_update && (
+              <ResultsPanel
+                displayContent={reviewDebrief.display_update}
+                isExam={true}
+                onRetry={null}
+                onSelectChapter={handleSelectChapter}
+              />
+            )}
+          </div>
+          <div className="quizexam-chat-panel">
+            {reviewDebrief?.tutor_response && (
+              <div className="results-review-tutor">
+                <div className="message tutor">
+                  <div className="message-content">
+                    <TutorMessage content={reviewDebrief.tutor_response} animate={false} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     );
   }
 

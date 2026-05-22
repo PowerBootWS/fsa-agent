@@ -1261,6 +1261,22 @@ body {
 }
 .lobby-start-btn:hover:not(:disabled) { background: #4f46e5; }
 .lobby-start-btn:disabled { background: #c7d2fe; cursor: not-allowed; }
+.lobby-review-btn {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  color: #6366f1;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  width: 100%;
+}
+.lobby-review-btn:hover { background: #eef2ff; border-color: #6366f1; }
+.results-review-back { margin-bottom: 1rem; }
+.results-review-tutor { padding: 1rem; overflow-y: auto; }
 .lobby-loading { font-size: 0.875rem; color: #9ca3af; }
 .lobby-chapter-grid {
   display: grid;

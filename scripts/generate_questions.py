@@ -46,6 +46,7 @@ from openai import OpenAI
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import db_inserter  # noqa: E402
+from latex_utils import sanitize_question  # noqa: E402
 
 PROJECT_DIR = SCRIPT_DIR.parent
 AGGREGATED_PATH = PROJECT_DIR / "docs" / "source" / "lesson_content_aggregated.json"
@@ -179,6 +180,10 @@ def build_system_prompt(paper: str, style_guides: dict[str, str]) -> str:
         "Every question must be fully answerable from the question text and options alone.\n"
         f"{style_block}\n"
         f"{DISTRACTOR_RULES}\n"
+        "MATH FORMATTING:\n"
+        "- Use $...$ for inline expressions and $$...$$ for standalone/display equations.\n"
+        "- NEVER nest delimiters. Do NOT write $$...$expr$...$$ — the inner $ signs are wrong.\n"
+        "- Correct: $$t = \\frac{5PL}{4.8S}$$   Wrong: $$t = $\\frac{5PL}{4.8S}$$$\n\n"
         "Output ONLY a valid JSON array — no markdown fences, no preamble, no trailing text.\n"
         "Each element must have exactly these keys:\n"
         "  question_text   string\n"
@@ -244,7 +249,10 @@ def call_model(client: OpenAI, system: str, user: str, model: str, retries: int 
             )
             raw = response.choices[0].message.content.strip()
             cleaned = _clean_json(raw)
-            return json.loads(cleaned)
+            questions = json.loads(cleaned)
+            for q in questions:
+                sanitize_question(q)
+            return questions
         except (json.JSONDecodeError, RecursionError, ValueError) as exc:
             last_exc = exc
             if attempt <= retries:

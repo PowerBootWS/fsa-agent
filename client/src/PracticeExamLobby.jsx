@@ -12,16 +12,19 @@ const COUNT_OPTIONS = [
  *   Right panel — per-chapter quiz buttons for inline chapter practice.
  *
  * Props:
- *   courseId       string   e.g. '2B1'
- *   lessonTitle    string   display name
- *   onStartExam    fn({count, timed}) — called when student clicks Start
- *   onSelectChapter fn(chapterId)     — called when a chapter button is clicked
+ *   courseId           string   e.g. '2B1'
+ *   user               string   user email (for fetching last results)
+ *   lessonTitle        string   display name
+ *   onStartExam        fn({count, timed}) — called when student clicks Start
+ *   onSelectChapter    fn(chapterId)      — called when a chapter button is clicked
+ *   onViewLastResults  fn(debrief)        — called when student wants to review last attempt
  */
-export function PracticeExamLobby({ courseId, lessonTitle, onStartExam, onSelectChapter }) {
+export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, onSelectChapter, onViewLastResults }) {
   const [selectedCount, setSelectedCount] = useState(null);
   const [timed, setTimed] = useState(false);
   const [chapters, setChapters] = useState([]);
   const [chaptersLoading, setChaptersLoading] = useState(true);
+  const [lastResults, setLastResults] = useState(null); // null = not yet checked
 
   useEffect(() => {
     fetch(`/api/exam/${encodeURIComponent(courseId)}/chapters`)
@@ -30,6 +33,14 @@ export function PracticeExamLobby({ courseId, lessonTitle, onStartExam, onSelect
       .catch(() => setChapters([]))
       .finally(() => setChaptersLoading(false));
   }, [courseId]);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch(`/api/exam/${encodeURIComponent(courseId)}/last-results?user=${encodeURIComponent(user)}`)
+      .then(r => r.json())
+      .then(data => setLastResults(data.available ? data : null))
+      .catch(() => setLastResults(null));
+  }, [courseId, user]);
 
   const handleStart = () => {
     if (!selectedCount) return;
@@ -81,6 +92,15 @@ export function PracticeExamLobby({ courseId, lessonTitle, onStartExam, onSelect
           >
             Start Exam →
           </button>
+
+          {lastResults && onViewLastResults && (
+            <button
+              className="lobby-review-btn"
+              onClick={() => onViewLastResults(lastResults)}
+            >
+              Review most recent results
+            </button>
+          )}
         </div>
 
         {/* ── Chapter Quizzes panel ── */}

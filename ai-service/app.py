@@ -69,6 +69,24 @@ def get_context(lesson_id):
     return jsonify(context)
 
 
+@app.route('/agent/exam/<course_id>/last-results', methods=['GET'])
+def get_last_results(course_id):
+    """
+    Return cached debrief data for the most recent completed exam for this user+course.
+    Used by the lobby to offer a "Review most recent results" button.
+    Returns {available: false} when no cached results exist (first attempt or service restart).
+    """
+    user = request.args.get('user')
+    if not user:
+        return jsonify({'error': 'Missing user'}), 400
+    state_key = f'{user}:{course_id}'
+    state = orchestrator.conversation_state.get(state_key, {})
+    last_debrief = state.get('last_debrief')
+    if not last_debrief:
+        return jsonify({'available': False})
+    return jsonify({'available': True, **last_debrief})
+
+
 @app.route('/agent/demo/exam-debrief', methods=['POST'])
 def demo_seed_exam():
     """

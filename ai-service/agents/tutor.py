@@ -113,30 +113,39 @@ class TutorAgent:
             return "Something went wrong on my end. Please try again — I'll be right here."
 
     def _sanitize_response(self, text):
-        """Strip artefacts that the LLM occasionally appends (e.g. literal 'undefined').
-        Also normalise LaTeX delimiters to KaTeX-compatible $...$ / $$...$$ format.
-        """
+        """Strip artefacts that the LLM occasionally appends and normalise LaTeX delimiters."""
         import re
-        # Remove any standalone occurrence of 'undefined', 'null', or 'None' that leaked
-        # from template context — these appear as isolated words, often at the end.
-        # Match them at end-of-string, or surrounded by whitespace/punctuation.
+        # Remove standalone 'undefined' / 'null' leaked from template context.
         text = re.sub(r'\bundefined\b', '', text)
         text = re.sub(r'\bnull\b', '', text)
-        # Normalise LaTeX delimiters: \[...\] → $$...$$ and \(...\) → $...$
-        # Some models use these despite being instructed to use $ notation.
+
+        # Normalise alternate delimiter styles (\[...\] and \(...\)).
         text = re.sub(r'\\\[([\s\S]*?)\\\]', r'$$\1$$', text)
         text = re.sub(r'\\\((.*?)\\\)', r'$\1$', text)
-        # Wrap bare LaTeX commands that appear outside any $ delimiter.
-        # Matches a \command{...} sequence (possibly chained: \frac{a}{b}) not already
-        # preceded by a $ on the same line.
-        text = re.sub(
-            r'(?<!\$)(\\(?:frac|sqrt|sum|int|prod|lim|infty|partial|cdot|times|div|pm|'
+
+        # Collapse 3+ consecutive $ (e.g. $$expr$$$ double-wrap artefact) to $$.
+        text = re.sub(r'\${3,}', '$$', text)
+
+        # Strip inner $ delimiters from inside $$...$$ blocks.
+        # Models sometimes wrap a command as $\cmd$ and then wrap that again in $$...$$,
+        # producing $$t = $\frac{...}$$$.  Remove the inner $ signs.
+        def _strip_inner(m):
+            return '$$' + m.group(1).replace('$', '') + '$$'
+        text = re.sub(r'\$\$([\s\S]*?)\$\$', _strip_inner, text)
+
+        # Wrap bare LaTeX commands, but only in prose segments outside $...$ / $$...$$.
+        _math_span = re.compile(r'(\$\$[\s\S]*?\$\$|\$[^$]+?\$)')
+        _bare_cmd = re.compile(
+            r'(\\(?:frac|sqrt|sum|int|prod|lim|infty|partial|cdot|times|div|pm|'
             r'leq|geq|neq|approx|propto|Delta|alpha|beta|gamma|theta|lambda|mu|pi|sigma|omega)'
-            r'(?:\{[^}]*\})*)',
-            r'$\1$',
-            text
+            r'(?:\{[^}]*\})*)'
         )
-        # Collapse double spaces/newlines left by removal
+        parts = _math_span.split(text)
+        for i in range(0, len(parts), 2):
+            parts[i] = _bare_cmd.sub(r'$\1$', parts[i])
+        text = ''.join(parts)
+
+        # Collapse extra whitespace left by removal steps.
         text = re.sub(r'  +', ' ', text)
         text = re.sub(r'\n{3,}', '\n\n', text)
         return text.strip()

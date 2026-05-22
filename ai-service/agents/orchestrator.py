@@ -137,6 +137,17 @@ class Orchestrator:
                 state, user, lesson_id, message, researcher, display
             )
         if mode == 'practice_exam':
+            # If the lobby is starting a fresh exam (examConfig provided) and the previous
+            # session is in the debrief/done state, reset exam-specific state now so that
+            # _process_practice_exam sees a clean slate and doesn't re-run the debrief LLM call.
+            if exam_config is not None and state.get('exam_done'):
+                state['exam_done'] = False
+                state['exam_phase'] = 'answering'
+                state['exam_questions'] = []
+                state['exam_index'] = 0
+                state['exam_results'] = []
+                state['exam_question_count'] = exam_config.get('count', PRACTICE_EXAM_QUESTION_COUNT)
+                state['exam_timed'] = exam_config.get('timed', False)
             return self._process_practice_exam(
                 state, user, lesson_id, message, researcher, display, tutor, lesson_context, progress
             )
@@ -806,6 +817,18 @@ class Orchestrator:
                 return self._reset_and_start_exam(
                     state, user, course_id, first_name, researcher, display
                 )
+            # Page-refresh / session-resume 'hello': return cached debrief without re-running LLM.
+            if message.strip().lower() == 'hello' and state.get('last_debrief'):
+                cached = state['last_debrief']
+                return {
+                    'tutor_response': cached.get('tutor_response', ''),
+                    'display_update': cached.get('display_update'),
+                    'progress_update': {},
+                    'complexity_level': state['complexity_level'],
+                    'first_name': first_name,
+                    'action': None,
+                    'mode': 'practice_exam',
+                }
             return self._generate_exam_debrief(
                 state, user, course_id, first_name, researcher, tutor, lesson_context, progress
             )
@@ -1183,18 +1206,24 @@ class Orchestrator:
         )
         tutor_response = tutor_result.get('response', '') if isinstance(tutor_result, dict) else str(tutor_result)
 
+        display_update = {
+            'type': 'exam_done',
+            'title': f'{course_id} Exam Results',
+            'score': total_correct,
+            'total': total_q,
+            'score_pct': score_pct,
+            'chapter_stats': chapter_lines,
+            'objective_breakdowns': objective_breakdowns,
+            'next_attempt_allocation': next_allocation,
+        }
+        # Cache so page refreshes can return results without re-running the LLM.
+        state['last_debrief'] = {
+            'tutor_response': tutor_response,
+            'display_update': display_update,
+        }
         return {
             'tutor_response': tutor_response,
-            'display_update': {
-                'type': 'exam_done',
-                'title': f'{course_id} Exam Results',
-                'score': total_correct,
-                'total': total_q,
-                'score_pct': score_pct,
-                'chapter_stats': chapter_lines,
-                'objective_breakdowns': objective_breakdowns,
-                'next_attempt_allocation': next_allocation,
-            },
+            'display_update': display_update,
             'progress_update': {},
             'complexity_level': state['complexity_level'],
             'first_name': first_name,
