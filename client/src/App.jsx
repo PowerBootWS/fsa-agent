@@ -1113,7 +1113,6 @@ function TranscriptView({ lesson }) {
         <div className="transcript-slides">
           {chunks.map((chunk) => (
             <div key={chunk.slide_number} className="transcript-slide">
-              {chunk.title && <h2 className="transcript-slide-title">{chunk.title}</h2>}
               {chunk.narration && <p className="transcript-slide-narration">{chunk.narration}</p>}
             </div>
           ))}
