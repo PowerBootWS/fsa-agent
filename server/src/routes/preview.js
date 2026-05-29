@@ -76,9 +76,14 @@ router.post('/send-results', async (req, res) => {
   res.json({ success: true });
 
   try {
-    const contact = await lookupContactByEmail(String(email).toLowerCase().trim());
-    if (!contact?.id) {
-      console.error('preview/send-results: GHL contact not found for', email);
+    // Upsert ensures the contact exists in GHL and gives us the ID in one call
+    const upsertResult = await upsertContact({
+      email: String(email).toLowerCase().trim(),
+      firstName: first_name,
+    });
+    const contactId = upsertResult?.contact?.id;
+    if (!contactId) {
+      console.error('preview/send-results: could not resolve GHL contact for', email);
       return;
     }
 
@@ -177,7 +182,7 @@ router.post('/send-results', async (req, res) => {
       + `\nReady for unlimited practice? Start your subscription at https://enrollment.fullsteamahead.ca\n\n$149/month · all 6 papers · cancel anytime`;
 
     await sendEmail({
-      contactId: contact.id,
+      contactId,
       subject: `Your ${course_id} Practice Exam Results — Full Steam Ahead`,
       html,
       message: plainText,
