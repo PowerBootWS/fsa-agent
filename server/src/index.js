@@ -79,6 +79,9 @@ app.use('/api/v2/lesson', v2LessonRouter);
 const v2SessionRouter = require('./routes/v2/session');
 app.use('/api/v2/session', v2SessionRouter);
 
+const v2CheckpointRouter = require('./routes/v2/checkpoint');
+app.use('/api/v2/checkpoint', v2CheckpointRouter);
+
 // Serve lesson media files (bind-mounted from host)
 const MEDIA_DIR = process.env.MEDIA_DIR || '/srv/fsa-media';
 app.use('/media', express.static(MEDIA_DIR));
