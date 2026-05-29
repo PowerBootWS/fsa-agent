@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../services/database');
-const axios = require('axios');
-const { lookupContactByEmail, sendEmail } = require('../services/gohighlevel');
+const { upsertContact, lookupContactByEmail, sendEmail } = require('../services/gohighlevel');
 
 // POST /api/preview/signup
 // Body: { email: string, first_name: string }
@@ -55,23 +54,9 @@ router.post('/signup', async (req, res) => {
     return res.status(500).json({ error: 'Failed to save signup' });
   }
 
-  // Fire-and-forget GHL contact creation
-  const ghlKey = process.env.GHL_API_KEY || process.env.GOHIGHLEVEL_API;
-  if (ghlKey) {
-    axios.post(
-      'https://rest.gohighlevel.com/v1/contacts/',
-      {
-        locationId: process.env.GHL_LOCATION_ID || 'SrttR5wZPQD7bIeOAplf',
-        email: cleanEmail,
-        firstName: cleanName,
-        tags: ['practice-preview'],
-      },
-      {
-        headers: { Authorization: `Bearer ${ghlKey}`, 'Content-Type': 'application/json' },
-        timeout: 8000,
-      }
-    ).catch(err => console.error('preview/signup GHL error:', err.message));
-  }
+  // Fire-and-forget GHL contact creation (uses the v2 service that's already validated)
+  upsertContact({ email: cleanEmail, firstName: cleanName, tags: ['practice-preview'] })
+    .catch(err => console.error('preview/signup GHL error:', err.message));
 
   res.json({ success: true });
 });

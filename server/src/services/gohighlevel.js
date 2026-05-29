@@ -37,9 +37,19 @@ async function lookupContactByEmail(email) {
   const locationId = process.env.GHL_LOCATION_ID;
   if (!apiKey || !locationId) return null;
 
-  const url = `${GHL_API_BASE}/contacts/?locationId=${encodeURIComponent(locationId)}&query=${encodeURIComponent(email)}&limit=1`;
-  const res = await fetch(url, {
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Version': '2021-07-28' },
+  // POST /contacts/search supports exact email matching via the filters body
+  const res = await fetch(`${GHL_API_BASE}/contacts/search`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Version': '2021-07-28',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      locationId,
+      filters: [{ field: 'email', operator: 'eq', value: email }],
+      pageLimit: 1,
+    }),
   });
   if (!res.ok) return null;
   const data = await res.json();
