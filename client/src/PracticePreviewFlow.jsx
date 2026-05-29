@@ -12,6 +12,7 @@ export function PracticePreviewFlow() {
   const [examConfig, setExamConfig] = useState(null);
   const [signupLoading, setSignupLoading] = useState(false);
   const [signupError, setSignupError] = useState(null);
+  const [consentChecked, setConsentChecked] = useState(false);
   const [chatState, setChatState] = useState({
     messages: [],
     displayContent: null,
@@ -116,13 +117,31 @@ export function PracticePreviewFlow() {
                 placeholder="you@example.com"
               />
             </div>
+            <div className="diagnostic-consent-field">
+              <label className="diagnostic-consent-label">
+                <input
+                  type="checkbox"
+                  className="diagnostic-consent-checkbox"
+                  checked={consentChecked}
+                  onChange={e => setConsentChecked(e.target.checked)}
+                  required
+                />
+                <span>
+                  I agree to the{' '}
+                  <a href="/terms-of-use.html" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                  {' '}and{' '}
+                  <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+                  , and consent to receive email messages from Full Steam Ahead.
+                </span>
+              </label>
+            </div>
             {signupError && (
               <p className="diagnostic-error">{signupError}</p>
             )}
             <button
               type="submit"
               className="diagnostic-cta-btn"
-              disabled={signupLoading}
+              disabled={signupLoading || !consentChecked}
             >
               {signupLoading ? 'Saving…' : 'Start My Free Practice Exam →'}
             </button>

@@ -55,7 +55,7 @@ router.post('/signup', async (req, res) => {
   }
 
   // Fire-and-forget GHL contact creation (uses the v2 service that's already validated)
-  upsertContact({ email: cleanEmail, firstName: cleanName, tags: ['practice-preview'] })
+  upsertContact({ email: cleanEmail, firstName: cleanName, tags: ['practice-preview', 'opted-in'] })
     .catch(err => console.error('preview/signup GHL error:', err.message));
 
   res.json({ success: true });
