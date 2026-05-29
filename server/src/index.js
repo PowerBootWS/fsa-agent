@@ -72,6 +72,14 @@ app.use('/api/diagnostic', diagnosticRouter);
 const examRouter = require('./routes/exam');
 app.use('/api/exam', examRouter);
 
+// v2 routes
+const v2LessonRouter = require('./routes/v2/lesson');
+app.use('/api/v2/lesson', v2LessonRouter);
+
+// Serve lesson media files (bind-mounted from host)
+const MEDIA_DIR = process.env.MEDIA_DIR || '/srv/fsa-media';
+app.use('/media', express.static(MEDIA_DIR));
+
 // Serve React app from client build
 app.use(express.static(path.join(__dirname, '../client/build')));
 

@@ -149,6 +149,107 @@ async function getChapterWeights(userEmail, courseId) {
   return result.rows;
 }
 
+// ── v2: Lesson Player ────────────────────────────────────────────────────────
+
+async function getV2Lesson(lessonCode) {
+  const chunksResult = await pool.query(
+    `SELECT
+       lc.slide_number,
+       lc.chunk_type,
+       lc.title,
+       lc.body,
+       lc.narration,
+       lc.source_content,
+       lc.audio_url,
+       lc.image_url,
+       lc.narration_timing,
+       lc.checkpoint_after
+     FROM lesson_chunks lc
+     WHERE lc.lesson_code = $1
+     ORDER BY lc.slide_number ASC`,
+    [lessonCode]
+  );
+  if (chunksResult.rows.length === 0) return null;
+
+  const metaResult = await pool.query(
+    'SELECT title, summary FROM lessons WHERE lesson_code = $1',
+    [lessonCode]
+  );
+
+  return {
+    lesson_code: lessonCode,
+    title: metaResult.rows[0]?.title || lessonCode,
+    summary: metaResult.rows[0]?.summary || null,
+    sections: chunksResult.rows,
+  };
+}
+
+async function upsertLearnerSession(learnerId, lessonCode) {
+  const result = await pool.query(
+    `INSERT INTO learner_sessions (learner_id, lesson_code)
+     VALUES ($1, $2)
+     ON CONFLICT (learner_id, lesson_code) DO UPDATE
+       SET updated_at = now()
+     RETURNING *`,
+    [learnerId, lessonCode]
+  );
+  return result.rows[0];
+}
+
+async function updateLearnerSession(sessionId, { lastSection, sectionsViewed, checkpointEntry }) {
+  const updates = [];
+  const values = [];
+  let idx = 1;
+
+  if (lastSection !== undefined) {
+    updates.push(`last_section = $${idx++}`);
+    values.push(lastSection);
+  }
+  if (sectionsViewed !== undefined) {
+    updates.push(`sections_viewed = $${idx++}`);
+    values.push(sectionsViewed);
+  }
+  if (checkpointEntry !== undefined) {
+    updates.push(`checkpoint_log = checkpoint_log || $${idx++}::jsonb`);
+    values.push(JSON.stringify([checkpointEntry]));
+  }
+
+  updates.push('updated_at = now()');
+  values.push(sessionId);
+
+  const result = await pool.query(
+    `UPDATE learner_sessions SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`,
+    values
+  );
+  return result.rows[0] || null;
+}
+
+async function getLearnerSession(sessionId) {
+  const result = await pool.query(
+    'SELECT * FROM learner_sessions WHERE id = $1',
+    [sessionId]
+  );
+  return result.rows[0] || null;
+}
+
+async function getCheckpointQuestion(lessonCode, excludeIds = []) {
+  const excludeClause = excludeIds.length > 0 ? 'AND id != ALL($2::int[])' : '';
+  const params = excludeIds.length > 0 ? [lessonCode, excludeIds] : [lessonCode];
+
+  const result = await pool.query(
+    `SELECT id, question_text, options, correct_answer, difficulty, question_type
+     FROM questions
+     WHERE lesson_code = $1
+       AND question_type = 'objective_practice'
+       AND standalone = true
+       ${excludeClause}
+     ORDER BY RANDOM()
+     LIMIT 1`,
+    params
+  );
+  return result.rows[0] || null;
+}
+
 module.exports = {
   pool,
   getLesson,
@@ -159,4 +260,10 @@ module.exports = {
   upsertUser,
   saveChatHistory,
   getChapterWeights,
+  // v2
+  getV2Lesson,
+  upsertLearnerSession,
+  updateLearnerSession,
+  getLearnerSession,
+  getCheckpointQuestion,
 };
