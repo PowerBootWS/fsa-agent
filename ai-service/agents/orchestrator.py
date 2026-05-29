@@ -124,6 +124,7 @@ class Orchestrator:
                 # Exam configuration (set once on session init from client)
                 'exam_question_count': (exam_config or {}).get('count', PRACTICE_EXAM_QUESTION_COUNT),
                 'exam_timed': (exam_config or {}).get('timed', False),
+                'exam_lead_magnet': (exam_config or {}).get('lead_magnet', False),
             }
 
         state = self.conversation_state[state_key]
@@ -148,6 +149,7 @@ class Orchestrator:
                 state['exam_results'] = []
                 state['exam_question_count'] = exam_config.get('count', PRACTICE_EXAM_QUESTION_COUNT)
                 state['exam_timed'] = exam_config.get('timed', False)
+                state['exam_lead_magnet'] = exam_config.get('lead_magnet', False)
             return self._process_practice_exam(
                 state, user, lesson_id, message, researcher, display, tutor, lesson_context, progress
             )
@@ -1167,18 +1169,40 @@ class Orchestrator:
         strong_str = ', '.join(strong_chapters) if strong_chapters else 'none'
         missed_str = ', '.join(missed_obj_mentions) if missed_obj_mentions else ''
 
-        debrief_prompt = (
-            f"The student {first_name} just completed a {total_q}-question practice exam for {course_id}.\n"
-            f"Overall: {total_correct}/{total_q} ({score_pct}%)\n"
-            f"Strong chapters: {strong_str}\n"
-            f"Chapters needing review: {weak_str}\n"
-            + (f"Missed objectives: {missed_str}\n" if missed_str else '')
-            + f"\nWrite a warm, concise debrief (4-6 sentences). Acknowledge their score. "
-            f"Highlight 1-2 strong chapters if any. "
-            + (f"Reference the specific missed objectives by name ({missed_str}) and say you've added teaching notes below. " if missed_str else '')
-            + f"Mention the next exam will be weighted to their weak areas. "
-            f"End by asking if they'd like to try again. Address them as {first_name}."
-        )
+        if state.get('exam_lead_magnet'):
+            debrief_prompt = (
+                f"A prospective student named {first_name} just completed a {total_q}-question "
+                f"practice exam for the {course_id} exam paper.\n"
+                f"Overall: {total_correct}/{total_q} ({score_pct}%)\n"
+                f"Strong chapters: {strong_str}\n"
+                f"Chapters needing review: {weak_str}\n"
+                + (f"Missed objectives: {missed_str}\n" if missed_str else "")
+                + f"\nWrite a warm, encouraging 5-7 sentence response. "
+                f"Address them as {first_name}. "
+                f"Start by acknowledging their score. "
+                f"Highlight their strong chapters if any exist. "
+                f"If they have weak chapters, explain that Full Steam Ahead's practice exams "
+                f"automatically adapt — giving more questions on chapters they struggle with — "
+                f"so they improve faster. "
+                f"End with a genuine, warm invitation: a Full Steam Ahead subscription gives them "
+                f"unlimited adaptive practice exams for all 6 papers, full course content with "
+                f"step-by-step lessons, and AI tutoring for $149/month. "
+                f"Invite them to enroll at https://enrollment.fullsteamahead.ca . "
+                f"Be encouraging and genuine, not pushy."
+            )
+        else:
+            debrief_prompt = (
+                f"The student {first_name} just completed a {total_q}-question practice exam for {course_id}.\n"
+                f"Overall: {total_correct}/{total_q} ({score_pct}%)\n"
+                f"Strong chapters: {strong_str}\n"
+                f"Chapters needing review: {weak_str}\n"
+                + (f"Missed objectives: {missed_str}\n" if missed_str else '')
+                + f"\nWrite a warm, concise debrief (4-6 sentences). Acknowledge their score. "
+                f"Highlight 1-2 strong chapters if any. "
+                + (f"Reference the specific missed objectives by name ({missed_str}) and say you've added teaching notes below. " if missed_str else '')
+                + f"Mention the next exam will be weighted to their weak areas. "
+                f"End by asking if they'd like to try again. Address them as {first_name}."
+            )
 
         debrief_state = {
             'activity': 'exam_debrief',

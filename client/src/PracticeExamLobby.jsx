@@ -19,7 +19,7 @@ const COUNT_OPTIONS = [
  *   onSelectChapter    fn(chapterId)      — called when a chapter button is clicked
  *   onViewLastResults  fn(debrief)        — called when student wants to review last attempt
  */
-export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, onSelectChapter, onViewLastResults }) {
+export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, onSelectChapter, onViewLastResults, leadMagnetMode = false }) {
   const [selectedCount, setSelectedCount] = useState(null);
   const [timed, setTimed] = useState(false);
   const [chapters, setChapters] = useState([]);
@@ -36,6 +36,7 @@ export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, on
 
   useEffect(() => {
     if (!user) return;
+    if (leadMagnetMode) return;
     fetch(`/api/exam/${encodeURIComponent(courseId)}/last-results?user=${encodeURIComponent(user)}`)
       .then(r => r.json())
       .then(data => setLastResults(data.available ? data : null))
@@ -61,7 +62,7 @@ export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, on
           </p>
 
           <div className="lobby-count-options">
-            {COUNT_OPTIONS.map(opt => (
+            {(leadMagnetMode ? COUNT_OPTIONS.filter(o => o.count !== 100) : COUNT_OPTIONS).map(opt => (
               <button
                 key={opt.count}
                 className={`lobby-count-btn${selectedCount === opt.count ? ' lobby-count-btn--selected' : ''}`}
@@ -93,7 +94,7 @@ export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, on
             Start Exam →
           </button>
 
-          {lastResults && onViewLastResults && (
+          {lastResults && onViewLastResults && !leadMagnetMode && (
             <button
               className="lobby-review-btn"
               onClick={() => onViewLastResults(lastResults)}
@@ -120,6 +121,17 @@ export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, on
                 // Display as "Chapter N" by extracting the trailing number
                 const parts = chapterId.split('-');
                 const label = parts.length >= 2 ? `Chapter ${parts[parts.length - 1]}` : chapterId;
+                if (leadMagnetMode) {
+                  return (
+                    <button
+                      key={chapterId}
+                      className="lobby-chapter-btn lobby-chapter-btn--locked"
+                      disabled
+                    >
+                      🔒 {label}
+                    </button>
+                  );
+                }
                 return (
                   <button
                     key={chapterId}
@@ -131,6 +143,9 @@ export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, on
                 );
               })}
             </div>
+          )}
+          {leadMagnetMode && (
+            <p className="lobby-chapter-locked-note">Chapter quizzes available with a full subscription</p>
           )}
         </div>
       </div>

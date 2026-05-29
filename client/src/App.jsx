@@ -8,6 +8,7 @@ import { CountdownTimer } from './CountdownTimer.jsx';
 import { PracticeExamLobby } from './PracticeExamLobby.jsx';
 import { TeachingNotes, NextAttemptPreview } from './TeachingNotes.jsx';
 import { MathContent } from './MathContent.jsx';
+import { PracticePreviewFlow } from './PracticePreviewFlow.jsx';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -110,6 +111,12 @@ function App() {
       return;
     }
 
+    if (modeParam === 'practice_preview') {
+      setMode('practice_preview');
+      setLoading(false);
+      return;
+    }
+
     const userEmail = params.get('user');
     const lessonParam = params.get('lesson');
 
@@ -155,6 +162,17 @@ function App() {
       <ErrorBoundary>
         <div className="app-container app-fullpage">
           <DiagnosticFlow />
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
+  // Practice preview lead magnet mode
+  if (mode === 'practice_preview') {
+    return (
+      <ErrorBoundary>
+        <div className="app-container app-fullpage">
+          <PracticePreviewFlow />
         </div>
       </ErrorBoundary>
     );
@@ -379,7 +397,7 @@ function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState })
 // Quiz / Exam full-page view
 // ---------------------------------------------------------------------------
 
-function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter }) {
+export function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter, leadMagnetMode }) {
   const isExam = mode === 'practice_exam';
   const examProgress = chatState.examProgress;
 
@@ -500,6 +518,7 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
             mode={mode}
             isExam={isExam}
             onSelectChapter={onSelectChapter}
+            leadMagnetMode={leadMagnetMode}
           />
         </div>
         <div className="quizexam-chat-panel">
@@ -849,7 +868,7 @@ function ExamProgressBar({ current, total, correct }) {
   );
 }
 
-function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSelectChapter }) {
+function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSelectChapter, leadMagnetMode }) {
   if (!displayContent) {
     return (
       <div className="quizexam-display-empty">
@@ -868,6 +887,7 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSele
         isExam={isExam}
         onRetry={isExam ? () => onAnswer('yes') : null}
         onSelectChapter={onSelectChapter}
+        leadMagnetMode={leadMagnetMode}
       />
     );
   }
@@ -918,7 +938,7 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSele
   return null;
 }
 
-function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter }) {
+function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, leadMagnetMode }) {
   const { score, total, score_pct, chapter_stats,
           objective_breakdowns, next_attempt_allocation } = displayContent;
   const scoreColor = score_pct >= 75 ? '#16a34a' : score_pct >= 55 ? '#d97706' : '#dc2626';
@@ -957,6 +977,7 @@ function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter }) {
           objectiveBreakdowns={objective_breakdowns}
           chapterStats={chapter_stats}
           onSelectChapter={onSelectChapter}
+          leadMagnetMode={leadMagnetMode}
         />
       )}
 
@@ -967,7 +988,7 @@ function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter }) {
         />
       )}
 
-      {onRetry && (
+      {onRetry && !leadMagnetMode && (
         <div className="results-retry-block">
           <button
             className="results-retry-btn"
@@ -979,6 +1000,16 @@ function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter }) {
           <p className="results-retry-hint">
             Your next exam will pull more questions from chapters you struggled with.
           </p>
+        </div>
+      )}
+
+      {leadMagnetMode && (
+        <div className="results-enroll-cta">
+          <p>Ready to close the gaps? Full Steam Ahead covers all six papers with adaptive practice exams, step-by-step courses, and AI tutoring.</p>
+          <a href="https://enrollment.fullsteamahead.ca" className="diagnostic-cta-btn" target="_blank" rel="noopener noreferrer">
+            Start Your Subscription →
+          </a>
+          <p className="diagnostic-cta-fine">$149/month · all 6 papers · cancel anytime</p>
         </div>
       )}
     </div>

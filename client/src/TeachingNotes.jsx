@@ -11,7 +11,7 @@ import { MathContent } from './MathContent.jsx';
  *   chapterStats         array  from display_update.chapter_stats [{chapter, pct, ...}]
  *   onSelectChapter      fn(chapterId) — triggers inline chapter quiz
  */
-export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapter }) {
+export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapter, leadMagnetMode }) {
   if (!objectiveBreakdowns || objectiveBreakdowns.length === 0) return null;
 
   // Build a quick lookup: chapter_id → pct
@@ -35,13 +35,17 @@ export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapt
               )}
             </div>
             <p className="teaching-card-tip"><MathContent text={obj.teaching_tip} /></p>
-            {showQuizBtn && onSelectChapter && (
-              <button
-                className="teaching-card-quiz-btn"
-                onClick={() => onSelectChapter(obj.chapter_id)}
-              >
-                📝 Try the Chapter Quiz instead →
-              </button>
+            {showQuizBtn && (
+              leadMagnetMode
+                ? <button disabled className="teaching-card-quiz-btn teaching-card-quiz-btn--locked">🔒 Chapter Quizzes — Unlock with Full Access</button>
+                : (onSelectChapter && (
+                    <button
+                      className="teaching-card-quiz-btn"
+                      onClick={() => onSelectChapter(obj.chapter_id)}
+                    >
+                      📝 Try the Chapter Quiz instead →
+                    </button>
+                  ))
             )}
           </div>
         );

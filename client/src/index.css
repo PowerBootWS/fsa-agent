@@ -921,9 +921,24 @@ body {
 .diagnostic-form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
+  margin-top: 8px;
 }
+.diagnostic-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.diagnostic-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #5a6c7d;
+  letter-spacing: 0.02em;
+}
+.diagnostic-input,
 .diagnostic-form input {
+  width: 100%;
+  box-sizing: border-box;
   padding: 12px 16px;
   border: 1.5px solid #d1dde8;
   border-radius: 8px;
@@ -931,7 +946,9 @@ body {
   outline: none;
   transition: border-color 0.2s;
   font-family: inherit;
+  color: #1a2e42;
 }
+.diagnostic-input:focus,
 .diagnostic-form input:focus {
   border-color: #2563eb;
 }

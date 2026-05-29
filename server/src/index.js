@@ -56,6 +56,7 @@ const chatHistoryRouter = require('./routes/chat-history');
 const enrollRouter = require('./routes/enroll');
 const responsesRouter = require('./routes/responses');
 const demoRouter = require('./routes/demo');
+const previewRouter = require('./routes/preview');
 
 app.use('/api/validate', validateRouter);
 app.use('/api/lesson', lessonRouter);
@@ -71,6 +72,7 @@ app.use('/api/diagnostic', diagnosticRouter);
 
 const examRouter = require('./routes/exam');
 app.use('/api/exam', examRouter);
+app.use('/api/preview', previewRouter);
 
 // v2 routes
 const v2LessonRouter = require('./routes/v2/lesson');

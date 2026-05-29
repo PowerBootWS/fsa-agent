@@ -1,0 +1,218 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { PracticeExamLobby } from './PracticeExamLobby.jsx';
+import { QuizExamView } from './App.jsx';
+
+const PAPERS = ['2A1', '2A2', '2A3', '2B1', '2B2', '2B3'];
+
+export function PracticePreviewFlow() {
+  const [phase, setPhase] = useState('signup'); // 'signup' | 'paper_picker' | 'lobby' | 'exam' | 'already_used'
+  const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [selectedPaper, setSelectedPaper] = useState(null);
+  const [examConfig, setExamConfig] = useState(null);
+  const [signupLoading, setSignupLoading] = useState(false);
+  const [signupError, setSignupError] = useState(null);
+  const [chatState, setChatState] = useState({
+    messages: [],
+    displayContent: null,
+    complexityLevel: 3,
+    examProgress: null,
+  });
+  const emailSentRef = useRef(false);
+
+  // Send results email exactly once when the debrief loads
+  useEffect(() => {
+    const d = chatState.displayContent;
+    if (d?.type !== 'exam_done' || emailSentRef.current || !email) return;
+    emailSentRef.current = true;
+    fetch('/api/preview/send-results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        first_name: firstName,
+        course_id: selectedPaper,
+        score: d.score,
+        total: d.total,
+        score_pct: d.score_pct,
+        chapter_stats: d.chapter_stats || [],
+      }),
+    }).catch(() => {}); // fire-and-forget
+  }, [chatState.displayContent]);
+
+  // ── Signup ──────────────────────────────────────────────────────────────────
+  const handleSignupSubmit = async (e) => {
+    e.preventDefault();
+    setSignupError(null);
+    setSignupLoading(true);
+    try {
+      const res = await fetch('/api/preview/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, first_name: firstName }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPhase('paper_picker');
+      } else if (data.already_used) {
+        setPhase('already_used');
+      } else {
+        setSignupError(data.error || 'Something went wrong. Please try again.');
+      }
+    } catch {
+      setSignupError('Something went wrong. Please try again.');
+    } finally {
+      setSignupLoading(false);
+    }
+  };
+
+  // ── Paper picker ─────────────────────────────────────────────────────────────
+  const handleSelectPaper = (paper) => {
+    setSelectedPaper(paper);
+    // Reset chat state for a fresh exam
+    setChatState({ messages: [], displayContent: null, complexityLevel: 3, examProgress: null });
+    setPhase('lobby');
+  };
+
+  // ── Lobby → exam ─────────────────────────────────────────────────────────────
+  const handleStartExam = ({ count, timed }) => {
+    setExamConfig({ count, timed, lead_magnet: true, first_name: firstName });
+    setChatState({ messages: [], displayContent: null, complexityLevel: 3, examProgress: null });
+    setPhase('exam');
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+
+  if (phase === 'signup') {
+    return (
+      <div className="diagnostic-page">
+        <div className="diagnostic-card">
+          <h1 className="diagnostic-heading">Free Practice Exam</h1>
+          <p className="diagnostic-intro">
+            Try a real practice exam — no credit card needed. We'll send your personalized results to your inbox.
+          </p>
+          <form onSubmit={handleSignupSubmit} className="diagnostic-form">
+            <div className="diagnostic-field">
+              <label className="diagnostic-label" htmlFor="preview-firstname">First Name</label>
+              <input
+                id="preview-firstname"
+                type="text"
+                className="diagnostic-input"
+                value={firstName}
+                onChange={e => setFirstName(e.target.value)}
+                required
+                placeholder="Your first name"
+              />
+            </div>
+            <div className="diagnostic-field">
+              <label className="diagnostic-label" htmlFor="preview-email">Email</label>
+              <input
+                id="preview-email"
+                type="email"
+                className="diagnostic-input"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                placeholder="you@example.com"
+              />
+            </div>
+            {signupError && (
+              <p className="diagnostic-error">{signupError}</p>
+            )}
+            <button
+              type="submit"
+              className="diagnostic-cta-btn"
+              disabled={signupLoading}
+            >
+              {signupLoading ? 'Saving…' : 'Start My Free Practice Exam →'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === 'already_used') {
+    return (
+      <div className="diagnostic-page">
+        <div className="diagnostic-card">
+          <h1 className="diagnostic-heading">You've Already Taken Your Free Exam</h1>
+          <p className="diagnostic-intro">
+            Looks like {firstName || 'you'} already completed a free practice exam with us.
+            Each visitor gets one free attempt — but the real thing is even better.
+          </p>
+          <p className="diagnostic-intro">
+            A Full Steam Ahead subscription gives you unlimited adaptive practice exams for all
+            six papers, full course content with step-by-step lessons, and AI tutoring — all for $149/month.
+          </p>
+          <a
+            href="https://enrollment.fullsteamahead.ca"
+            className="diagnostic-cta-btn"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Start Your Subscription →
+          </a>
+          <p className="diagnostic-cta-fine">$149/month · all 6 papers · cancel anytime</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === 'paper_picker') {
+    return (
+      <div className="diagnostic-page">
+        <div className="diagnostic-card">
+          <h1 className="diagnostic-heading">Choose Your Exam Paper</h1>
+          <p className="diagnostic-intro">Select the paper you'd like to practice</p>
+          <div className="preview-paper-grid">
+            {PAPERS.map(paper => (
+              <button
+                key={paper}
+                className="preview-paper-btn"
+                onClick={() => handleSelectPaper(paper)}
+              >
+                {paper}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === 'lobby') {
+    return (
+      <PracticeExamLobby
+        courseId={selectedPaper}
+        user={email}
+        lessonTitle={`${selectedPaper} Practice Exam`}
+        leadMagnetMode={true}
+        onStartExam={handleStartExam}
+        onSelectChapter={null}
+      />
+    );
+  }
+
+  // phase === 'exam'
+  const lesson = {
+    id: selectedPaper,
+    title: selectedPaper + ' Practice Exam',
+    mode: 'practice_exam',
+    paper: selectedPaper,
+  };
+
+  return (
+    <QuizExamView
+      lesson={lesson}
+      user={email}
+      lessonId={selectedPaper}
+      mode="practice_exam"
+      chatState={chatState}
+      setChatState={setChatState}
+      examConfig={examConfig}
+      onSelectChapter={null}
+      leadMagnetMode={true}
+    />
+  );
+}
