@@ -1,0 +1,166 @@
+// fsa-agent/client-v2/src/components/TutorPanel.jsx
+import { useState, useRef, useEffect } from 'react';
+
+const BETWEEN_MESSAGES = [
+  "You can ask me anything about this section at any time.",
+  "Take your time — I'm here if you have questions.",
+  "Did that make sense? Keep going or ask me to explain anything differently.",
+];
+
+/**
+ * QuestionCard — renders a single practice question with answer selection.
+ * Uses correct_answer (matches the DB column name).
+ */
+function QuestionCard({ question, onAnswer }) {
+  const [selected, setSelected] = useState(null);
+  const options = question.options || [];
+
+  function handleSelect(idx) {
+    if (selected !== null) return; // already answered
+    setSelected(idx);
+    const correct = idx === question.correct_answer;
+    onAnswer({
+      question_id: question.id,
+      answer_index: idx,
+      correct,
+      correct_answer: question.correct_answer,
+    });
+  }
+
+  return (
+    <div className="question-card">
+      <div className="q-text">{question.question_text}</div>
+      {options.map((opt, idx) => (
+        <button
+          key={idx}
+          className={[
+            'q-option',
+            selected !== null && idx === question.correct_answer ? 'correct' : '',
+            selected === idx && idx !== question.correct_answer ? 'wrong' : '',
+          ].filter(Boolean).join(' ')}
+          onClick={() => handleSelect(idx)}
+        >
+          {typeof opt === 'string' ? opt : opt.text || JSON.stringify(opt)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * TutorPanel — right 40% of the lesson player.
+ *
+ * Props:
+ *   lessonCode     — string
+ *   learnerId      — string
+ *   sectionIndex   — current section index (triggers between-section messages)
+ *   checkpoint     — { message, question } | null
+ *   onAnswered     — (entry) => void
+ */
+export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, onAnswered }) {
+  const [messages, setMessages] = useState([
+    { type: 'proactive', text: "Welcome! I'm your AI tutor. Ask me anything as we go through this lesson." },
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Between-section proactive nudge (skip first section)
+  useEffect(() => {
+    if (sectionIndex === 0) return;
+    const msg = BETWEEN_MESSAGES[sectionIndex % BETWEEN_MESSAGES.length];
+    setMessages(prev => [...prev, { type: 'proactive', text: msg }]);
+  }, [sectionIndex]);
+
+  // Checkpoint injection
+  useEffect(() => {
+    if (!checkpoint) return;
+    setMessages(prev => [
+      ...prev,
+      { type: 'proactive', text: checkpoint.message },
+      ...(checkpoint.question
+        ? [{ type: 'question', question: checkpoint.question }]
+        : []),
+    ]);
+  }, [checkpoint]);
+
+  async function handleSend() {
+    const text = input.trim();
+    if (!text || loading) return;
+    setInput('');
+    setMessages(prev => [...prev, { type: 'user', text }]);
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user: learnerId,
+          lessonId: lessonCode,
+          message: text,
+        }),
+      });
+      const data = await res.json();
+      const reply = data.response || data.message || 'Sorry, I could not respond right now.';
+      setMessages(prev => [...prev, { type: 'tutor', text: reply }]);
+    } catch {
+      setMessages(prev => [...prev, { type: 'tutor', text: 'Connection error. Please try again.' }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  }
+
+  function handleAnswer(entry) {
+    onAnswered(entry);
+    const feedback = entry.correct
+      ? "Correct! Great work."
+      : `Not quite — the correct answer was option ${(entry.correct_answer ?? 0) + 1}. Don't worry, keep going!`;
+    setMessages(prev => [...prev, { type: 'proactive', text: feedback }]);
+  }
+
+  return (
+    <div className="tutor-panel">
+      <div className="tutor-header">AI Tutor</div>
+      <div className="tutor-messages">
+        {messages.map((msg, i) => {
+          if (msg.type === 'question') {
+            return <QuestionCard key={i} question={msg.question} onAnswer={handleAnswer} />;
+          }
+          return (
+            <div
+              key={i}
+              className={`tutor-msg${msg.type === 'proactive' ? ' proactive' : msg.type === 'user' ? ' user' : ''}`}
+            >
+              {msg.text}
+            </div>
+          );
+        })}
+        {loading && <div className="tutor-msg proactive">Thinking…</div>}
+        <div ref={messagesEndRef} />
+      </div>
+      <div className="tutor-input-row">
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Ask the tutor…"
+          disabled={loading}
+        />
+        <button onClick={handleSend} disabled={loading || !input.trim()}>Send</button>
+      </div>
+    </div>
+  );
+}
