@@ -86,7 +86,13 @@ app.use('/api/v2/checkpoint', v2CheckpointRouter);
 const MEDIA_DIR = process.env.MEDIA_DIR || '/srv/fsa-media';
 app.use('/media', express.static(MEDIA_DIR));
 
-// Serve React app from client build
+// Serve client-v2 at /v2
+app.use('/v2', express.static(path.join(__dirname, '../client-v2/build')));
+app.get('/v2/*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client-v2/build/index.html'));
+});
+
+// Serve React app (client v1) from client build
 app.use(express.static(path.join(__dirname, '../client/build')));
 
 // Handle React routing - return index.html for all non-API routes
