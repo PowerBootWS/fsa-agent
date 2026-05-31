@@ -5,24 +5,68 @@ import 'katex/dist/katex.min.css';
 import { useAudio } from '../hooks/useAudio';
 import { useNarrationSync } from '../hooks/useNarrationSync';
 
-/**
- * Render body text, replacing $$...$$ and $...$ with KaTeX components.
- */
-function MathContent({ text }) {
-  if (!text) return null;
-  const parts = text.split(/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g);
+// Render a text segment with math and **bold** support.
+function renderInline(text, keyPrefix) {
+  const mathParts = text.split(/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g);
+  return mathParts.flatMap((part, i) => {
+    if (part.startsWith('$$') && part.endsWith('$$')) {
+      return [<BlockMath key={`${keyPrefix}-m${i}`} math={part.slice(2, -2)} />];
+    }
+    if (part.startsWith('$') && part.endsWith('$')) {
+      return [<InlineMath key={`${keyPrefix}-m${i}`} math={part.slice(1, -1)} />];
+    }
+    return part.split(/(\*\*[^*]+\*\*)/g).map((p, j) => {
+      if (p.startsWith('**') && p.endsWith('**')) {
+        return <strong key={`${keyPrefix}-b${i}-${j}`}>{p.slice(2, -2)}</strong>;
+      }
+      return <span key={`${keyPrefix}-b${i}-${j}`}>{p}</span>;
+    });
+  });
+}
+
+// Parses body text into seed sentence(s) + bullet lines.
+// Seed sentences are non-bullet lines before the first bullet.
+// Bullets start with - / • / *.
+function BodyContent({ body, imageUrl }) {
+  if (!body && !imageUrl) return null;
+
+  const seedLines = [];
+  const bulletLines = [];
+
+  if (body) {
+    for (const raw of body.split('\n')) {
+      const line = raw.trim();
+      if (!line) continue;
+      if (/^[-•*]\s/.test(line)) {
+        bulletLines.push(line.replace(/^[-•*]\s*/, ''));
+      } else if (bulletLines.length === 0) {
+        seedLines.push(line);
+      }
+    }
+  }
+
+  const seedText = seedLines.join(' ');
+
   return (
-    <>
-      {parts.map((part, i) => {
-        if (part.startsWith('$$') && part.endsWith('$$')) {
-          return <BlockMath key={i} math={part.slice(2, -2)} />;
-        }
-        if (part.startsWith('$') && part.endsWith('$')) {
-          return <InlineMath key={i} math={part.slice(1, -1)} />;
-        }
-        return <span key={i}>{part}</span>;
-      })}
-    </>
+    <div className="body-content">
+      {(seedText || imageUrl) && (
+        <div className="slide-header">
+          {seedText && (
+            <p className="slide-seed">{renderInline(seedText, 'seed')}</p>
+          )}
+          {imageUrl && (
+            <img className="slide-image" src={imageUrl} alt="" />
+          )}
+        </div>
+      )}
+      {bulletLines.length > 0 && (
+        <ul className="slide-bullets">
+          {bulletLines.map((line, i) => (
+            <li key={i}>{renderInline(line, `b${i}`)}</li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -49,12 +93,10 @@ export function ContentPanel({ section, sectionIndex, totalSections, autoPlay, o
     sectionStartTime
   );
 
-  // Reset start time when section changes
   useEffect(() => {
     setSectionStartTime(Date.now());
   }, [section?.slide_number]);
 
-  // Auto-play on forward navigation only
   useEffect(() => {
     if (autoPlay && section?.audio_url && !muted) {
       play();
@@ -66,18 +108,9 @@ export function ContentPanel({ section, sectionIndex, totalSections, autoPlay, o
 
   return (
     <div className="content-panel">
-      <h2 className="section-title">{section.title}</h2>
-
-      {section.image_url && (
-        <img
-          className="section-image"
-          src={section.image_url}
-          alt={section.title}
-        />
-      )}
-
-      <div className="section-body">
-        <MathContent text={section.body} />
+      <div className="content-scroll">
+        <h2 className="section-title">{section.title}</h2>
+        <BodyContent body={section.body} imageUrl={section.image_url} />
       </div>
 
       {section.narration_timing && (

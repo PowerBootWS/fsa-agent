@@ -86,7 +86,7 @@ app.use('/api/v2/checkpoint', v2CheckpointRouter);
 
 // Serve lesson media files (bind-mounted from host)
 const MEDIA_DIR = process.env.MEDIA_DIR || '/srv/fsa-media';
-app.use('/media', express.static(MEDIA_DIR));
+app.use('/media', express.static(MEDIA_DIR, { maxAge: '5m' }));
 
 // Serve client-v2 at /v2
 app.use('/v2', express.static(path.join(__dirname, '../client-v2/build')));

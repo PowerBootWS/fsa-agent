@@ -70,11 +70,11 @@ export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, on
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Between-section proactive nudge (skip first section)
+  // On section change, clear chat and show a fresh single message
   useEffect(() => {
     if (sectionIndex === 0) return;
     const msg = BETWEEN_MESSAGES[sectionIndex % BETWEEN_MESSAGES.length];
-    setMessages(prev => [...prev, { type: 'proactive', text: msg }]);
+    setMessages([{ type: 'proactive', text: msg }]);
   }, [sectionIndex]);
 
   // Checkpoint injection
