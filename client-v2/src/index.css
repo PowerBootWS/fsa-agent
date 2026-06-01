@@ -3,7 +3,7 @@
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1.6;
   color: #1a1a2e;
   background: #f8f9fa;
@@ -11,7 +11,7 @@ body {
 
 .lesson-player {
   display: flex;
-  height: 100vh;
+  height: 80vh;
   overflow: hidden;
 }
 
@@ -27,7 +27,7 @@ body {
 .content-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 32px 40px 16px;
+  padding: 20px 32px 12px;
 }
 
 .tutor-panel {
@@ -45,27 +45,33 @@ body {
   color: #0d1b2a;
 }
 
-/* Slide body layout */
-.slide-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 12px;
-}
-
-.slide-seed {
-  flex: 1;
-  margin: 0;
-  font-size: 1rem;
-  color: #2c3e50;
-  line-height: 1.6;
+/* Slide body layout — image floats right, text wraps around it */
+.body-content::after {
+  content: '';
+  display: table;
+  clear: both;
 }
 
 .slide-image {
-  width: 30%;
-  flex-shrink: 0;
+  float: right;
+  width: 50%;
+  margin: 0 0 12px 20px;
   border-radius: 6px;
   object-fit: contain;
+}
+
+.slide-image-latex {
+  display: block;
+  max-width: 65%;
+  margin: 20px auto 0;
+  border-radius: 4px;
+}
+
+.slide-seed {
+  margin: 0 0 10px 0;
+  font-size: 1rem;
+  color: #2c3e50;
+  line-height: 1.6;
 }
 
 .slide-bullets {
@@ -80,15 +86,29 @@ body {
   line-height: 1.5;
 }
 
+/* Title slide card */
+.title-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.title-card-hint {
+  font-size: 1rem;
+  color: #6b7a99;
+  text-align: center;
+}
+
 /* Narration box — sits between scroll area and controls, expands upward */
 .narration-box {
   background: #f0f4ff;
   border-left: 3px solid #5c7cfa;
-  padding: 10px 40px;
+  padding: 8px 32px;
   font-size: 0.88rem;
   color: #3b4a6b;
-  min-height: 52px;
-  max-height: 140px;
+  min-height: 44px;
+  max-height: 110px;
   overflow-y: auto;
   line-height: 1.7;
   flex-shrink: 0;
@@ -98,7 +118,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 40px 0;
+  padding: 8px 32px 0;
   flex-shrink: 0;
 }
 
@@ -127,7 +147,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 40px;
+  padding: 8px 32px;
   border-top: 1px solid #e0e0e0;
   flex-shrink: 0;
 }
@@ -158,10 +178,10 @@ body {
 .tutor-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 20px;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .tutor-msg { background: #fff; border-radius: 8px; padding: 10px 14px; font-size: 0.9rem; }

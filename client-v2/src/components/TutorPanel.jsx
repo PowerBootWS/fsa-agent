@@ -1,5 +1,25 @@
 // fsa-agent/client-v2/src/components/TutorPanel.jsx
 import { useState, useRef, useEffect } from 'react';
+import { InlineMath, BlockMath } from 'react-katex';
+import 'katex/dist/katex.min.css';
+
+function renderInline(text, keyPrefix) {
+  const mathParts = text.split(/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g);
+  return mathParts.flatMap((part, i) => {
+    if (part.startsWith('$$') && part.endsWith('$$')) {
+      return [<BlockMath key={`${keyPrefix}-m${i}`} math={part.slice(2, -2)} />];
+    }
+    if (part.startsWith('$') && part.endsWith('$')) {
+      return [<InlineMath key={`${keyPrefix}-m${i}`} math={part.slice(1, -1)} />];
+    }
+    return part.split(/(\*\*[^*]+\*\*)/g).map((p, j) => {
+      if (p.startsWith('**') && p.endsWith('**')) {
+        return <strong key={`${keyPrefix}-b${i}-${j}`}>{p.slice(2, -2)}</strong>;
+      }
+      return <span key={`${keyPrefix}-b${i}-${j}`}>{p}</span>;
+    });
+  });
+}
 
 const BETWEEN_MESSAGES = [
   "You can ask me anything about this section at any time.",
@@ -63,11 +83,12 @@ export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, on
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom within the messages container (not scrollIntoView — that bubbles to parent page in iframes)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = messagesContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   // On section change, clear chat and show a fresh single message
@@ -107,7 +128,7 @@ export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, on
         }),
       });
       const data = await res.json();
-      const reply = data.response || data.message || 'Sorry, I could not respond right now.';
+      const reply = data.tutor_response || data.response || data.message || 'Sorry, I could not respond right now.';
       setMessages(prev => [...prev, { type: 'tutor', text: reply }]);
     } catch {
       setMessages(prev => [...prev, { type: 'tutor', text: 'Connection error. Please try again.' }]);
@@ -134,7 +155,7 @@ export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, on
   return (
     <div className="tutor-panel">
       <div className="tutor-header">AI Tutor</div>
-      <div className="tutor-messages">
+      <div className="tutor-messages" ref={messagesContainerRef}>
         {messages.map((msg, i) => {
           if (msg.type === 'question') {
             return <QuestionCard key={i} question={msg.question} onAnswer={handleAnswer} />;
@@ -144,12 +165,11 @@ export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, on
               key={i}
               className={`tutor-msg${msg.type === 'proactive' ? ' proactive' : msg.type === 'user' ? ' user' : ''}`}
             >
-              {msg.text}
+              {renderInline(msg.text, `msg${i}`)}
             </div>
           );
         })}
         {loading && <div className="tutor-msg proactive">Thinking…</div>}
-        <div ref={messagesEndRef} />
       </div>
       <div className="tutor-input-row">
         <input

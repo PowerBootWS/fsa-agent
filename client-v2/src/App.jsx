@@ -4,7 +4,7 @@ import { LessonPlayer } from './LessonPlayer';
 export default function App() {
   const params = new URLSearchParams(window.location.search);
   const lessonCode = params.get('lessonId') || params.get('lesson_code') || params.get('lesson');
-  const learnerId = params.get('contact_id') || params.get('learner_id');
+  const learnerId = params.get('contact_id') || params.get('learner_id') || params.get('user');
 
   if (!lessonCode) {
     return (

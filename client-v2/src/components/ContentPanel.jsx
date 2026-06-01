@@ -27,8 +27,17 @@ function renderInline(text, keyPrefix) {
 // Parses body text into seed sentence(s) + bullet lines.
 // Seed sentences are non-bullet lines before the first bullet.
 // Bullets start with - / • / *.
-function BodyContent({ body, imageUrl }) {
-  if (!body && !imageUrl) return null;
+function BodyContent({ body, imageUrl, chunkType }) {
+  if (!body && !imageUrl) {
+    if (chunkType === 'title') {
+      return (
+        <div className="title-card">
+          <p className="title-card-hint">Click <strong>Next →</strong> to begin this objective.</p>
+        </div>
+      );
+    }
+    return null;
+  }
 
   const seedLines = [];
   const bulletLines = [];
@@ -47,18 +56,12 @@ function BodyContent({ body, imageUrl }) {
 
   const seedText = seedLines.join(' ');
 
+  const isLatex = chunkType === 'formula';
+
   return (
     <div className="body-content">
-      {(seedText || imageUrl) && (
-        <div className="slide-header">
-          {seedText && (
-            <p className="slide-seed">{renderInline(seedText, 'seed')}</p>
-          )}
-          {imageUrl && (
-            <img className="slide-image" src={imageUrl} alt="" />
-          )}
-        </div>
-      )}
+      {imageUrl && !isLatex && <img className="slide-image" src={imageUrl} alt="" />}
+      {seedText && <p className="slide-seed">{renderInline(seedText, 'seed')}</p>}
       {bulletLines.length > 0 && (
         <ul className="slide-bullets">
           {bulletLines.map((line, i) => (
@@ -66,6 +69,7 @@ function BodyContent({ body, imageUrl }) {
           ))}
         </ul>
       )}
+      {imageUrl && isLatex && <img className="slide-image-latex" src={imageUrl} alt="" />}
     </div>
   );
 }
@@ -110,7 +114,7 @@ export function ContentPanel({ section, sectionIndex, totalSections, autoPlay, o
     <div className="content-panel">
       <div className="content-scroll">
         <h2 className="section-title">{section.title}</h2>
-        <BodyContent body={section.body} imageUrl={section.image_url} />
+        <BodyContent body={section.body} imageUrl={section.image_url} chunkType={section.chunk_type} />
       </div>
 
       {section.narration_timing && (
