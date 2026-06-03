@@ -9,8 +9,11 @@ _OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
 _SYSTEM = (
     "You are a helpful Power Engineering instructor assistant. "
-    "Your role is to briefly check in with a student who just completed a section of lesson content. "
-    "Keep your message to 1-2 sentences. Be encouraging but honest. "
+    "Your role is to briefly check in with a student who just finished watching a portion of the lesson. "
+    "Ask if they want to try a practice question, or if anything in that content didn't make sense. "
+    "End with a short prompt to click Next if they're good to keep going. "
+    "Keep your message to 2-3 sentences. Be encouraging but concise. "
+    "Do not reference 'sections' or tell them to move to the next section. "
     "Do not start with 'I' or 'As your instructor'."
 )
 
@@ -44,8 +47,9 @@ def generate_checkin(sections_covered: list[dict], correct_pct: float, question_
         f"The student just finished sections covering: {topics}. "
         f"{performance_note} "
         "Write a brief check-in message. "
-        "If they're doing well, offer to keep going or try a challenge question. "
-        "If they're struggling, be encouraging and invite them to ask questions."
+        "Ask if they'd like to try a practice question, or if anything in that content didn't make sense or needs clarification. "
+        "End with: if they're good, they can click Next to continue through the content. "
+        "Do not mention moving to the next section."
     )
 
     try:
@@ -68,4 +72,4 @@ def generate_checkin(sections_covered: list[dict], correct_pct: float, question_
         response.raise_for_status()
         return response.json()['choices'][0]['message']['content'].strip()
     except Exception:
-        return "Great work so far! Keep going, or ask me if anything needs clarification."
+        return "Nice work! Would you like to try a practice question, or did anything in that content not quite click? If you're good, go ahead and click Next to keep going."
