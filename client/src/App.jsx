@@ -337,6 +337,7 @@ function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState })
                 isExam={true}
                 onRetry={null}
                 onSelectChapter={handleSelectChapter}
+                user={user}
               />
             )}
           </div>
@@ -519,6 +520,7 @@ export function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatS
             isExam={isExam}
             onSelectChapter={onSelectChapter}
             leadMagnetMode={leadMagnetMode}
+            user={user}
           />
         </div>
         <div className="quizexam-chat-panel">
@@ -868,7 +870,7 @@ function ExamProgressBar({ current, total, correct }) {
   );
 }
 
-function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSelectChapter, leadMagnetMode }) {
+function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSelectChapter, leadMagnetMode, user }) {
   if (!displayContent) {
     return (
       <div className="quizexam-display-empty">
@@ -888,6 +890,7 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSele
         onRetry={isExam ? () => onAnswer('yes') : null}
         onSelectChapter={onSelectChapter}
         leadMagnetMode={leadMagnetMode}
+        user={user}
       />
     );
   }
@@ -938,7 +941,7 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSele
   return null;
 }
 
-function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, leadMagnetMode }) {
+function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, leadMagnetMode, user }) {
   const { score, total, score_pct, chapter_stats,
           objective_breakdowns, next_attempt_allocation } = displayContent;
   const scoreColor = score_pct >= 75 ? '#16a34a' : score_pct >= 55 ? '#d97706' : '#dc2626';
@@ -978,6 +981,7 @@ function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, leadMa
           chapterStats={chapter_stats}
           onSelectChapter={onSelectChapter}
           leadMagnetMode={leadMagnetMode}
+          user={user}
         />
       )}
 
