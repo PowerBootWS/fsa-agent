@@ -1,11 +1,12 @@
-// fsa-agent/client-v2/src/components/ContentPanel.jsx
+// client-v2/src/components/ContentPanel.jsx
 import { useEffect, useState } from 'react';
 import { InlineMath, BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css';
 import { useAudio } from '../hooks/useAudio';
 import { useNarrationSync } from '../hooks/useNarrationSync';
+import { NavigationHeader } from './NavigationHeader';
+import { ObjectiveComplete } from './ObjectiveComplete';
 
-// Render a text segment with math and **bold** support.
 function renderInline(text, keyPrefix) {
   const mathParts = text.split(/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g);
   return mathParts.flatMap((part, i) => {
@@ -24,9 +25,6 @@ function renderInline(text, keyPrefix) {
   });
 }
 
-// Parses body text into seed sentence(s) + bullet lines.
-// Seed sentences are non-bullet lines before the first bullet.
-// Bullets start with - / • / *.
 function BodyContent({ body, imageUrl, chunkType }) {
   if (!body && !imageUrl) {
     if (chunkType === 'title') {
@@ -55,7 +53,6 @@ function BodyContent({ body, imageUrl, chunkType }) {
   }
 
   const seedText = seedLines.join(' ');
-
   const isLatex = chunkType === 'formula';
 
   return (
@@ -74,18 +71,21 @@ function BodyContent({ body, imageUrl, chunkType }) {
   );
 }
 
-/**
- * ContentPanel — left 60% of the lesson player.
- *
- * Props:
- *   section        — { title, body, image_url, audio_url, narration_timing, slide_number }
- *   sectionIndex   — 0-based current index
- *   totalSections  — total section count
- *   autoPlay       — true when navigating forward, false when going back
- *   onNext         — () => void
- *   onBack         — () => void
- */
-export function ContentPanel({ section, sectionIndex, totalSections, autoPlay, onNext, onBack }) {
+export function ContentPanel({
+  section,
+  sectionIndex,
+  totalSections,
+  autoPlay,
+  onNext,
+  onBack,
+  courseOutline,
+  activeLessonCode,
+  onNavigate,
+  prevChapter,
+  nextChapter,
+  nextLessonCode,
+  isComplete,
+}) {
   const [sectionStartTime, setSectionStartTime] = useState(() => Date.now());
   const { play, pause, playing, muted, toggleMute, currentTimeMs } = useAudio(
     section?.audio_url || null
@@ -108,40 +108,67 @@ export function ContentPanel({ section, sectionIndex, totalSections, autoPlay, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section?.slide_number]);
 
-  if (!section) return null;
+  if (!section && !isComplete) return null;
+
+  const isLastSlide = !isComplete && sectionIndex === totalSections - 1;
+  const nextLabel = isLastSlide ? 'Finish Objective →' : 'Next →';
 
   return (
     <div className="content-panel">
-      <div className="content-scroll">
-        <h2 className="section-title">{section.title}</h2>
-        <BodyContent body={section.body} imageUrl={section.image_url} chunkType={section.chunk_type} />
-      </div>
-
-      {section.narration_timing && (
-        <div className="narration-box">{visibleText || ' '}</div>
+      {courseOutline && activeLessonCode && (
+        <NavigationHeader
+          courseOutline={courseOutline}
+          activeLessonCode={activeLessonCode}
+          onNavigate={onNavigate}
+          prevChapter={prevChapter}
+          nextChapter={nextChapter}
+        />
       )}
 
-      <div className="audio-controls">
-        {section.audio_url && (
-          <button onClick={playing ? pause : play}>
-            {playing ? '⏸ Pause' : '▶ Play'}
-          </button>
-        )}
-        <label className="toggle-label">
-          <input type="checkbox" checked={muted} onChange={toggleMute} />
-          Mute audio
-        </label>
-      </div>
+      {isComplete ? (
+        <ObjectiveComplete
+          activeLessonCode={activeLessonCode}
+          nextLessonCode={nextLessonCode}
+          nextChapter={nextChapter}
+          onContinue={() => onNavigate(nextLessonCode, 0)}
+          onReview={() => onNavigate(activeLessonCode, 0)}
+        />
+      ) : (
+        <>
+          <div className="content-scroll">
+            <h2 className="section-title">{section?.title}</h2>
+            <BodyContent
+              body={section?.body}
+              imageUrl={section?.image_url}
+              chunkType={section?.chunk_type}
+            />
+          </div>
 
-      <div className="nav-bar">
-        <button onClick={onBack} disabled={sectionIndex === 0}>← Back</button>
-        <span className="nav-counter">
-          {sectionIndex + 1} of {totalSections}
-        </span>
-        <button onClick={onNext} disabled={sectionIndex === totalSections - 1}>
-          Next →
-        </button>
-      </div>
+          {section?.narration_timing && (
+            <div className="narration-box">{visibleText || ' '}</div>
+          )}
+
+          <div className="audio-controls">
+            {section?.audio_url && (
+              <button onClick={playing ? pause : play}>
+                {playing ? '⏸ Pause' : '▶ Play'}
+              </button>
+            )}
+            <label className="toggle-label">
+              <input type="checkbox" checked={muted} onChange={toggleMute} />
+              Mute audio
+            </label>
+          </div>
+
+          <div className="nav-bar">
+            <button onClick={onBack} disabled={sectionIndex === 0}>← Back</button>
+            <span className="nav-counter">
+              {sectionIndex + 1} of {totalSections}
+            </span>
+            <button onClick={onNext}>{nextLabel}</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

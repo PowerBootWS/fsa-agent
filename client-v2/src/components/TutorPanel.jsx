@@ -77,7 +77,7 @@ function QuestionCard({ question, onAnswer }) {
  *   checkpoint     — { message, question } | null
  *   onAnswered     — (entry) => void
  */
-export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, onAnswered }) {
+export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, completionTrigger, onAnswered }) {
   const [messages, setMessages] = useState([
     { type: 'proactive', text: "Welcome! I'm your AI tutor. Ask me anything as we go through this lesson." },
   ]);
@@ -109,6 +109,18 @@ export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, on
         : []),
     ]);
   }, [checkpoint]);
+
+  // Completion trigger — encourage practice before moving on
+  useEffect(() => {
+    if (!completionTrigger) return;
+    setMessages(prev => [
+      ...prev,
+      {
+        type: 'proactive',
+        text: "Nice work finishing that objective! Before moving on, it's worth trying a couple of practice questions to lock in what you just covered. Want to give it a go?",
+      },
+    ]);
+  }, [completionTrigger]);
 
   async function handleSend() {
     const text = input.trim();
