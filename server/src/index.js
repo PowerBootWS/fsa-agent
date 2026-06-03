@@ -84,6 +84,12 @@ app.use('/api/v2/session', v2SessionRouter);
 const v2CheckpointRouter = require('./routes/v2/checkpoint');
 app.use('/api/v2/checkpoint', v2CheckpointRouter);
 
+const v2CourseRouter = require('./routes/v2/course');
+app.use('/api/v2/course', v2CourseRouter);
+
+const v2ProgressRouter = require('./routes/v2/progress');
+app.use('/api/v2/progress', v2ProgressRouter);
+
 // Serve lesson media files (bind-mounted from host)
 const MEDIA_DIR = process.env.MEDIA_DIR || '/srv/fsa-media';
 app.use('/media', express.static(MEDIA_DIR, { maxAge: '5m' }));

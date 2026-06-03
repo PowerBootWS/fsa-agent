@@ -250,6 +250,71 @@ async function getCheckpointQuestion(lessonCode, excludeIds = []) {
   return result.rows[0] || null;
 }
 
+async function getCourseOutline(courseId) {
+  const lessonsResult = await pool.query(
+    `SELECT lesson_code, title FROM lessons
+     WHERE lesson_code ~ $1
+     ORDER BY lesson_code`,
+    [`^${courseId}-\\d+-\\d+$`]
+  );
+
+  const chaptersResult = await pool.query(
+    `SELECT chapter_num, title FROM chapters WHERE course_id = $1`,
+    [courseId]
+  );
+
+  const chapterTitles = {};
+  for (const row of chaptersResult.rows) {
+    chapterTitles[row.chapter_num] = row.title;
+  }
+
+  const chaptersMap = {};
+  for (const row of lessonsResult.rows) {
+    const parts = row.lesson_code.split('-');
+    const chapterNum = parseInt(parts[1], 10);
+    const objectiveNum = parseInt(parts[2], 10);
+    if (!chaptersMap[chapterNum]) {
+      chaptersMap[chapterNum] = {
+        chapter_num: chapterNum,
+        label: chapterTitles[chapterNum] || `Chapter ${chapterNum}`,
+        objectives: [],
+      };
+    }
+    chaptersMap[chapterNum].objectives.push({
+      lesson_code: row.lesson_code,
+      title: row.title,
+      objective_num: objectiveNum,
+    });
+  }
+
+  const chapters = Object.values(chaptersMap).sort((a, b) => a.chapter_num - b.chapter_num);
+  return { course_id: courseId, chapters };
+}
+
+async function getCourseProgress(learnerId, courseId) {
+  const result = await pool.query(
+    `SELECT learner_id, course_id, last_lesson_code, last_slide
+     FROM course_progress
+     WHERE learner_id = $1 AND course_id = $2`,
+    [learnerId, courseId]
+  );
+  return result.rows[0] || null;
+}
+
+async function upsertCourseProgress(learnerId, courseId, lastLessonCode, lastSlide) {
+  const result = await pool.query(
+    `INSERT INTO course_progress (learner_id, course_id, last_lesson_code, last_slide, updated_at)
+     VALUES ($1, $2, $3, $4, now())
+     ON CONFLICT (learner_id, course_id) DO UPDATE
+       SET last_lesson_code = EXCLUDED.last_lesson_code,
+           last_slide       = EXCLUDED.last_slide,
+           updated_at       = now()
+     RETURNING *`,
+    [learnerId, courseId, lastLessonCode, lastSlide]
+  );
+  return result.rows[0];
+}
+
 module.exports = {
   pool,
   getLesson,
@@ -266,4 +331,7 @@ module.exports = {
   updateLearnerSession,
   getLearnerSession,
   getCheckpointQuestion,
+  getCourseOutline,
+  getCourseProgress,
+  upsertCourseProgress,
 };
