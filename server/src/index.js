@@ -35,12 +35,11 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Rate limiting
+// Rate limiting — applied to /api only so media/static fetches don't count
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 300, // limit each IP to 300 API requests per windowMs
 });
-app.use(limiter);
 
 // Parse JSON bodies
 app.use(express.json());
@@ -61,6 +60,7 @@ const responsesRouter = require('./routes/responses');
 const demoRouter = require('./routes/demo');
 const previewRouter = require('./routes/preview');
 
+app.use('/api', limiter);
 app.use('/api/validate', validateRouter);
 app.use('/api/lesson', lessonRouter);
 app.use('/api/chat', chatRouter);
