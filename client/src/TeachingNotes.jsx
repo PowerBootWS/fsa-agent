@@ -11,7 +11,7 @@ import { MathContent } from './MathContent.jsx';
  *   chapterStats         array  from display_update.chapter_stats [{chapter, pct, ...}]
  *   onSelectChapter      fn(chapterId) — triggers inline chapter quiz
  */
-export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapter, leadMagnetMode }) {
+export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapter, leadMagnetMode, user }) {
   if (!objectiveBreakdowns || objectiveBreakdowns.length === 0) return null;
 
   // Build a quick lookup: chapter_id → pct
@@ -35,18 +35,32 @@ export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapt
               )}
             </div>
             <p className="teaching-card-tip"><MathContent text={obj.teaching_tip} /></p>
-            {showQuizBtn && (
-              leadMagnetMode
-                ? <button disabled className="teaching-card-quiz-btn teaching-card-quiz-btn--locked">🔒 Chapter Quizzes — Unlock with Full Access</button>
-                : (onSelectChapter && (
+            <div className="teaching-card-actions">
+              {obj.lesson_code && (
+                leadMagnetMode
+                  ? <button disabled className="teaching-card-lesson-btn teaching-card-lesson-btn--locked">🔒 Lesson Review — Unlock with Full Access</button>
+                  : (
                     <button
-                      className="teaching-card-quiz-btn"
-                      onClick={() => onSelectChapter(obj.chapter_id)}
+                      className="teaching-card-lesson-btn"
+                      onClick={() => window.open(`/v2/?lesson=${obj.lesson_code}&user=${encodeURIComponent(user || '')}`, '_blank')}
                     >
-                      📝 Try the Chapter Quiz instead →
+                      📖 Review this Lesson →
                     </button>
-                  ))
-            )}
+                  )
+              )}
+              {showQuizBtn && (
+                leadMagnetMode
+                  ? <button disabled className="teaching-card-quiz-btn teaching-card-quiz-btn--locked">🔒 Chapter Quizzes — Unlock with Full Access</button>
+                  : (onSelectChapter && (
+                      <button
+                        className="teaching-card-quiz-btn"
+                        onClick={() => onSelectChapter(obj.chapter_id)}
+                      >
+                        📝 Try the Chapter Quiz instead →
+                      </button>
+                    ))
+              )}
+            </div>
           </div>
         );
       })}
