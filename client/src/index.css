@@ -1390,6 +1390,27 @@ body {
 }
 .teaching-card-quiz-btn:hover { background: #eef2ff; }
 
+.teaching-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+.teaching-card-lesson-btn {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0f766e;
+  background: none;
+  border: 1px solid #99f6e4;
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.teaching-card-lesson-btn:hover { background: #f0fdfa; }
+.teaching-card-lesson-btn:disabled,
+.teaching-card-quiz-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* ── Next Attempt Preview ─────────────────────────────────── */
 .next-attempt-preview { margin-top: 1.5rem; }
 .next-attempt-heading {
