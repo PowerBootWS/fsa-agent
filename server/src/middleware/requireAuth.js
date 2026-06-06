@@ -10,7 +10,7 @@ const pool = new Pool({
 
 module.exports = async function requireAuth(req, res, next) {
   const token = req.cookies?.fsa_session;
-  if (!token) return res.status(401).json({ error: 'Authentication required' });
+  if (!token) return res.status(401).json({ error: 'You have been signed out because another device logged in.' });
 
   try {
     const result = await pool.query(
@@ -23,7 +23,7 @@ module.exports = async function requireAuth(req, res, next) {
     );
 
     if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Session invalid. Please log in again.' });
+      return res.status(401).json({ error: 'You have been signed out because another device logged in.' });
     }
 
     req.user = result.rows[0];
