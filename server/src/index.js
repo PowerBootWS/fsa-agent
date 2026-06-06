@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 
@@ -40,6 +41,9 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 300, // limit each IP to 300 API requests per windowMs
 });
+
+// Parse cookies
+app.use(cookieParser());
 
 // Parse JSON bodies
 app.use(express.json());
@@ -92,6 +96,12 @@ app.use('/api/v2/course', v2CourseRouter);
 
 const v2ProgressRouter = require('./routes/v2/progress');
 app.use('/api/v2/progress', v2ProgressRouter);
+
+const authRouter = require('./routes/auth');
+const platformRouter = require('./routes/platform');
+
+app.use('/api/auth', authRouter);
+app.use('/api/platform', platformRouter);
 
 // Serve lesson media files (bind-mounted from host)
 const MEDIA_DIR = process.env.MEDIA_DIR || '/srv/fsa-media';
