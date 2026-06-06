@@ -106,7 +106,7 @@ export default function SetupPage() {
     fetch(`/api/auth/setup?token=${encodeURIComponent(token)}`)
       .then(res => res.json())
       .then(data => {
-        if (data.valid) {
+        if (data.ok) {
           setTokenValid(true);
           setFirstName(data.first_name || '');
         } else {
