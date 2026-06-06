@@ -147,6 +147,15 @@ router.post('/switch-paper', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/platform/papers-for-class
+router.get('/papers-for-class', requireAuth, async (req, res) => {
+  const { class_code } = req.user;
+  const papers = class_code === 'second'
+    ? ['2A1', '2A2', '2A3', '2B1', '2B2', '2B3']
+    : ['3A1', '3A2', '3A3', '3B1', '3B2', '3B3'];
+  return res.json({ papers, class_code });
+});
+
 // GET /api/platform/me
 router.get('/me', requireAuth, async (req, res) => {
   try {

@@ -37,7 +37,7 @@ export default function App() {
       <Route
         path="/select-paper"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requirePaper={false}>
             <SelectPaperPage />
           </ProtectedRoute>
         }
