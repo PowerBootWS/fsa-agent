@@ -99,9 +99,11 @@ app.use('/api/v2/progress', v2ProgressRouter);
 
 const authRouter = require('./routes/auth');
 const platformRouter = require('./routes/platform');
+const adminRouter = require('./routes/admin');
 
 app.use('/api/auth', authRouter);
 app.use('/api/platform', platformRouter);
+app.use('/api/admin', adminRouter);
 
 // Serve lesson media files (bind-mounted from host)
 const MEDIA_DIR = process.env.MEDIA_DIR || '/srv/fsa-media';

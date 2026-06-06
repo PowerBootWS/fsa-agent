@@ -121,26 +121,7 @@ router.post('/switch-paper', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'paper is required' });
     }
 
-    // requireAuth placeholder passes through — in production req.user will be set
-    // For now derive user from session cookie if available
-    const sessionToken = req.cookies?.fsa_session;
-    if (!sessionToken) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const userResult = await pool.query(
-      `SELECT u.id, s.id AS sub_id, s.last_paper_switch_at
-       FROM platform_users u
-       JOIN subscriptions s ON s.user_id = u.id AND s.status = 'active'
-       WHERE u.current_session_token = $1`,
-      [sessionToken]
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { sub_id, last_paper_switch_at } = userResult.rows[0];
+    const { subscription_id, last_paper_switch_at } = req.user;
 
     if (last_paper_switch_at) {
       const switchedAt = new Date(last_paper_switch_at);
@@ -156,7 +137,7 @@ router.post('/switch-paper', requireAuth, async (req, res) => {
 
     await pool.query(
       `UPDATE subscriptions SET active_paper = $1, last_paper_switch_at = now() WHERE id = $2`,
-      [paper, sub_id]
+      [paper, subscription_id]
     );
 
     return res.json({ ok: true, active_paper: paper });
@@ -169,34 +150,16 @@ router.post('/switch-paper', requireAuth, async (req, res) => {
 // GET /api/platform/me
 router.get('/me', requireAuth, async (req, res) => {
   try {
-    const sessionToken = req.cookies?.fsa_session;
-    if (!sessionToken) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const result = await pool.query(
-      `SELECT u.id, u.email, u.first_name, u.last_name,
-              s.active_paper, s.class_code, s.status, s.last_paper_switch_at
-       FROM platform_users u
-       JOIN subscriptions s ON s.user_id = u.id AND s.status = 'active'
-       WHERE u.current_session_token = $1`,
-      [sessionToken]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const row = result.rows[0];
+    const u = req.user;
     return res.json({
-      id: row.id,
-      email: row.email,
-      first_name: row.first_name,
-      last_name: row.last_name,
-      active_paper: row.active_paper,
-      class_code: row.class_code,
-      status: row.status,
-      last_paper_switch_at: row.last_paper_switch_at,
+      id: u.id,
+      email: u.email,
+      first_name: u.first_name,
+      last_name: u.last_name,
+      active_paper: u.active_paper,
+      class_code: u.class_code,
+      status: u.status,
+      last_paper_switch_at: u.last_paper_switch_at,
     });
   } catch (err) {
     console.error('GET /api/platform/me error:', err);
