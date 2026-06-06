@@ -45,19 +45,16 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
     const user = userResult.rows[0];
 
     // Ensure active subscription exists for this user + class_code
-    const subResult = await pool.query(
-      `SELECT id FROM subscriptions
-       WHERE user_id = $1 AND class_code = $2 AND status = 'active'`,
+    // For re-enrollment (returning users with inactive subscriptions), insert a new active subscription
+    await pool.query(
+      `INSERT INTO subscriptions (user_id, class_code, status, active_paper)
+       SELECT $1, $2, 'active', NULL
+       WHERE NOT EXISTS (
+         SELECT 1 FROM subscriptions
+         WHERE user_id = $1 AND class_code = $2 AND status = 'active'
+       )`,
       [user.id, class_code]
     );
-
-    if (subResult.rows.length === 0) {
-      await pool.query(
-        `INSERT INTO subscriptions (user_id, class_code, status, active_paper)
-         VALUES ($1, $2, 'active', NULL)`,
-        [user.id, class_code]
-      );
-    }
 
     // Generate magic link token (48h TTL)
     const token = crypto.randomUUID();
