@@ -366,6 +366,7 @@ function QuizExamChatSection({ messages, setMessages, user, lessonId, setChatSta
 function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter }) {
   const isExam = mode === 'practice_exam';
   const examProgress = chatState.examProgress;
+  const [chatOpen, setChatOpen] = useState(false);
 
   const updateMessages = (updater) => {
     setChatState(prev => ({
@@ -405,6 +406,28 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
 
   const displayContent = chatState.displayContent;
   const isDone = displayContent?.type === 'exam_done' || displayContent?.type === 'quiz_done';
+
+  // Store exam results in localStorage when exam completes
+  useEffect(() => {
+    if (isExam && displayContent?.type === 'exam_done') {
+      try {
+        localStorage.setItem('fsa_last_exam', JSON.stringify({
+          score: displayContent.score_pct,
+          total: displayContent.total,
+          correct: displayContent.score,
+          chapters: (displayContent.chapter_stats || []).map(row => ({
+            chapter_id: row.chapter,
+            score: row.pct,
+            correct: row.correct,
+            total: row.total,
+          })),
+          date: new Date().toISOString(),
+        }));
+      } catch (e) {
+        console.error('Failed to save exam results:', e);
+      }
+    }
+  }, [displayContent?.type]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendAnswer = (answer) => {
     const isLastQuestion = isExam && !isDone && examProgress && examProgress.current === examProgress.total;
@@ -471,8 +494,8 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
         </div>
       </div>
 
-      <div className="quizexam-body">
-        <div className="quizexam-question-panel">
+      <div className="quizexam-body" style={{ display: 'block' }}>
+        <div className="quizexam-question-panel" style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
           <QuizExamDisplaySection
             displayContent={displayContent}
             onAnswer={sendAnswer}
@@ -482,18 +505,54 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
             user={user}
           />
         </div>
-        <div className="quizexam-chat-panel">
-          <QuizExamChatSection
-            messages={chatState.messages}
-            setMessages={updateMessages}
-            user={user}
-            lessonId={lessonId}
-            setChatState={setChatState}
-            isExam={isExam}
-            isDone={isDone}
-          />
-        </div>
       </div>
+
+      {/* Floating chat button */}
+      <button
+        onClick={() => setChatOpen(o => !o)}
+        style={{
+          position: 'fixed', bottom: '24px', right: '24px',
+          width: '56px', height: '56px', borderRadius: '50%',
+          background: '#1d4ed8', border: 'none', cursor: 'pointer',
+          fontSize: '24px', color: 'white', zIndex: 100,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }}
+        title="Ask the AI Tutor"
+      >
+        💬
+      </button>
+
+      {/* Chat overlay */}
+      {chatOpen && (
+        <div style={{
+          position: 'fixed', bottom: '90px', right: '24px',
+          width: '350px', height: '500px',
+          background: '#1e293b', border: '1px solid #334155', borderRadius: '12px',
+          display: 'flex', flexDirection: 'column', zIndex: 99,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: '#e2e8f0', fontWeight: 600 }}>Ask the AI Tutor</span>
+            <button
+              onClick={() => setChatOpen(false)}
+              style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '18px' }}
+            >
+              ✕
+            </button>
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <QuizExamChatSection
+              messages={chatState.messages}
+              setMessages={updateMessages}
+              user={user}
+              lessonId={lessonId}
+              setChatState={setChatState}
+              isExam={isExam}
+              isDone={isDone}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -502,9 +561,9 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
 // PracticeExamRouter — orchestrates lobby → exam → results flow
 // ---------------------------------------------------------------------------
 
-function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState }) {
-  const [phase, setPhase] = useState('lobby');
-  const [examConfig, setExamConfig] = useState(null);
+function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState, startPhase, initialConfig }) {
+  const [phase, setPhase] = useState(startPhase || 'lobby');
+  const [examConfig, setExamConfig] = useState(initialConfig || null);
   const [activeChapterId, setActiveChapterId] = useState(null);
   const [returnPhase, setReturnPhase] = useState('lobby');
   const [reviewDebrief, setReviewDebrief] = useState(null);
@@ -630,7 +689,7 @@ function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState })
 // ExamRouter — top-level export, receives courseId + learnerId from App.jsx
 // ---------------------------------------------------------------------------
 
-export function ExamRouter({ courseId, learnerId }) {
+export function ExamRouter({ courseId, learnerId, initialConfig }) {
   const [chatState, setChatState] = useState({
     messages: [],
     displayContent: null,
@@ -646,6 +705,8 @@ export function ExamRouter({ courseId, learnerId }) {
         lessonId={courseId}
         chatState={chatState}
         setChatState={setChatState}
+        startPhase={initialConfig ? 'exam' : 'lobby'}
+        initialConfig={initialConfig}
       />
     </div>
   );

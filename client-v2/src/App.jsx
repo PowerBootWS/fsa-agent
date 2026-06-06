@@ -7,6 +7,7 @@ import SelectPaperPage from './pages/SelectPaperPage';
 import LobbyPage from './pages/LobbyPage';
 import AllChaptersPage from './pages/AllChaptersPage';
 import LessonPlayerPage from './pages/LessonPlayerPage';
+import ExamResultsPage from './pages/ExamResultsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { LessonPlayer } from './LessonPlayer';
 import { ExamRouter } from './ExamRouter';
@@ -63,6 +64,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <LessonPlayerPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/exam/results"
+        element={
+          <ProtectedRoute>
+            <ExamResultsPage />
           </ProtectedRoute>
         }
       />
