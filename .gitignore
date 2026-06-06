@@ -38,4 +38,4 @@ coverage/
 docs/source/lesson_content_aggregated.json
 
 # Google OAuth credentials (never commit)
-credentials/
+credentials/.worktrees
