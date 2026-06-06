@@ -114,7 +114,8 @@ app.use('/api/preview', previewRouter);
 
 // v2 routes
 const v2LessonRouter = require('./routes/v2/lesson');
-app.use('/api/v2/lesson', platformAuth, v2LessonRouter);
+const { gateLessonAccess } = require('./middleware/platformGate');
+app.use('/api/v2/lesson', platformAuth, gateLessonAccess, v2LessonRouter);
 
 const v2SessionRouter = require('./routes/v2/session');
 app.use('/api/v2/session', platformAuth, v2SessionRouter);

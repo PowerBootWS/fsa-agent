@@ -389,6 +389,71 @@ router.get('/lesson-preview/:lessonCode', async (req, res) => {
   }
 });
 
+// GET /api/platform/check-access
+// Query params: type ('lesson'|'chapter_quiz'), lesson_code or chapter_id
+// Returns: { allowed: boolean, reason: string|null, required_lesson_code?: string, required_chapter_id?: string }
+router.get('/check-access', requireAuth, async (req, res) => {
+  const { type, lesson_code, chapter_id } = req.query;
+  const { email } = req.user;
+
+  const { isChapterQuizPassed, areAllObjectivesComplete } = require('../middleware/platformGate');
+
+  try {
+    if (type === 'lesson' && lesson_code) {
+      const parts = lesson_code.split('-');
+      if (parts.length < 3) return res.json({ allowed: true });
+
+      const courseId = parts[0];
+      const chapterNum = parseInt(parts[1], 10);
+      const objectiveNum = parseInt(parts[2], 10);
+
+      // Objective 1 of Chapter 1: always unlocked
+      if (chapterNum === 1 && objectiveNum === 1) return res.json({ allowed: true });
+
+      // Objective 1 of Chapter N (N>1): require previous chapter quiz passed
+      if (objectiveNum === 1 && chapterNum > 1) {
+        const prevChapterId = `${courseId}-${chapterNum - 1}`;
+        const passed = await isChapterQuizPassed(email, prevChapterId);
+        if (!passed) {
+          return res.json({ allowed: false, reason: 'chapter_quiz', required_chapter_id: prevChapterId });
+        }
+        return res.json({ allowed: true });
+      }
+
+      // Objective N (N>1): require objective N-1 completed
+      const prevLessonCode = `${courseId}-${chapterNum}-${objectiveNum - 1}`;
+      const result = await pool.query(
+        `SELECT completed FROM user_progress WHERE user_email = $1 AND lesson_code = $2`,
+        [email, prevLessonCode]
+      );
+      const allowed = result.rows.length > 0 && result.rows[0].completed === true;
+      return res.json({
+        allowed,
+        reason: allowed ? null : 'previous_objective',
+        required_lesson_code: allowed ? undefined : prevLessonCode,
+      });
+    }
+
+    if (type === 'chapter_quiz' && chapter_id) {
+      const parts = chapter_id.split('-');
+      if (parts.length < 2) return res.json({ allowed: true });
+      const courseId = parts[0];
+      const chapterNum = parseInt(parts[1], 10);
+      const allDone = await areAllObjectivesComplete(email, courseId, chapterNum);
+      return res.json({
+        allowed: allDone,
+        reason: allDone ? null : 'objectives_incomplete',
+      });
+    }
+
+    // Unknown type or missing params — allow through
+    return res.json({ allowed: true });
+  } catch (err) {
+    console.error('GET /api/platform/check-access error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/platform/me
 router.get('/me', requireAuth, async (req, res) => {
   try {
