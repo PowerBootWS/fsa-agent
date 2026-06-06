@@ -156,6 +156,146 @@ router.get('/papers-for-class', requireAuth, async (req, res) => {
   return res.json({ papers, class_code });
 });
 
+// GET /api/platform/lobby-data
+router.get('/lobby-data', requireAuth, async (req, res) => {
+  try {
+    const { email, active_paper } = req.user;
+
+    if (!active_paper) {
+      return res.status(400).json({ error: 'No active paper selected' });
+    }
+
+    // 1. Count total objectives for this paper
+    const totalObjectivesResult = await pool.query(
+      `SELECT COUNT(*) FROM lessons WHERE lesson_code LIKE $1`,
+      [`${active_paper}-%`]
+    );
+    const totalObjectives = parseInt(totalObjectivesResult.rows[0].count);
+
+    // 2. Count completed objectives
+    const completedObjectivesResult = await pool.query(
+      `SELECT COUNT(*) FROM user_progress
+       WHERE user_email = $1 AND lesson_code LIKE $2 AND completed = true`,
+      [email, `${active_paper}-%`]
+    );
+    const completedObjectives = parseInt(completedObjectivesResult.rows[0].count);
+
+    // 3. Last visited lesson
+    const lastVisitedResult = await pool.query(
+      `SELECT up.lesson_code, l.title, up.last_accessed
+       FROM user_progress up
+       LEFT JOIN lessons l ON l.lesson_code = up.lesson_code
+       WHERE up.user_email = $1 AND up.lesson_code LIKE $2
+       ORDER BY up.last_accessed DESC LIMIT 1`,
+      [email, `${active_paper}-%`]
+    );
+    const lastVisited = lastVisitedResult.rows[0] || null;
+
+    // 4. Chapter quiz data — for each chapter, get the latest quiz score
+    const chapterQuizResult = await pool.query(
+      `SELECT
+         qr.chapter_id,
+         COUNT(*) as total_questions,
+         SUM(CASE WHEN qr.correct THEN 1 ELSE 0 END) as correct_count,
+         MAX(qr.answered_at) as last_attempt
+       FROM question_responses qr
+       WHERE qr.user_email = $1 AND qr.course_id = $2 AND qr.session_type = 'chapter_quiz'
+       GROUP BY qr.chapter_id
+       ORDER BY qr.chapter_id`,
+      [email, active_paper]
+    );
+
+    const passingThreshold = parseInt(process.env.QUIZ_PASSING_THRESHOLD || '75', 10);
+    const chapterQuizzes = chapterQuizResult.rows.map(row => {
+      const score = Math.round((parseInt(row.correct_count) / parseInt(row.total_questions)) * 100);
+      return {
+        chapter_id: row.chapter_id,
+        score,
+        total: parseInt(row.total_questions),
+        correct: parseInt(row.correct_count),
+        last_attempt: row.last_attempt,
+        passed: score >= passingThreshold,
+      };
+    });
+
+    // 5. Practice exam history — last attempt
+    const lastExamResult = await pool.query(
+      `SELECT
+         qr.chapter_id,
+         COUNT(*) as total,
+         SUM(CASE WHEN qr.correct THEN 1 ELSE 0 END) as correct,
+         DATE_TRUNC('minute', MAX(qr.answered_at)) as exam_date
+       FROM question_responses qr
+       WHERE qr.user_email = $1 AND qr.course_id = $2 AND qr.session_type = 'practice_exam'
+         AND qr.answered_at = (
+           SELECT MAX(answered_at) FROM question_responses
+           WHERE user_email = $1 AND course_id = $2 AND session_type = 'practice_exam'
+         )
+       GROUP BY qr.chapter_id`,
+      [email, active_paper]
+    );
+
+    // 6. Total chapters for this paper
+    const totalChaptersResult = await pool.query(
+      `SELECT COUNT(DISTINCT chapter_num) FROM chapters WHERE course_id = $1`,
+      [active_paper]
+    );
+    const totalChapters = parseInt(totalChaptersResult.rows[0].count);
+
+    const quizzesPassed = chapterQuizzes.filter(q => q.passed).length;
+    const avgQuizScore = chapterQuizzes.length > 0
+      ? Math.round(chapterQuizzes.reduce((sum, q) => sum + q.score, 0) / chapterQuizzes.length)
+      : null;
+
+    // Calculate last exam total score
+    let lastExam = null;
+    if (lastExamResult.rows.length > 0) {
+      const totalCorrect = lastExamResult.rows.reduce((sum, r) => sum + parseInt(r.correct), 0);
+      const totalQs = lastExamResult.rows.reduce((sum, r) => sum + parseInt(r.total), 0);
+      lastExam = {
+        score: Math.round((totalCorrect / totalQs) * 100),
+        date: lastExamResult.rows[0].exam_date,
+        chapters: lastExamResult.rows.map(r => ({
+          chapter_id: r.chapter_id,
+          score: Math.round((parseInt(r.correct) / parseInt(r.total)) * 100),
+        })),
+      };
+    }
+
+    // Next quiz ready = first chapter in sequence not yet passed
+    const nextQuizChapterId = (() => {
+      for (let i = 1; i <= totalChapters; i++) {
+        const chapterId = `${active_paper}-${i}`;
+        const quiz = chapterQuizzes.find(q => q.chapter_id === chapterId);
+        if (!quiz || !quiz.passed) return chapterId;
+      }
+      return null;
+    })();
+
+    return res.json({
+      paper: active_paper,
+      progress: {
+        completed_objectives: completedObjectives,
+        total_objectives: totalObjectives,
+        percent: totalObjectives > 0 ? Math.round((completedObjectives / totalObjectives) * 100) : 0,
+        last_visited: lastVisited,
+      },
+      stats: {
+        objectives_done: completedObjectives,
+        quizzes_passed: quizzesPassed,
+        avg_quiz_score: avgQuizScore,
+        total_chapters: totalChapters,
+      },
+      chapter_quizzes: chapterQuizzes,
+      next_quiz_chapter_id: nextQuizChapterId,
+      last_exam: lastExam,
+    });
+  } catch (err) {
+    console.error('GET /api/platform/lobby-data error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/platform/me
 router.get('/me', requireAuth, async (req, res) => {
   try {
