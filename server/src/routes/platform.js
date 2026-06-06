@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { pool } = require('../services/database');
+const { pool, getCourseOutline } = require('../services/database');
 const { sendMagicLink } = require('../services/email');
 const requireAuth = require('../middleware/requireAuth');
 
@@ -292,6 +292,79 @@ router.get('/lobby-data', requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error('GET /api/platform/lobby-data error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/platform/course-structure/:paperCode
+router.get('/course-structure/:paperCode', requireAuth, async (req, res) => {
+  try {
+    const { email } = req.user;
+    const { paperCode } = req.params;
+    const PASSING_THRESHOLD = parseInt(process.env.QUIZ_PASSING_THRESHOLD || '75');
+
+    // Get course outline (chapters + objectives)
+    const outline = await getCourseOutline(paperCode);
+
+    // Get completed objectives for this user
+    const progressResult = await pool.query(
+      `SELECT lesson_code FROM user_progress WHERE user_email = $1 AND lesson_code LIKE $2 AND completed = true`,
+      [email, `${paperCode}-%`]
+    );
+    const completedLessons = new Set(progressResult.rows.map(r => r.lesson_code));
+
+    // Get chapter quiz scores
+    const quizResult = await pool.query(
+      `SELECT chapter_id,
+         COUNT(*) as total,
+         SUM(CASE WHEN correct THEN 1 ELSE 0 END) as correct
+       FROM question_responses
+       WHERE user_email = $1 AND course_id = $2 AND session_type = 'chapter_quiz'
+       GROUP BY chapter_id`,
+      [email, paperCode]
+    );
+    const quizMap = {};
+    for (const row of quizResult.rows) {
+      const score = Math.round((parseInt(row.correct) / parseInt(row.total)) * 100);
+      quizMap[row.chapter_id] = { score, passed: score >= PASSING_THRESHOLD };
+    }
+
+    // Build gated structure
+    let previousChapterPassed = true; // chapter 1 is always unlocked
+    const chapters = outline.chapters.map((chapter, idx) => {
+      const chapterId = `${paperCode}-${chapter.chapter_num}`;
+      const quiz = quizMap[chapterId];
+      const quizPassed = quiz?.passed || false;
+      const chapterLocked = !previousChapterPassed;
+
+      const objectives = chapter.objectives.map((obj, objIdx) => {
+        const previousComplete = objIdx === 0
+          ? !chapterLocked
+          : completedLessons.has(chapter.objectives[objIdx - 1].lesson_code);
+        const objLocked = chapterLocked || (objIdx > 0 && !previousComplete);
+        return {
+          ...obj,
+          completed: completedLessons.has(obj.lesson_code),
+          locked: objLocked,
+        };
+      });
+
+      const result = {
+        ...chapter,
+        chapter_id: chapterId,
+        locked: chapterLocked,
+        quiz_score: quiz?.score || null,
+        quiz_passed: quizPassed,
+        objectives,
+      };
+
+      previousChapterPassed = quizPassed;
+      return result;
+    });
+
+    return res.json({ paper: paperCode, chapters });
+  } catch (err) {
+    console.error('GET /api/platform/course-structure error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
