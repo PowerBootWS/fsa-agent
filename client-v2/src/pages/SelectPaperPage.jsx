@@ -58,42 +58,48 @@ export default function SelectPaperPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#0f172a',
-      color: '#e2e8f0',
+      background: '#0D1117',
+      color: '#F4F5F7',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '32px 16px',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
+      fontFamily: "'Barlow', -apple-system, sans-serif",
     }}>
       {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: '40px', maxWidth: '480px' }}>
+        <div style={{ color: '#E8720C', fontFamily: "'Barlow Condensed', sans-serif", fontSize: '13px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '12px' }}>
+          Full Steam Ahead
+        </div>
         <h1 style={{
-          fontSize: '28px',
+          fontFamily: "'Barlow Condensed', sans-serif",
+          fontSize: '30px',
           fontWeight: '700',
-          color: '#e2e8f0',
+          color: '#F4F5F7',
           margin: '0 0 12px 0',
+          textTransform: 'uppercase',
+          letterSpacing: '0.03em',
         }}>
           Select Your Study Paper
         </h1>
-        <p style={{ color: '#94a3b8', fontSize: '16px', margin: 0 }}>
+        <p style={{ color: '#a8b4c0', fontSize: '15px', margin: 0 }}>
           Choose which exam paper you want to study
         </p>
       </div>
 
       {/* Loading state */}
       {loading && (
-        <div style={{ color: '#94a3b8', fontSize: '16px' }}>Loading papers…</div>
+        <div style={{ color: '#a8b4c0', fontSize: '16px' }}>Loading papers…</div>
       )}
 
       {/* Error message */}
       {error && (
         <div style={{
-          background: '#450a0a',
-          border: '1px solid #7f1d1d',
+          background: 'rgba(220,38,38,0.12)',
+          border: '1px solid rgba(220,38,38,0.3)',
           color: '#fca5a5',
-          borderRadius: '8px',
+          borderRadius: '4px',
           padding: '12px 20px',
           marginBottom: '24px',
           maxWidth: '480px',
@@ -122,9 +128,9 @@ export default function SelectPaperPage() {
                 onClick={() => handleSelectPaper(paper)}
                 disabled={switching !== null}
                 style={{
-                  background: isSelecting ? '#1e3a8a' : '#1e293b',
-                  border: `2px solid ${isSelecting ? '#1d4ed8' : '#334155'}`,
-                  borderRadius: '12px',
+                  background: isSelecting ? 'rgba(232,114,12,0.15)' : '#1C2333',
+                  border: `2px solid ${isSelecting ? '#E8720C' : '#252F42'}`,
+                  borderRadius: '4px',
                   padding: '28px 16px',
                   cursor: switching !== null ? 'not-allowed' : 'pointer',
                   display: 'flex',
@@ -133,33 +139,37 @@ export default function SelectPaperPage() {
                   gap: '8px',
                   transition: 'border-color 0.15s, background 0.15s',
                   opacity: switching !== null && !isSelecting ? 0.5 : 1,
+                  fontFamily: 'inherit',
                 }}
                 onMouseEnter={(e) => {
                   if (switching === null) {
-                    e.currentTarget.style.borderColor = '#1d4ed8';
-                    e.currentTarget.style.background = '#1e3a8a';
+                    e.currentTarget.style.borderColor = '#E8720C';
+                    e.currentTarget.style.background = 'rgba(232,114,12,0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (switching === null) {
-                    e.currentTarget.style.borderColor = '#334155';
-                    e.currentTarget.style.background = '#1e293b';
+                    e.currentTarget.style.borderColor = '#252F42';
+                    e.currentTarget.style.background = '#1C2333';
                   }
                 }}
               >
                 <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif",
                   fontSize: '32px',
                   fontWeight: '800',
-                  color: isSelecting ? '#93c5fd' : '#e2e8f0',
+                  color: isSelecting ? '#E8720C' : '#F4F5F7',
                   letterSpacing: '1px',
                 }}>
                   {isSelecting ? '…' : paper}
                 </span>
                 <span style={{
                   fontSize: '11px',
-                  color: '#94a3b8',
+                  color: '#a8b4c0',
                   textAlign: 'center',
                   lineHeight: '1.4',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
                 }}>
                   Power Engineering{'\n'}Exam Paper
                 </span>

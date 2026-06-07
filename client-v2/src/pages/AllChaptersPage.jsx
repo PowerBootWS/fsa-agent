@@ -2,15 +2,15 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const COLORS = {
-  bg: '#0f172a',
-  card: '#1e293b',
-  border: '#334155',
-  text: '#e2e8f0',
-  muted: '#94a3b8',
-  primary: '#1d4ed8',
-  success: '#16a34a',
-  danger: '#dc2626',
-  locked: '#374151',
+  bg: '#0D1117',
+  card: '#1C2333',
+  border: '#252F42',
+  text: '#F4F5F7',
+  muted: '#a8b4c0',
+  primary: '#E8720C',
+  success: '#52A882',
+  danger: '#f87171',
+  locked: '#141A24',
 };
 
 export default function AllChaptersPage() {
@@ -180,7 +180,7 @@ export default function AllChaptersPage() {
                         borderRadius: 4,
                         transition: 'background 0.1s',
                       }}
-                      onMouseEnter={e => { if (!obj.locked) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                      onMouseEnter={e => { if (!obj.locked) e.currentTarget.style.background = 'rgba(232,114,12,0.07)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                     >
                       <span style={{ fontSize: 13, width: 16, textAlign: 'center', flexShrink: 0 }}>

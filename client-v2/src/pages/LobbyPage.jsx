@@ -32,15 +32,15 @@ function formatDate(dateStr) {
 const s = {
   page: {
     minHeight: '100vh',
-    background: '#0f172a',
-    color: '#e2e8f0',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    background: '#0D1117',
+    color: '#F4F5F7',
+    fontFamily: "'Barlow', -apple-system, sans-serif",
   },
 
   // Header
   header: {
-    background: '#1e293b',
-    borderBottom: '1px solid #334155',
+    background: '#1C2333',
+    borderBottom: '2px solid #E8720C',
     padding: '0 24px',
     height: '56px',
     display: 'flex',
@@ -48,10 +48,12 @@ const s = {
     justifyContent: 'space-between',
   },
   brand: {
-    color: '#1d4ed8',
+    color: '#E8720C',
+    fontFamily: "'Barlow Condensed', sans-serif",
     fontWeight: '700',
-    fontSize: '18px',
-    letterSpacing: '-0.3px',
+    fontSize: '20px',
+    letterSpacing: '0.03em',
+    textTransform: 'uppercase',
   },
   headerRight: {
     display: 'flex',
@@ -59,17 +61,19 @@ const s = {
     gap: '16px',
   },
   userName: {
-    color: '#94a3b8',
+    color: '#a8b4c0',
     fontSize: '14px',
   },
   logoutBtn: {
     background: 'transparent',
-    border: '1px solid #334155',
-    borderRadius: '6px',
-    color: '#94a3b8',
+    border: '1px solid #252F42',
+    borderRadius: '4px',
+    color: '#a8b4c0',
     fontSize: '13px',
     padding: '6px 14px',
     cursor: 'pointer',
+    fontFamily: 'inherit',
+    transition: 'border-color 0.2s, color 0.2s',
   },
 
   // Main content
@@ -81,9 +85,9 @@ const s = {
 
   // Big course card
   courseCard: {
-    background: '#1e293b',
-    border: '1px solid #334155',
-    borderRadius: '12px',
+    background: '#1C2333',
+    border: '1px solid #252F42',
+    borderRadius: '4px',
     padding: '28px 32px',
     marginBottom: '24px',
   },
@@ -96,13 +100,16 @@ const s = {
     gap: '16px',
   },
   paperTitle: {
-    fontSize: '22px',
+    fontFamily: "'Barlow Condensed', sans-serif",
+    fontSize: '24px',
     fontWeight: '700',
-    color: '#e2e8f0',
+    color: '#F4F5F7',
     margin: '0 0 4px 0',
+    letterSpacing: '0.02em',
+    textTransform: 'uppercase',
   },
   paperSubtitle: {
-    color: '#94a3b8',
+    color: '#a8b4c0',
     fontSize: '14px',
     margin: 0,
   },
@@ -112,26 +119,30 @@ const s = {
     flexShrink: 0,
   },
   btnPrimary: {
-    background: '#1d4ed8',
+    background: '#E8720C',
     color: '#fff',
     border: 'none',
-    borderRadius: '7px',
+    borderRadius: '4px',
     fontSize: '14px',
     fontWeight: '600',
     padding: '10px 20px',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
+    fontFamily: 'inherit',
+    transition: 'background 0.2s',
   },
   btnSecondary: {
     background: 'transparent',
-    color: '#94a3b8',
-    border: '1px solid #334155',
-    borderRadius: '7px',
+    color: '#a8b4c0',
+    border: '1px solid #252F42',
+    borderRadius: '4px',
     fontSize: '14px',
     fontWeight: '500',
     padding: '10px 20px',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
+    fontFamily: 'inherit',
+    transition: 'border-color 0.2s, color 0.2s',
   },
 
   // Progress bar
@@ -145,36 +156,36 @@ const s = {
     marginBottom: '6px',
   },
   progressLabel: {
-    color: '#94a3b8',
+    color: '#a8b4c0',
     fontSize: '13px',
   },
   progressPct: {
-    color: '#e2e8f0',
+    color: '#F4F5F7',
     fontSize: '13px',
     fontWeight: '600',
   },
   progressTrack: {
     height: '8px',
-    background: '#0f172a',
+    background: '#0D1117',
     borderRadius: '4px',
     overflow: 'hidden',
   },
   progressFill: (pct) => ({
     height: '100%',
     width: `${pct}%`,
-    background: pct >= 100 ? '#16a34a' : '#1d4ed8',
+    background: pct >= 100 ? '#52A882' : '#E8720C',
     borderRadius: '4px',
     transition: 'width 0.4s ease',
   }),
 
   // Last visited
   lastVisited: {
-    color: '#94a3b8',
+    color: '#a8b4c0',
     fontSize: '13px',
     marginBottom: '20px',
   },
   lastVisitedTitle: {
-    color: '#e2e8f0',
+    color: '#F4F5F7',
     fontWeight: '500',
   },
 
@@ -185,15 +196,15 @@ const s = {
     flexWrap: 'wrap',
   },
   chip: {
-    background: '#0f172a',
-    border: '1px solid #334155',
+    background: '#0D1117',
+    border: '1px solid #252F42',
     borderRadius: '20px',
     padding: '5px 14px',
     fontSize: '13px',
-    color: '#94a3b8',
+    color: '#a8b4c0',
   },
   chipValue: {
-    color: '#e2e8f0',
+    color: '#F4F5F7',
     fontWeight: '600',
   },
 
@@ -205,17 +216,18 @@ const s = {
     marginBottom: '32px',
   },
   tile: {
-    background: '#1e293b',
-    border: '1px solid #334155',
-    borderRadius: '12px',
+    background: '#1C2333',
+    border: '1px solid #252F42',
+    borderRadius: '4px',
     padding: '24px',
   },
   tileTitle: {
-    fontSize: '14px',
+    fontFamily: "'Barlow Condensed', sans-serif",
+    fontSize: '13px',
     fontWeight: '700',
-    color: '#94a3b8',
+    color: '#a8b4c0',
     textTransform: 'uppercase',
-    letterSpacing: '0.06em',
+    letterSpacing: '0.1em',
     margin: '0 0 16px 0',
   },
 
@@ -234,7 +246,7 @@ const s = {
     alignItems: 'center',
   },
   quizChapterId: {
-    color: '#e2e8f0',
+    color: '#F4F5F7',
     fontSize: '14px',
   },
   quizRowRight: {
@@ -243,25 +255,25 @@ const s = {
     gap: '8px',
   },
   badgePass: {
-    background: '#14532d',
-    color: '#4ade80',
-    border: '1px solid #166534',
-    borderRadius: '12px',
+    background: 'rgba(82,168,130,0.15)',
+    color: '#52A882',
+    border: '1px solid rgba(82,168,130,0.3)',
+    borderRadius: '3px',
     padding: '2px 9px',
     fontSize: '12px',
     fontWeight: '600',
   },
   badgeFail: {
-    background: '#450a0a',
+    background: 'rgba(220,38,38,0.12)',
     color: '#f87171',
-    border: '1px solid #7f1d1d',
-    borderRadius: '12px',
+    border: '1px solid rgba(220,38,38,0.25)',
+    borderRadius: '3px',
     padding: '2px 9px',
     fontSize: '12px',
     fontWeight: '600',
   },
   scoreText: {
-    color: '#e2e8f0',
+    color: '#F4F5F7',
     fontSize: '14px',
     fontWeight: '600',
     minWidth: '40px',
@@ -275,14 +287,16 @@ const s = {
     marginBottom: '16px',
   },
   countBtn: (active) => ({
-    background: active ? '#1d4ed8' : '#0f172a',
-    border: `1px solid ${active ? '#1d4ed8' : '#334155'}`,
-    borderRadius: '6px',
-    color: active ? '#fff' : '#94a3b8',
+    background: active ? '#E8720C' : '#0D1117',
+    border: `1px solid ${active ? '#E8720C' : '#252F42'}`,
+    borderRadius: '4px',
+    color: active ? '#fff' : '#a8b4c0',
     fontSize: '14px',
     fontWeight: '600',
     padding: '8px 18px',
     cursor: 'pointer',
+    fontFamily: 'inherit',
+    transition: 'background 0.15s, border-color 0.15s, color 0.15s',
   }),
   timedRow: {
     display: 'flex',
@@ -295,7 +309,7 @@ const s = {
     width: '36px',
     height: '20px',
     borderRadius: '10px',
-    background: on ? '#1d4ed8' : '#334155',
+    background: on ? '#E8720C' : '#252F42',
     position: 'relative',
     flexShrink: 0,
     transition: 'background 0.2s',
@@ -313,7 +327,7 @@ const s = {
     transition: 'left 0.2s',
   }),
   timedLabel: {
-    color: '#94a3b8',
+    color: '#a8b4c0',
     fontSize: '14px',
   },
 
@@ -323,39 +337,41 @@ const s = {
     paddingTop: '8px',
   },
   switchLabel: {
-    color: '#475569',
+    color: '#666',
     fontSize: '13px',
     marginBottom: '8px',
   },
   switchLink: {
-    color: '#1d4ed8',
+    color: '#E8720C',
     fontSize: '13px',
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
     textDecoration: 'underline',
     padding: 0,
+    fontFamily: 'inherit',
   },
   cooldownNote: {
-    color: '#d97706',
+    color: '#F5A623',
     fontSize: '12px',
     marginTop: '4px',
   },
 
   // Misc
   muted: {
-    color: '#94a3b8',
+    color: '#a8b4c0',
     fontSize: '14px',
   },
   bigScore: {
+    fontFamily: "'Barlow Condensed', sans-serif",
     fontSize: '40px',
     fontWeight: '800',
-    color: '#e2e8f0',
+    color: '#F4F5F7',
     lineHeight: 1,
     marginBottom: '4px',
   },
   examDate: {
-    color: '#94a3b8',
+    color: '#a8b4c0',
     fontSize: '13px',
     marginBottom: '16px',
   },
@@ -363,58 +379,61 @@ const s = {
     display: 'flex',
     justifyContent: 'space-between',
     fontSize: '13px',
-    color: '#94a3b8',
+    color: '#a8b4c0',
     marginBottom: '4px',
   },
   btnLink: {
     background: 'transparent',
     border: 'none',
-    color: '#1d4ed8',
+    color: '#E8720C',
     fontSize: '13px',
     cursor: 'pointer',
     padding: 0,
     marginTop: '12px',
+    fontFamily: 'inherit',
   },
   reattemptBtn: {
     background: 'transparent',
-    border: '1px solid #334155',
-    borderRadius: '6px',
-    color: '#94a3b8',
+    border: '1px solid #252F42',
+    borderRadius: '4px',
+    color: '#a8b4c0',
     fontSize: '12px',
     padding: '4px 10px',
     cursor: 'pointer',
     flexShrink: 0,
+    fontFamily: 'inherit',
   },
   nextQuizId: {
-    color: '#e2e8f0',
+    color: '#F4F5F7',
     fontWeight: '600',
     fontSize: '18px',
     marginBottom: '6px',
   },
   quizPassedAll: {
-    color: '#4ade80',
+    color: '#52A882',
     fontSize: '15px',
     fontWeight: '600',
     marginBottom: '6px',
   },
   quizPassCount: {
-    color: '#94a3b8',
+    color: '#a8b4c0',
     fontSize: '13px',
   },
   loadingWrap: {
     minHeight: '100vh',
-    background: '#0f172a',
-    color: '#94a3b8',
+    background: '#0D1117',
+    color: '#a8b4c0',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '16px',
+    fontFamily: "'Barlow', -apple-system, sans-serif",
   },
   errorWrap: {
-    background: '#450a0a',
-    border: '1px solid #7f1d1d',
+    background: 'rgba(220,38,38,0.12)',
+    border: '1px solid rgba(220,38,38,0.3)',
     color: '#fca5a5',
-    borderRadius: '8px',
+    borderRadius: '6px',
     padding: '16px 20px',
     maxWidth: '480px',
     margin: '40px auto',
@@ -575,7 +594,7 @@ export default function LobbyPage() {
                 </span>
               </>
             ) : (
-              <span style={{ color: '#475569' }}>Start studying to track your progress</span>
+              <span style={{ color: '#666' }}>Start studying to track your progress</span>
             )}
           </div>
 
@@ -676,7 +695,7 @@ export default function LobbyPage() {
                     </div>
                   ))}
                   {last_exam.chapters.length > 3 && (
-                    <div style={{ color: '#475569', fontSize: '12px', marginTop: '4px' }}>
+                    <div style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>
                       +{last_exam.chapters.length - 3} more chapters
                     </div>
                   )}

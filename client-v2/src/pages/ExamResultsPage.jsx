@@ -10,9 +10,9 @@ function getGrade(pct) {
 
 function GradeBadge({ grade }) {
   const colors = {
-    A: { bg: '#166534', color: '#bbf7d0' },
-    B: { bg: '#854d0e', color: '#fef08a' },
-    C: { bg: '#991b1b', color: '#fecaca' },
+    A: { bg: 'rgba(82,168,130,0.18)', color: '#52A882' },
+    B: { bg: 'rgba(245,166,35,0.15)', color: '#F5A623' },
+    C: { bg: 'rgba(220,38,38,0.12)', color: '#f87171' },
   };
   const style = colors[grade] || colors.C;
   return (
@@ -47,32 +47,32 @@ function LessonPreview({ chapterId }) {
       .catch(e => { setError(e.message); setLoading(false); });
   }, [chapterId]);
 
-  if (loading) return <p style={{ color: '#94a3b8', fontSize: '14px' }}>Loading lesson…</p>;
+  if (loading) return <p style={{ color: '#a8b4c0', fontSize: '14px' }}>Loading lesson…</p>;
   if (error) return <p style={{ color: '#f87171', fontSize: '14px' }}>Could not load lesson preview.</p>;
 
   return (
     <div style={{
       marginTop: '12px',
       padding: '12px',
-      background: '#0f172a',
-      borderRadius: '8px',
-      border: '1px solid #1e293b',
+      background: '#0D1117',
+      borderRadius: '6px',
+      border: '1px solid #252F42',
     }}>
-      <h4 style={{ color: '#e2e8f0', margin: '0 0 8px 0', fontSize: '14px' }}>
+      <h4 style={{ color: '#F4F5F7', margin: '0 0 8px 0', fontSize: '14px' }}>
         {lesson.title}
       </h4>
       {lesson.summary && (
-        <p style={{ color: '#94a3b8', fontSize: '13px', lineHeight: '1.6', margin: '0 0 8px 0' }}>
+        <p style={{ color: '#a8b4c0', fontSize: '13px', lineHeight: '1.6', margin: '0 0 8px 0' }}>
           {lesson.summary}
         </p>
       )}
       {lesson.narration_text && !lesson.summary && (
-        <p style={{ color: '#94a3b8', fontSize: '13px', lineHeight: '1.6', margin: 0 }}>
+        <p style={{ color: '#a8b4c0', fontSize: '13px', lineHeight: '1.6', margin: 0 }}>
           {lesson.narration_text.slice(0, 400)}{lesson.narration_text.length > 400 ? '…' : ''}
         </p>
       )}
       {lesson.key_points && Array.isArray(lesson.key_points) && lesson.key_points.length > 0 && (
-        <ul style={{ color: '#94a3b8', fontSize: '13px', margin: '8px 0 0 0', paddingLeft: '18px' }}>
+        <ul style={{ color: '#a8b4c0', fontSize: '13px', margin: '8px 0 0 0', paddingLeft: '18px' }}>
           {lesson.key_points.slice(0, 3).map((pt, i) => <li key={i}>{pt}</li>)}
         </ul>
       )}
@@ -89,16 +89,16 @@ function WeaknessCard({ chapter, openId, setOpenId }) {
 
   return (
     <div style={{
-      background: '#1e293b',
-      border: '1px solid #334155',
-      borderRadius: '10px',
+      background: '#1C2333',
+      border: '1px solid #252F42',
+      borderRadius: '6px',
       padding: '16px',
       marginBottom: '12px',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{chapter.chapter_id}</span>
-          <span style={{ color: '#64748b', fontSize: '13px', marginLeft: '10px' }}>
+          <span style={{ color: '#F4F5F7', fontWeight: 600 }}>{chapter.chapter_id}</span>
+          <span style={{ color: '#666', fontSize: '13px', marginLeft: '10px' }}>
             {chapter.score}%
             {missed != null ? ` · missed ${missed} question${missed !== 1 ? 's' : ''}` : ''}
           </span>
@@ -109,13 +109,15 @@ function WeaknessCard({ chapter, openId, setOpenId }) {
         onClick={() => setOpenId(isOpen ? null : chapter.chapter_id)}
         style={{
           marginTop: '10px',
-          background: '#1d4ed8',
+          background: '#E8720C',
           border: 'none',
           color: 'white',
           padding: '6px 14px',
-          borderRadius: '6px',
+          borderRadius: '4px',
           cursor: 'pointer',
           fontSize: '13px',
+          fontFamily: 'inherit',
+          transition: 'background 0.2s',
         }}
       >
         {isOpen ? '▲ Hide lesson' : '▶ Watch a lesson on this'}
@@ -146,11 +148,11 @@ export default function ExamResultsPage() {
 
   if (!results) {
     return (
-      <div style={{ padding: '48px', color: '#94a3b8', textAlign: 'center' }}>
+      <div style={{ minHeight: '100vh', background: '#0D1117', padding: '48px', color: '#a8b4c0', textAlign: 'center', fontFamily: "'Barlow', -apple-system, sans-serif" }}>
         <p>No exam results found.</p>
         <button
           onClick={() => navigate('/lobby')}
-          style={{ marginTop: '16px', background: '#1d4ed8', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}
+          style={{ marginTop: '16px', background: '#E8720C', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontFamily: 'inherit' }}
         >
           ← Back to Lobby
         </button>
@@ -166,9 +168,10 @@ export default function ExamResultsPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#0f172a',
-      color: '#e2e8f0',
+      background: '#0D1117',
+      color: '#F4F5F7',
       padding: '32px 24px',
+      fontFamily: "'Barlow', -apple-system, sans-serif",
     }}>
       <div style={{
         maxWidth: '1100px',
@@ -181,30 +184,30 @@ export default function ExamResultsPage() {
 
         {/* Left column — overall results */}
         <div>
-          <h1 style={{ fontSize: '26px', fontWeight: 700, marginBottom: '8px', color: '#f1f5f9' }}>
+          <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: '28px', fontWeight: 700, marginBottom: '8px', color: '#F4F5F7', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
             Practice Exam Results
           </h1>
           {date && (
-            <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '24px' }}>
+            <p style={{ color: '#666', fontSize: '13px', marginBottom: '24px' }}>
               {new Date(date).toLocaleDateString(undefined, { dateStyle: 'medium' })}
             </p>
           )}
 
           {/* Overall score */}
           <div style={{
-            background: '#1e293b',
-            borderRadius: '12px',
+            background: '#1C2333',
+            borderRadius: '4px',
             padding: '24px',
             marginBottom: '24px',
-            border: '1px solid #334155',
+            border: '1px solid #252F42',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
-              <span style={{ fontSize: '48px', fontWeight: 800, color: overallGrade === 'A' ? '#4ade80' : overallGrade === 'B' ? '#fbbf24' : '#f87171' }}>
+              <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: '48px', fontWeight: 800, color: overallGrade === 'A' ? '#52A882' : overallGrade === 'B' ? '#F5A623' : '#f87171' }}>
                 {score}%
               </span>
               <GradeBadge grade={overallGrade} />
             </div>
-            <p style={{ color: '#94a3b8', margin: 0, fontSize: '15px' }}>
+            <p style={{ color: '#a8b4c0', margin: 0, fontSize: '15px' }}>
               {correct} / {total} questions correct
             </p>
           </div>
@@ -212,28 +215,28 @@ export default function ExamResultsPage() {
           {/* Chapter breakdown table */}
           {chapters.length > 0 && (
             <div style={{
-              background: '#1e293b',
-              borderRadius: '12px',
+              background: '#1C2333',
+              borderRadius: '4px',
               padding: '20px',
               marginBottom: '24px',
-              border: '1px solid #334155',
+              border: '1px solid #252F42',
             }}>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <h3 style={{ fontFamily: "'Barlow Condensed', sans-serif", margin: '0 0 16px 0', fontSize: '13px', color: '#a8b4c0', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                 Chapter Breakdown
               </h3>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #334155' }}>
-                    <th style={{ textAlign: 'left', padding: '8px 4px', color: '#64748b', fontSize: '13px', fontWeight: 600 }}>Chapter</th>
-                    <th style={{ textAlign: 'left', padding: '8px 4px', color: '#64748b', fontSize: '13px', fontWeight: 600 }}>Score</th>
-                    <th style={{ textAlign: 'left', padding: '8px 4px', color: '#64748b', fontSize: '13px', fontWeight: 600 }}>Grade</th>
+                  <tr style={{ borderBottom: '1px solid #252F42' }}>
+                    <th style={{ textAlign: 'left', padding: '8px 4px', color: '#666', fontSize: '13px', fontWeight: 600 }}>Chapter</th>
+                    <th style={{ textAlign: 'left', padding: '8px 4px', color: '#666', fontSize: '13px', fontWeight: 600 }}>Score</th>
+                    <th style={{ textAlign: 'left', padding: '8px 4px', color: '#666', fontSize: '13px', fontWeight: 600 }}>Grade</th>
                   </tr>
                 </thead>
                 <tbody>
                   {chapters.map(ch => (
-                    <tr key={ch.chapter_id} style={{ borderBottom: '1px solid #1e293b' }}>
-                      <td style={{ padding: '10px 4px', color: '#e2e8f0', fontSize: '14px' }}>{ch.chapter_id}</td>
-                      <td style={{ padding: '10px 4px', color: '#94a3b8', fontSize: '14px' }}>{ch.score}%</td>
+                    <tr key={ch.chapter_id} style={{ borderBottom: '1px solid #252F42' }}>
+                      <td style={{ padding: '10px 4px', color: '#F4F5F7', fontSize: '14px' }}>{ch.chapter_id}</td>
+                      <td style={{ padding: '10px 4px', color: '#a8b4c0', fontSize: '14px' }}>{ch.score}%</td>
                       <td style={{ padding: '10px 4px' }}><GradeBadge grade={getGrade(ch.score)} /></td>
                     </tr>
                   ))}
@@ -247,14 +250,16 @@ export default function ExamResultsPage() {
             <button
               onClick={handleStartNextAttempt}
               style={{
-                background: '#1d4ed8',
+                background: '#E8720C',
                 color: 'white',
                 border: 'none',
                 padding: '12px 24px',
-                borderRadius: '8px',
+                borderRadius: '4px',
                 cursor: 'pointer',
                 fontWeight: 600,
                 fontSize: '14px',
+                fontFamily: 'inherit',
+                transition: 'background 0.2s',
               }}
             >
               Start Next Attempt
@@ -263,12 +268,13 @@ export default function ExamResultsPage() {
               onClick={() => navigate('/lobby')}
               style={{
                 background: 'transparent',
-                color: '#94a3b8',
-                border: '1px solid #334155',
+                color: '#a8b4c0',
+                border: '1px solid #252F42',
                 padding: '12px 24px',
-                borderRadius: '8px',
+                borderRadius: '4px',
                 cursor: 'pointer',
                 fontSize: '14px',
+                fontFamily: 'inherit',
               }}
             >
               ← Back to Lobby
@@ -278,12 +284,12 @@ export default function ExamResultsPage() {
 
         {/* Right column — areas to improve */}
         <div>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', color: '#f1f5f9' }}>
+          <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: '22px', fontWeight: 700, marginBottom: '20px', color: '#F4F5F7', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
             Areas to Improve
           </h2>
           {weakChapters.length === 0 ? (
-            <div style={{ background: '#1e293b', borderRadius: '12px', padding: '24px', border: '1px solid #334155', textAlign: 'center' }}>
-              <p style={{ color: '#4ade80', fontWeight: 600, margin: 0 }}>All chapters are grade A — great work!</p>
+            <div style={{ background: '#1C2333', borderRadius: '4px', padding: '24px', border: '1px solid #252F42', textAlign: 'center' }}>
+              <p style={{ color: '#52A882', fontWeight: 600, margin: 0 }}>All chapters are grade A — great work!</p>
             </div>
           ) : (
             weakChapters.map(ch => (

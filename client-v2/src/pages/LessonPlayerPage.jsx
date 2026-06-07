@@ -7,11 +7,11 @@ export default function LessonPlayerPage() {
   const user = JSON.parse(localStorage.getItem('fsa_user') || '{}');
 
   return (
-    <div style={{ background: '#0f172a', minHeight: '100vh' }}>
-      <div style={{ padding: '12px 24px', background: '#1e293b', borderBottom: '1px solid #334155' }}>
+    <div style={{ background: '#0D1117', minHeight: '100vh', fontFamily: "'Barlow', -apple-system, sans-serif" }}>
+      <div style={{ padding: '12px 24px', background: '#1C2333', borderBottom: '1px solid #252F42', display: 'flex', alignItems: 'center', borderBottom: '2px solid #E8720C' }}>
         <button
           onClick={() => navigate('/chapters')}
-          style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '14px' }}
+          style={{ background: 'none', border: 'none', color: '#a8b4c0', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit' }}
         >
           ← Back to Chapters
         </button>
