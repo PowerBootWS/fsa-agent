@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // Maps paper codes to human-readable names
@@ -60,20 +60,83 @@ const s = {
     alignItems: 'center',
     gap: '16px',
   },
-  userName: {
-    color: '#a8b4c0',
-    fontSize: '14px',
+
+  // User menu dropdown
+  userMenuWrap: {
+    position: 'relative',
   },
-  logoutBtn: {
+  userMenuBtn: {
     background: 'transparent',
     border: '1px solid #252F42',
     borderRadius: '4px',
-    color: '#a8b4c0',
+    color: '#F4F5F7',
     fontSize: '13px',
+    fontWeight: '500',
     padding: '6px 14px',
     cursor: 'pointer',
     fontFamily: 'inherit',
-    transition: 'border-color 0.2s, color 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  userMenuDropdown: {
+    position: 'absolute',
+    top: 'calc(100% + 8px)',
+    right: 0,
+    background: '#1C2333',
+    border: '1px solid #252F42',
+    borderRadius: '4px',
+    minWidth: '200px',
+    zIndex: 100,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+    overflow: 'hidden',
+  },
+  menuItem: {
+    display: 'block',
+    width: '100%',
+    background: 'transparent',
+    border: 'none',
+    textAlign: 'left',
+    color: '#F4F5F7',
+    fontSize: '14px',
+    padding: '10px 16px',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    textDecoration: 'none',
+  },
+  menuItemDisabled: {
+    display: 'block',
+    width: '100%',
+    background: 'transparent',
+    border: 'none',
+    textAlign: 'left',
+    color: '#4a5568',
+    fontSize: '14px',
+    padding: '10px 16px',
+    cursor: 'not-allowed',
+    fontFamily: 'inherit',
+  },
+  menuItemDanger: {
+    display: 'block',
+    width: '100%',
+    background: 'transparent',
+    border: 'none',
+    textAlign: 'left',
+    color: '#f87171',
+    fontSize: '14px',
+    padding: '10px 16px',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+  },
+  menuDivider: {
+    height: '1px',
+    background: '#252F42',
+    margin: '4px 0',
+  },
+  menuNote: {
+    color: '#4a5568',
+    fontSize: '11px',
+    padding: '2px 16px 8px',
   },
 
   // Main content
@@ -451,11 +514,31 @@ export default function LobbyPage() {
   const [error, setError] = useState(null);
   const [examCount, setExamCount] = useState(50);
   const [timedMode, setTimedMode] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const menuRef = useRef(null);
 
   const user = JSON.parse(localStorage.getItem('fsa_user') || '{}');
 
   useEffect(() => {
     fetchLobbyData();
+  }, []);
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    }
+    function handleKey(e) {
+      if (e.key === 'Escape') setMenuOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
   }, []);
 
   async function fetchLobbyData() {
@@ -509,8 +592,26 @@ export default function LobbyPage() {
     navigate(`/practice-exam?paper=${data.paper}&count=${examCount}&timed=${timedMode}`);
   }
 
-  // Calculate paper switch cooldown
-  const lastSwitchAt = user?.last_paper_switch_at;
+  async function handleOpenBillingPortal() {
+    setMenuOpen(false);
+    setBillingLoading(true);
+    try {
+      const res = await fetch('/api/platform/billing-portal', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Could not open billing portal');
+      window.open(d.url, '_blank', 'noopener');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setBillingLoading(false);
+    }
+  }
+
+  // Calculate paper switch cooldown from server data (not localStorage, which lacks this field)
+  const lastSwitchAt = data?.last_paper_switch_at;
   const COOLDOWN_DAYS = 7;
   let daysUntilSwitch = 0;
   if (lastSwitchAt) {
@@ -546,10 +647,54 @@ export default function LobbyPage() {
       <header style={s.header}>
         <div style={s.brand}>Full Steam Ahead</div>
         <div style={s.headerRight}>
-          <span style={s.userName}>
-            {user.first_name ? `${user.first_name}` : user.email}
-          </span>
-          <button style={s.logoutBtn} onClick={handleLogout}>Sign out</button>
+          <div style={s.userMenuWrap} ref={menuRef}>
+            <button
+              style={s.userMenuBtn}
+              onClick={() => setMenuOpen(o => !o)}
+              aria-expanded={menuOpen}
+            >
+              {user.first_name && user.last_name
+                ? `${user.first_name} ${user.last_name}`
+                : user.first_name || user.email}
+              {' '}▾
+            </button>
+            {menuOpen && (
+              <div style={s.userMenuDropdown}>
+                <button
+                  style={s.menuItem}
+                  onClick={() => { setMenuOpen(false); navigate('/profile'); }}
+                >
+                  Profile
+                </button>
+                <button
+                  style={s.menuItem}
+                  onClick={handleOpenBillingPortal}
+                  disabled={billingLoading}
+                >
+                  {billingLoading ? 'Opening…' : 'Subscription'}
+                </button>
+                {daysUntilSwitch > 0 ? (
+                  <>
+                    <button style={s.menuItemDisabled} disabled>
+                      Switch Paper
+                    </button>
+                    <div style={s.menuNote}>Available in {daysUntilSwitch} day{daysUntilSwitch !== 1 ? 's' : ''}</div>
+                  </>
+                ) : (
+                  <button
+                    style={s.menuItem}
+                    onClick={() => { setMenuOpen(false); navigate('/select-paper'); }}
+                  >
+                    Switch Paper
+                  </button>
+                )}
+                <div style={s.menuDivider} />
+                <button style={s.menuItemDanger} onClick={handleLogout}>
+                  Sign Out
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -749,19 +894,6 @@ export default function LobbyPage() {
           </div>
         </div>
 
-        {/* ── Paper Switch ── */}
-        <div style={s.switchSection}>
-          <div style={s.switchLabel}>Currently studying: {paper}</div>
-          {daysUntilSwitch > 0 ? (
-            <div style={s.cooldownNote}>
-              You can switch papers in {daysUntilSwitch} day{daysUntilSwitch !== 1 ? 's' : ''}
-            </div>
-          ) : (
-            <button style={s.switchLink} onClick={() => navigate('/select-paper')}>
-              Switch Paper
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );

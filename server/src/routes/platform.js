@@ -274,6 +274,7 @@ router.get('/lobby-data', requireAuth, async (req, res) => {
 
     return res.json({
       paper: active_paper,
+      last_paper_switch_at: req.user.last_paper_switch_at || null,
       progress: {
         completed_objectives: completedObjectives,
         total_objectives: totalObjectives,
@@ -463,6 +464,8 @@ router.get('/me', requireAuth, async (req, res) => {
       email: u.email,
       first_name: u.first_name,
       last_name: u.last_name,
+      phone: u.phone || null,
+      address: u.address || null,
       active_paper: u.active_paper,
       class_code: u.class_code,
       status: u.status,
@@ -471,6 +474,58 @@ router.get('/me', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('GET /api/platform/me error:', err);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/platform/profile
+router.patch('/profile', requireAuth, async (req, res) => {
+  try {
+    const { first_name, last_name, phone, address } = req.body;
+    const userId = req.user.id;
+
+    if (!first_name?.trim() || !last_name?.trim()) {
+      return res.status(400).json({ error: 'First and last name are required' });
+    }
+
+    await pool.query(
+      `UPDATE platform_users SET first_name = $1, last_name = $2, phone = $3, address = $4 WHERE id = $5`,
+      [first_name.trim(), last_name.trim(), phone?.trim() || null, address?.trim() || null, userId]
+    );
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('PATCH /api/platform/profile error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/platform/billing-portal
+// Creates a Stripe Customer Portal session and returns the URL.
+router.post('/billing-portal', requireAuth, async (req, res) => {
+  try {
+    const stripeSubId = req.user.stripe_subscription_id;
+    if (!stripeSubId) {
+      return res.status(400).json({ error: 'No Stripe subscription on file. Contact support@fullsteamahead.ca.' });
+    }
+
+    const Stripe = require('stripe');
+    const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+
+    const subscription = await stripe.subscriptions.retrieve(stripeSubId);
+    const customerId = typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer.id;
+
+    const returnUrl = `${process.env.PLATFORM_BASE_URL || 'https://learn.fullsteamahead.ca'}/lobby`;
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: returnUrl,
+    });
+
+    return res.json({ url: session.url });
+  } catch (err) {
+    console.error('POST /api/platform/billing-portal error:', err);
+    return res.status(500).json({ error: 'Failed to open billing portal. Please contact support@fullsteamahead.ca.' });
   }
 });
 

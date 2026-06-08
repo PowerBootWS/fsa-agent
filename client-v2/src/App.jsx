@@ -9,6 +9,7 @@ import AllChaptersPage from './pages/AllChaptersPage';
 import LessonPlayerPage from './pages/LessonPlayerPage';
 import ExamResultsPage from './pages/ExamResultsPage';
 import PracticeExamPage from './pages/PracticeExamPage';
+import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { LessonPlayer } from './LessonPlayer';
 import { ExamRouter } from './ExamRouter';
@@ -81,6 +82,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <ExamResultsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
           </ProtectedRoute>
         }
       />

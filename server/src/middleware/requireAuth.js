@@ -15,7 +15,9 @@ module.exports = async function requireAuth(req, res, next) {
   try {
     const result = await pool.query(
       `SELECT pu.id, pu.email, pu.first_name, pu.last_name, pu.current_session_token,
-              s.class_code, s.status, s.active_paper, s.last_paper_switch_at, s.id as subscription_id
+              pu.phone, pu.address,
+              s.class_code, s.status, s.active_paper, s.last_paper_switch_at,
+              s.id as subscription_id, s.stripe_subscription_id
        FROM platform_users pu
        JOIN subscriptions s ON s.user_id = pu.id AND s.status = 'active'
        WHERE pu.current_session_token = $1`,
