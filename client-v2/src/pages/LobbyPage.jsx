@@ -506,7 +506,7 @@ export default function LobbyPage() {
 
   function handleStartExam() {
     if (!data) return;
-    navigate(`/?mode=exam&lesson=${data.paper}&count=${examCount}&timed=${timedMode}`);
+    navigate(`/practice-exam?paper=${data.paper}&count=${examCount}&timed=${timedMode}`);
   }
 
   // Calculate paper switch cooldown

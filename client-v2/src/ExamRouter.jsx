@@ -561,7 +561,7 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
 // PracticeExamRouter — orchestrates lobby → exam → results flow
 // ---------------------------------------------------------------------------
 
-function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState, startPhase, initialConfig }) {
+function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState, startPhase, initialConfig, onExit }) {
   const [phase, setPhase] = useState(startPhase || 'lobby');
   const [examConfig, setExamConfig] = useState(initialConfig || null);
   const [activeChapterId, setActiveChapterId] = useState(null);
@@ -595,7 +595,8 @@ function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState, s
   };
 
   const handleBackToLobby = () => {
-    setPhase('lobby');
+    if (onExit) onExit();
+    else setPhase('lobby');
   };
 
   if (phase === 'lobby') {
@@ -672,16 +673,23 @@ function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState, s
 
   // phase === 'exam'
   return (
-    <QuizExamView
-      lesson={lesson}
-      user={user}
-      lessonId={lessonId}
-      mode="practice_exam"
-      chatState={chatState}
-      setChatState={setChatState}
-      examConfig={examConfig}
-      onSelectChapter={handleSelectChapter}
-    />
+    <div className="quizexam-with-back">
+      <div className="quizexam-back-bar">
+        <button className="quizexam-back-btn" onClick={handleBackToLobby}>
+          ← Back to Lobby
+        </button>
+      </div>
+      <QuizExamView
+        lesson={lesson}
+        user={user}
+        lessonId={lessonId}
+        mode="practice_exam"
+        chatState={chatState}
+        setChatState={setChatState}
+        examConfig={examConfig}
+        onSelectChapter={handleSelectChapter}
+      />
+    </div>
   );
 }
 
@@ -689,7 +697,7 @@ function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState, s
 // ExamRouter — top-level export, receives courseId + learnerId from App.jsx
 // ---------------------------------------------------------------------------
 
-export function ExamRouter({ courseId, learnerId, initialConfig }) {
+export function ExamRouter({ courseId, learnerId, initialConfig, onExit }) {
   const [chatState, setChatState] = useState({
     messages: [],
     displayContent: null,
@@ -707,6 +715,7 @@ export function ExamRouter({ courseId, learnerId, initialConfig }) {
         setChatState={setChatState}
         startPhase={initialConfig ? 'exam' : 'lobby'}
         initialConfig={initialConfig}
+        onExit={onExit}
       />
     </div>
   );
