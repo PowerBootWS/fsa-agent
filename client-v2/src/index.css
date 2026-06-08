@@ -49,8 +49,9 @@ body {
 
 .lesson-player {
   display: flex;
-  height: 80vh;
+  flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
 
 .content-panel {

@@ -7,7 +7,7 @@ export default function LessonPlayerPage() {
   const user = JSON.parse(localStorage.getItem('fsa_user') || '{}');
 
   return (
-    <div style={{ background: '#0D1117', minHeight: '100vh', fontFamily: "'Barlow', -apple-system, sans-serif" }}>
+    <div style={{ background: '#0D1117', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: "'Barlow', -apple-system, sans-serif" }}>
       <div style={{ padding: '12px 24px', background: '#1C2333', borderBottom: '1px solid #252F42', display: 'flex', alignItems: 'center', borderBottom: '2px solid #E8720C' }}>
         <button
           onClick={() => navigate('/chapters')}
