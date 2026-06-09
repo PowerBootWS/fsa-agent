@@ -53,10 +53,30 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId }) {
     const progressFetch = isCourse && learnerId
       ? fetch(`/api/v2/progress/${encodeURIComponent(learnerId)}/${courseId}`).then(r => r.json())
       : Promise.resolve(null);
+    const structureFetch = learnerId
+      ? fetch(`/api/platform/course-structure/${courseId}`, { credentials: 'include' })
+          .then(r => r.ok ? r.json() : null).catch(() => null)
+      : Promise.resolve(null);
 
-    Promise.all([outlineFetch, progressFetch])
-      .then(async ([outline, progress]) => {
+    Promise.all([outlineFetch, progressFetch, structureFetch])
+      .then(async ([outline, progress, structure]) => {
         if (outline.error) throw new Error(outline.error);
+
+        // Merge lock/completion state from gated structure into outline
+        if (structure?.chapters) {
+          const lockMap = new Map(structure.chapters.map(ch => [ch.chapter_num, ch]));
+          for (const ch of outline.chapters || []) {
+            const s = lockMap.get(ch.chapter_num);
+            if (!s) continue;
+            ch.locked = s.locked;
+            const objMap = new Map((s.objectives || []).map(o => [o.lesson_code, o]));
+            for (const obj of ch.objectives || []) {
+              const so = objMap.get(obj.lesson_code);
+              if (so) { obj.locked = so.locked; obj.completed = so.completed; }
+            }
+          }
+        }
+
         setCourseOutline(outline);
 
         // Resolve starting lesson code and slide index

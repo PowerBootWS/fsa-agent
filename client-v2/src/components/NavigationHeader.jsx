@@ -36,7 +36,7 @@ export function NavigationHeader({
   }, []);
 
   function handleChapterNav(chapter) {
-    if (!chapter?.objectives?.length) return;
+    if (!chapter?.objectives?.length || chapter.locked) return;
     onNavigate(chapter.objectives[0].lesson_code);
     setDropdownOpen(false);
   }
@@ -70,10 +70,12 @@ export function NavigationHeader({
               {courseOutline?.chapters?.map(chapter => (
                 <button
                   key={chapter.chapter_num}
-                  className={`nav-dropdown-chapter${chapter.chapter_num === currentChapterNum ? ' active' : ''}`}
+                  className={`nav-dropdown-chapter${chapter.chapter_num === currentChapterNum ? ' active' : ''}${chapter.locked ? ' locked' : ''}`}
                   onClick={() => handleChapterNav(chapter)}
+                  disabled={chapter.locked}
+                  title={chapter.locked ? 'Complete previous chapter quiz to unlock' : undefined}
                 >
-                  {chapter.chapter_num}. {chapter.label}
+                  {chapter.locked ? '🔒 ' : ''}{chapter.chapter_num}. {chapter.label}
                 </button>
               ))}
             </div>
@@ -83,8 +85,8 @@ export function NavigationHeader({
         <button
           className="nav-chapter-arrow"
           onClick={() => handleChapterNav(nextChapter)}
-          disabled={!nextChapter}
-          title="Next chapter"
+          disabled={!nextChapter || nextChapter.locked}
+          title={nextChapter?.locked ? 'Complete this chapter\'s quiz to unlock' : 'Next chapter'}
         >
           →
         </button>
@@ -97,12 +99,12 @@ export function NavigationHeader({
           return (
             <button
               key={obj.lesson_code}
-              className={`nav-obj-pill${isActive ? ' active' : ''}`}
-              onClick={() => !isActive && onNavigate(obj.lesson_code)}
-              disabled={isActive}
-              title={obj.title}
+              className={`nav-obj-pill${isActive ? ' active' : ''}${obj.locked ? ' locked' : ''}`}
+              onClick={() => !isActive && !obj.locked && onNavigate(obj.lesson_code)}
+              disabled={isActive || obj.locked}
+              title={obj.locked ? 'Complete previous objective to unlock' : obj.title}
             >
-              Obj {obj.objective_num}
+              {obj.locked ? '🔒' : `Obj ${obj.objective_num}`}
             </button>
           );
         })}
