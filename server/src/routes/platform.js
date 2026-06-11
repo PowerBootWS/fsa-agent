@@ -22,7 +22,7 @@ function requireInternalSecret(req, res, next) {
 // POST /api/platform/provision-user
 router.post('/provision-user', requireInternalSecret, async (req, res) => {
   try {
-    const { email, first_name, last_name, class_code } = req.body;
+    const { email, first_name, last_name, class_code, stripe_subscription_id } = req.body;
 
     if (!email || !first_name || !class_code) {
       return res.status(400).json({ error: 'email, first_name, and class_code are required' });
@@ -30,13 +30,15 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Upsert platform_users — insert if not exists, then select
-    await pool.query(
+    // Upsert platform_users — RETURNING id tells us if the row was just created
+    const userInsert = await pool.query(
       `INSERT INTO platform_users (email, first_name, last_name)
        VALUES ($1, $2, $3)
-       ON CONFLICT (email) DO NOTHING`,
+       ON CONFLICT (email) DO NOTHING
+       RETURNING id`,
       [normalizedEmail, first_name, last_name || null]
     );
+    const userIsNew = userInsert.rowCount > 0;
 
     const userResult = await pool.query(
       `SELECT id FROM platform_users WHERE email = $1`,
@@ -44,27 +46,33 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
     );
     const user = userResult.rows[0];
 
-    // Ensure active subscription exists for this user + class_code
-    // For re-enrollment (returning users with inactive subscriptions), insert a new active subscription
-    await pool.query(
-      `INSERT INTO subscriptions (user_id, class_code, status, active_paper)
-       SELECT $1, $2, 'active', NULL
+    // Insert active subscription if none exists — RETURNING id tells us if it was just created.
+    // Covers both new subscribers and re-enrollment after cancellation.
+    const subInsert = await pool.query(
+      `INSERT INTO subscriptions (user_id, class_code, status, active_paper, stripe_subscription_id)
+       SELECT $1, $2, 'active', NULL, $3
        WHERE NOT EXISTS (
          SELECT 1 FROM subscriptions
          WHERE user_id = $1 AND class_code = $2 AND status = 'active'
-       )`,
-      [user.id, class_code]
+       )
+       RETURNING id`,
+      [user.id, class_code, stripe_subscription_id || null]
     );
+    const subIsNew = subInsert.rowCount > 0;
 
-    // Generate magic link token (48h TTL)
-    const token = crypto.randomUUID();
-    await pool.query(
-      `INSERT INTO auth_tokens (user_id, token, type, expires_at)
-       VALUES ($1, $2, 'magic_link', now() + interval '48 hours')`,
-      [user.id, token]
-    );
-
-    await sendMagicLink(normalizedEmail, first_name, token);
+    // Only send magic link when something was actually new — prevents duplicate emails
+    // on Stripe's at-least-once re-delivery of the same checkout event.
+    if (userIsNew || subIsNew) {
+      const token = crypto.randomUUID();
+      await pool.query(
+        `INSERT INTO auth_tokens (user_id, token, type, expires_at)
+         VALUES ($1, $2, 'magic_link', now() + interval '48 hours')`,
+        [user.id, token]
+      );
+      await sendMagicLink(normalizedEmail, first_name, token);
+    } else {
+      console.log(`provision-user: idempotent re-delivery for ${normalizedEmail}, skipping magic link`);
+    }
 
     return res.json({ ok: true, user_id: user.id });
   } catch (err) {
@@ -74,9 +82,12 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
 });
 
 // POST /api/platform/deactivate-user
+// Body: { email, cancel_at? }
+// cancel_at (Unix timestamp or ISO string): if provided and in the future, schedules deactivation
+// at that time rather than deactivating immediately. Access continues until cancel_at.
 router.post('/deactivate-user', requireInternalSecret, async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, cancel_at } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: 'email is required' });
@@ -93,21 +104,59 @@ router.post('/deactivate-user', requireInternalSecret, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    await pool.query(
-      `UPDATE subscriptions
-       SET status = 'inactive', deactivated_at = now()
-       WHERE user_id = $1 AND status = 'active'`,
-      [user.id]
-    );
+    const cancelAt = cancel_at ? new Date(typeof cancel_at === 'number' ? cancel_at * 1000 : cancel_at) : null;
+    const isGracePeriod = cancelAt && cancelAt > new Date();
 
-    await pool.query(
-      `UPDATE platform_users SET current_session_token = NULL WHERE id = $1`,
-      [user.id]
-    );
+    if (isGracePeriod) {
+      // Subscription canceled but paid through cancel_at — keep status active, set cancel_at
+      await pool.query(
+        `UPDATE subscriptions SET cancel_at = $2 WHERE user_id = $1 AND status = 'active'`,
+        [user.id, cancelAt]
+      );
+      console.log(`deactivate-user: grace period set for ${email} until ${cancelAt.toISOString()}`);
+    } else {
+      // Immediate deactivation
+      await pool.query(
+        `UPDATE subscriptions SET status = 'inactive', deactivated_at = now(), cancel_at = NULL
+         WHERE user_id = $1 AND status = 'active'`,
+        [user.id]
+      );
+      await pool.query(
+        `UPDATE platform_users SET current_session_token = NULL WHERE id = $1`,
+        [user.id]
+      );
+      console.log(`deactivate-user: immediate deactivation for ${email}`);
+    }
 
-    return res.json({ ok: true });
+    return res.json({ ok: true, grace_period: isGracePeriod, cancel_at: cancelAt });
   } catch (err) {
     console.error('POST /api/platform/deactivate-user error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/platform/expire-grace-periods
+// Called daily by cloud routine — finalises deactivation for subscriptions whose cancel_at has passed.
+router.post('/expire-grace-periods', requireInternalSecret, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE subscriptions
+       SET status = 'inactive', deactivated_at = now(), cancel_at = NULL
+       WHERE status = 'active' AND cancel_at IS NOT NULL AND cancel_at <= NOW()
+       RETURNING user_id`
+    );
+    const count = result.rowCount;
+    if (count > 0) {
+      const userIds = result.rows.map(r => r.user_id);
+      await pool.query(
+        `UPDATE platform_users SET current_session_token = NULL WHERE id = ANY($1)`,
+        [userIds]
+      );
+      console.log(`expire-grace-periods: deactivated ${count} subscription(s), user_ids: ${userIds.join(', ')}`);
+    }
+    return res.json({ ok: true, deactivated: count });
+  } catch (err) {
+    console.error('POST /api/platform/expire-grace-periods error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -20,6 +20,7 @@ module.exports = async function requireAuth(req, res, next) {
               s.id as subscription_id, s.stripe_subscription_id
        FROM platform_users pu
        JOIN subscriptions s ON s.user_id = pu.id AND s.status = 'active'
+         AND (s.cancel_at IS NULL OR s.cancel_at > NOW())
        WHERE pu.current_session_token = $1`,
       [token]
     );
