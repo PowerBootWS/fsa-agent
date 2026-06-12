@@ -49,20 +49,23 @@ function QuestionCard({ question, onAnswer }) {
 
   return (
     <div className="question-card">
-      <div className="q-text">{question.question_text}</div>
-      {options.map((opt, idx) => (
-        <button
-          key={idx}
-          className={[
-            'q-option',
-            selected !== null && idx === question.correct_answer ? 'correct' : '',
-            selected === idx && idx !== question.correct_answer ? 'wrong' : '',
-          ].filter(Boolean).join(' ')}
-          onClick={() => handleSelect(idx)}
-        >
-          {typeof opt === 'string' ? opt : opt.text || JSON.stringify(opt)}
-        </button>
-      ))}
+      <div className="q-text">{renderInline(question.question_text || '', 'qt')}</div>
+      {options.map((opt, idx) => {
+        const optText = typeof opt === 'string' ? opt : opt.text || JSON.stringify(opt);
+        return (
+          <button
+            key={idx}
+            className={[
+              'q-option',
+              selected !== null && idx === question.correct_answer ? 'correct' : '',
+              selected === idx && idx !== question.correct_answer ? 'wrong' : '',
+            ].filter(Boolean).join(' ')}
+            onClick={() => handleSelect(idx)}
+          >
+            {renderInline(optText, `opt${idx}`)}
+          </button>
+        );
+      })}
     </div>
   );
 }
