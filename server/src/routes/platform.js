@@ -1,7 +1,13 @@
 const express = require('express');
 const crypto = require('crypto');
 const { pool, getCourseOutline } = require('../services/database');
-const { sendMagicLink } = require('../services/email');
+const { sendMagicLink, sendDeactivationReview } = require('../services/email');
+
+// While the LMS transition stabilizes, automated deactivations are held for operator
+// confirmation instead of pulling access immediately. Default ON; set to 'false' to resume
+// auto-deactivation (now correctly scoped — see webhook-listener subscription.deleted handler).
+const DEACTIVATION_REQUIRES_CONFIRMATION =
+  (process.env.DEACTIVATION_REQUIRES_CONFIRMATION || 'true').toLowerCase() !== 'false';
 const requireAuth = require('../middleware/requireAuth');
 
 const router = express.Router();
@@ -87,14 +93,14 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
 // at that time rather than deactivating immediately. Access continues until cancel_at.
 router.post('/deactivate-user', requireInternalSecret, async (req, res) => {
   try {
-    const { email, cancel_at } = req.body;
+    const { email, cancel_at, stripe_subscription_id } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: 'email is required' });
     }
 
     const userResult = await pool.query(
-      `SELECT id FROM platform_users WHERE email = $1`,
+      `SELECT id, first_name, last_name FROM platform_users WHERE email = $1`,
       [email.toLowerCase().trim()]
     );
 
@@ -104,31 +110,61 @@ router.post('/deactivate-user', requireInternalSecret, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Record the cancelled subscription id on the affected active row for traceability,
+    // without changing access. (No-op if it was already linked.)
+    if (stripe_subscription_id) {
+      await pool.query(
+        `UPDATE subscriptions SET stripe_subscription_id = $2
+         WHERE user_id = $1 AND status = 'active'
+           AND (stripe_subscription_id IS NULL OR stripe_subscription_id = '')`,
+        [user.id, stripe_subscription_id]
+      );
+    }
+
     const cancelAt = cancel_at ? new Date(typeof cancel_at === 'number' ? cancel_at * 1000 : cancel_at) : null;
     const isGracePeriod = cancelAt && cancelAt > new Date();
 
     if (isGracePeriod) {
-      // Subscription canceled but paid through cancel_at — keep status active, set cancel_at
+      // Subscription canceled but paid through cancel_at — keep status active, set cancel_at.
+      // Access is not pulled here, so this path is not gated; the eventual expiry is.
       await pool.query(
         `UPDATE subscriptions SET cancel_at = $2 WHERE user_id = $1 AND status = 'active'`,
         [user.id, cancelAt]
       );
       console.log(`deactivate-user: grace period set for ${email} until ${cancelAt.toISOString()}`);
-    } else {
-      // Immediate deactivation
-      await pool.query(
-        `UPDATE subscriptions SET status = 'inactive', deactivated_at = now(), cancel_at = NULL
-         WHERE user_id = $1 AND status = 'active'`,
-        [user.id]
-      );
-      await pool.query(
-        `UPDATE platform_users SET current_session_token = NULL WHERE id = $1`,
-        [user.id]
-      );
-      console.log(`deactivate-user: immediate deactivation for ${email}`);
+      return res.json({ ok: true, grace_period: true, cancel_at: cancelAt });
     }
 
-    return res.json({ ok: true, grace_period: isGracePeriod, cancel_at: cancelAt });
+    // Immediate deactivation path.
+    if (DEACTIVATION_REQUIRES_CONFIRMATION) {
+      // Gate on: do NOT pull access. Notify the operator and keep the customer active.
+      const name = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+      try {
+        await sendDeactivationReview({
+          name,
+          email: email.toLowerCase().trim(),
+          stripeSubscriptionId: stripe_subscription_id || null,
+          reason: 'Stripe subscription cancelled (no remaining active subscription)',
+        });
+      } catch (mailErr) {
+        console.error('deactivate-user: review email failed:', mailErr.message);
+      }
+      console.log(`deactivate-user: HELD for confirmation (gate on) — ${email}`);
+      return res.json({ ok: true, pending: true });
+    }
+
+    await pool.query(
+      `UPDATE subscriptions SET status = 'inactive', deactivated_at = now(), cancel_at = NULL
+       WHERE user_id = $1 AND status = 'active'`,
+      [user.id]
+    );
+    await pool.query(
+      `UPDATE platform_users SET current_session_token = NULL WHERE id = $1`,
+      [user.id]
+    );
+    console.log(`deactivate-user: immediate deactivation for ${email}`);
+
+    return res.json({ ok: true, grace_period: false, cancel_at: null });
   } catch (err) {
     console.error('POST /api/platform/deactivate-user error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -139,6 +175,33 @@ router.post('/deactivate-user', requireInternalSecret, async (req, res) => {
 // Called daily by cloud routine — finalises deactivation for subscriptions whose cancel_at has passed.
 router.post('/expire-grace-periods', requireInternalSecret, async (req, res) => {
   try {
+    if (DEACTIVATION_REQUIRES_CONFIRMATION) {
+      // Gate on: don't pull access. Email a digest of expired grace periods for confirmation
+      // and leave the rows active until the operator confirms.
+      const due = await pool.query(
+        `SELECT s.user_id, s.stripe_subscription_id, pu.email, pu.first_name, pu.last_name
+         FROM subscriptions s JOIN platform_users pu ON pu.id = s.user_id
+         WHERE s.status = 'active' AND s.cancel_at IS NOT NULL AND s.cancel_at <= NOW()`
+      );
+      const pending = due.rowCount;
+      if (pending > 0) {
+        try {
+          await sendDeactivationReview(
+            due.rows.map((r) => ({
+              name: [r.first_name, r.last_name].filter(Boolean).join(' ').trim(),
+              email: r.email,
+              stripeSubscriptionId: r.stripe_subscription_id,
+              reason: 'Grace period expired (subscription cancelled, paid time ended)',
+            }))
+          );
+        } catch (mailErr) {
+          console.error('expire-grace-periods: review email failed:', mailErr.message);
+        }
+        console.log(`expire-grace-periods: HELD ${pending} subscription(s) for confirmation (gate on)`);
+      }
+      return res.json({ ok: true, deactivated: 0, pending });
+    }
+
     const result = await pool.query(
       `UPDATE subscriptions
        SET status = 'inactive', deactivated_at = now(), cancel_at = NULL

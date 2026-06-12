@@ -7,6 +7,8 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - TZ=America/Edmonton
+      - PGTZ=America/Edmonton
     volumes:
       - fsa_postgres_data:/var/lib/postgresql/data
     networks:
@@ -42,6 +44,9 @@ services:
       - PLATFORM_BASE_URL=${PLATFORM_BASE_URL}
       - PAPER_SWITCH_COOLDOWN_DAYS=${PAPER_SWITCH_COOLDOWN_DAYS}
       - QUIZ_PASSING_THRESHOLD=${QUIZ_PASSING_THRESHOLD}
+      - DEACTIVATION_REQUIRES_CONFIRMATION=${DEACTIVATION_REQUIRES_CONFIRMATION}
+      - DEACTIVATION_REVIEW_EMAIL=${DEACTIVATION_REVIEW_EMAIL}
+      - TZ=America/Edmonton
     volumes:
       - ${FSA_MEDIA_DIR}:/srv/fsa-media:ro
     depends_on:
@@ -66,6 +71,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OPENROUTER_MODEL=google/gemini-3-flash-preview
+      - TZ=America/Edmonton
     networks:
       - fsa-network
     restart: unless-stopped

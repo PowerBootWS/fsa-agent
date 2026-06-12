@@ -35,4 +35,49 @@ async function sendPasswordReset(email, firstName, token) {
   });
 }
 
-module.exports = { sendMagicLink, sendPasswordReset };
+// Notifies the operator that one or more customers are queued for deactivation and
+// need manual confirmation before access is pulled. Used while the deactivation
+// confirmation gate (DEACTIVATION_REQUIRES_CONFIRMATION) is enabled.
+// `items`: array of { name, email, stripeSubscriptionId, reason }.
+async function sendDeactivationReview(items) {
+  const to = process.env.DEACTIVATION_REVIEW_EMAIL || 'sysadmin@powerboot.ca';
+  const list = (Array.isArray(items) ? items : [items]).filter(Boolean);
+  if (!list.length) return;
+
+  const rows = list
+    .map(
+      (i) =>
+        `<tr><td style="padding:4px 12px 4px 0">${i.name || '(no name)'}</td>` +
+        `<td style="padding:4px 12px 4px 0">${i.email || ''}</td>` +
+        `<td style="padding:4px 12px 4px 0">${i.stripeSubscriptionId || '—'}</td>` +
+        `<td style="padding:4px 0">${i.reason || ''}</td></tr>`
+    )
+    .join('');
+  const textRows = list
+    .map((i) => `- ${i.name || '(no name)'} <${i.email || ''}> | sub ${i.stripeSubscriptionId || '—'} | ${i.reason || ''}`)
+    .join('\n');
+
+  const subject =
+    list.length === 1
+      ? `Confirm deactivation: ${list[0].email}`
+      : `Confirm deactivation: ${list.length} customers pending`;
+
+  await transporter.sendMail({
+    from: FROM,
+    to,
+    subject,
+    html:
+      `<p>The deactivation confirmation gate is on. The following ${list.length === 1 ? 'customer is' : 'customers are'} ` +
+      `queued for deactivation but <strong>still have active access</strong> pending your confirmation:</p>` +
+      `<table style="border-collapse:collapse"><thead><tr style="text-align:left">` +
+      `<th style="padding:4px 12px 4px 0">Name</th><th style="padding:4px 12px 4px 0">Email</th>` +
+      `<th style="padding:4px 12px 4px 0">Stripe sub</th><th style="padding:4px 0">Reason</th></tr></thead>` +
+      `<tbody>${rows}</tbody></table>` +
+      `<p>Reply to confirm, and the deactivation will be applied. No action keeps the customer active.</p>`,
+    text:
+      `The deactivation confirmation gate is on. Pending deactivations (still active until confirmed):\n\n` +
+      `${textRows}\n\nReply to confirm. No action keeps the customer active.`,
+  });
+}
+
+module.exports = { sendMagicLink, sendPasswordReset, sendDeactivationReview };
