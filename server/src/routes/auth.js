@@ -59,6 +59,7 @@ router.post('/login', async (req, res) => {
       `UPDATE platform_users SET current_session_token = $1, last_login_at = now() WHERE id = $2`,
       [sessionToken, user.id]
     );
+    await pool.query(`INSERT INTO login_events (user_id) VALUES ($1)`, [user.id]);
 
     res.cookie(COOKIE_NAME, sessionToken, cookieOptions());
 
@@ -277,6 +278,7 @@ router.post('/setup', async (req, res) => {
        WHERE id = $3`,
       [passwordHash, sessionToken, row.user_id]
     );
+    await pool.query(`INSERT INTO login_events (user_id) VALUES ($1)`, [row.user_id]);
 
     await pool.query(
       `UPDATE auth_tokens SET used_at = now() WHERE id = $1`,
