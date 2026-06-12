@@ -36,6 +36,8 @@ coverage/
 
 # Generated artifacts (regenerate via aggregate_lesson_content.py)
 docs/source/lesson_content_aggregated.json
+# Large generated lesson-content source (131MB, over GitHub's 100MB limit; lives on disk only)
+docs/source/FSA_lesson_content.json
 
 # Google OAuth credentials (never commit)
 credentials/.worktrees
