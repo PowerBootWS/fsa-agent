@@ -377,6 +377,9 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
   const isExam = mode === 'practice_exam';
   const examProgress = chatState.examProgress;
   const [chatOpen, setChatOpen] = useState(false);
+  // True between answering the final exam question and the debrief arriving —
+  // swaps the question for a "compiling results" panel so it's clearly working.
+  const [compilingResults, setCompilingResults] = useState(false);
 
   const updateMessages = (updater) => {
     setChatState(prev => ({
@@ -443,6 +446,11 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
     const isLastQuestion = isExam && !isDone && examProgress && examProgress.current === examProgress.total;
     const suppressChat = isExam && !isDone && !isLastQuestion;
 
+    // On the final question, immediately replace the question with a loading
+    // panel — the debrief LLM call takes a few seconds and the static question
+    // otherwise looks frozen / invites re-clicking.
+    if (isLastQuestion) setCompilingResults(true);
+
     if (!suppressChat) {
       setChatState(prev => ({
         ...prev,
@@ -476,8 +484,12 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
             examProgress: data.exam_progress ?? prev.examProgress,
           };
         });
+        setCompilingResults(false);
       })
-      .catch(err => console.error('Chat error:', err));
+      .catch(err => {
+        console.error('Chat error:', err);
+        setCompilingResults(false);
+      });
   };
 
   return (
@@ -506,14 +518,22 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
 
       <div className="quizexam-body" style={{ display: 'block', overflowY: 'auto' }}>
         <div className="quizexam-question-panel" style={{ width: '100%', maxWidth: isExam && isDone ? '1180px' : '800px', margin: '0 auto', borderRight: 'none' }}>
-          <QuizExamDisplaySection
-            displayContent={displayContent}
-            onAnswer={sendAnswer}
-            mode={mode}
-            isExam={isExam}
-            onSelectChapter={onSelectChapter}
-            user={user}
-          />
+          {compilingResults && !isDone ? (
+            <div className="exam-compiling">
+              <div className="exam-compiling-spinner" />
+              <div className="exam-compiling-title">Loading results, please stand by…</div>
+              <div className="exam-compiling-sub">Scoring your exam and preparing your feedback.</div>
+            </div>
+          ) : (
+            <QuizExamDisplaySection
+              displayContent={displayContent}
+              onAnswer={sendAnswer}
+              mode={mode}
+              isExam={isExam}
+              onSelectChapter={onSelectChapter}
+              user={user}
+            />
+          )}
         </div>
       </div>
 
