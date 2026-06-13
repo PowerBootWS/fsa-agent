@@ -88,7 +88,7 @@ export function ContentPanel({
   hideNarration = false,
 }) {
   const [sectionStartTime, setSectionStartTime] = useState(() => Date.now());
-  const { play, pause, playing, muted, toggleMute, currentTimeMs } = useAudio(
+  const { play, pause, playing, muted, toggleMute, currentTimeMs, playbackRate, setPlaybackRate } = useAudio(
     section?.audio_url || null
   );
   const { visibleText } = useNarrationSync(
@@ -154,6 +154,19 @@ export function ContentPanel({
               <button onClick={playing ? pause : play}>
                 {playing ? '⏸ Pause' : '▶ Play'}
               </button>
+            )}
+            {section?.audio_url && (
+              <label className="toggle-label speed-control">
+                Speed
+                <select
+                  value={playbackRate}
+                  onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
+                >
+                  <option value={1}>1×</option>
+                  <option value={1.25}>1.25×</option>
+                  <option value={1.5}>1.5×</option>
+                </select>
+              </label>
             )}
             <label className="toggle-label">
               <input type="checkbox" checked={muted} onChange={toggleMute} />

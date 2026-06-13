@@ -5,7 +5,7 @@ import { ContentPanel } from './ContentPanel';
 // audio for a single objective, using the real ContentPanel (no AI tutor panel).
 // Decoupled from course state: no progress written, no gating. The host card
 // gives this a bounded height so ContentPanel's own .content-scroll scrolls.
-export function InlineLessonPlayer({ lessonCode, height = 620 }) {
+export function InlineLessonPlayer({ lessonCode, height = 530 }) {
   const [sections, setSections] = useState(null);
   const [idx, setIdx] = useState(0);
   const [autoPlay, setAutoPlay] = useState(false);

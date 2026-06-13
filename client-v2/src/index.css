@@ -186,6 +186,17 @@ body {
   gap: 6px;
 }
 
+.audio-controls .speed-control select {
+  background: var(--iron);
+  color: var(--off-white);
+  border: 1px solid var(--plate-edge);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
 .nav-bar {
   display: flex;
   align-items: center;
