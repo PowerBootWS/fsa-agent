@@ -85,6 +85,7 @@ export function ContentPanel({
   nextChapter,
   nextLessonCode,
   isComplete,
+  hideNarration = false,
 }) {
   const [sectionStartTime, setSectionStartTime] = useState(() => Date.now());
   const { play, pause, playing, muted, toggleMute, currentTimeMs } = useAudio(
@@ -144,7 +145,7 @@ export function ContentPanel({
             />
           </div>
 
-          {section?.narration_timing && (
+          {!hideNarration && section?.narration_timing && (
             <div className="narration-box">{visibleText || ' '}</div>
           )}
 
