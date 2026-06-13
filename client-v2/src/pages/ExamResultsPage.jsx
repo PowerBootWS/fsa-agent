@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ContentPanel } from '../components/ContentPanel';
 
 // Grade thresholds
 function getGrade(pct) {
@@ -30,52 +31,65 @@ function GradeBadge({ grade }) {
   );
 }
 
-// Inline lesson preview inside a weakness card
+// Inline lesson player inside a weakness card — plays slides + narration audio
+// for the chapter's first objective. Decoupled from course state: no progress
+// written, no gating, no AI tutor panel (per the platform spec's exam-debrief
+// "standalone lesson" — same player component, slides + narration only).
 function LessonPreview({ chapterId }) {
-  const [lesson, setLesson] = useState(null);
+  const [sections, setSections] = useState(null);
+  const [idx, setIdx] = useState(0);
+  const [autoPlay, setAutoPlay] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const lessonCode = `${chapterId}-1`;
-    fetch(`/api/platform/lesson-preview/${lessonCode}`)
+    fetch(`/api/v2/lesson/${lessonCode}`)
       .then(r => {
         if (!r.ok) throw new Error('Lesson not found');
         return r.json();
       })
-      .then(data => { setLesson(data); setLoading(false); })
+      .then(data => {
+        if (data.error) throw new Error(data.error);
+        setSections(data.sections || []);
+        setLoading(false);
+      })
       .catch(e => { setError(e.message); setLoading(false); });
   }, [chapterId]);
 
   if (loading) return <p style={{ color: '#a8b4c0', fontSize: '14px' }}>Loading lesson…</p>;
   if (error) return <p style={{ color: '#f87171', fontSize: '14px' }}>Could not load lesson preview.</p>;
+  if (!sections || sections.length === 0) return <p style={{ color: '#a8b4c0', fontSize: '14px' }}>No lesson content available.</p>;
+
+  const goNext = () => {
+    setIdx(i => Math.min(i + 1, sections.length - 1));
+    setAutoPlay(true);
+  };
+  const goBack = () => {
+    setIdx(i => Math.max(i - 1, 0));
+    setAutoPlay(false);
+  };
 
   return (
     <div style={{
       marginTop: '12px',
-      padding: '12px',
+      height: '460px',
+      display: 'flex',
+      flexDirection: 'column',
       background: '#0D1117',
       borderRadius: '6px',
       border: '1px solid #252F42',
+      overflow: 'hidden',
     }}>
-      <h4 style={{ color: '#F4F5F7', margin: '0 0 8px 0', fontSize: '14px' }}>
-        {lesson.title}
-      </h4>
-      {lesson.summary && (
-        <p style={{ color: '#a8b4c0', fontSize: '13px', lineHeight: '1.6', margin: '0 0 8px 0' }}>
-          {lesson.summary}
-        </p>
-      )}
-      {lesson.narration_text && !lesson.summary && (
-        <p style={{ color: '#a8b4c0', fontSize: '13px', lineHeight: '1.6', margin: 0 }}>
-          {lesson.narration_text.slice(0, 400)}{lesson.narration_text.length > 400 ? '…' : ''}
-        </p>
-      )}
-      {lesson.key_points && Array.isArray(lesson.key_points) && lesson.key_points.length > 0 && (
-        <ul style={{ color: '#a8b4c0', fontSize: '13px', margin: '8px 0 0 0', paddingLeft: '18px' }}>
-          {lesson.key_points.slice(0, 3).map((pt, i) => <li key={i}>{pt}</li>)}
-        </ul>
-      )}
+      <ContentPanel
+        section={sections[idx] || null}
+        sectionIndex={idx}
+        totalSections={sections.length}
+        autoPlay={autoPlay}
+        onNext={goNext}
+        onBack={goBack}
+        isComplete={false}
+      />
     </div>
   );
 }
@@ -167,7 +181,8 @@ export default function ExamResultsPage() {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      height: '100vh',
+      overflowY: 'auto',
       background: '#0D1117',
       color: '#F4F5F7',
       padding: '32px 24px',
