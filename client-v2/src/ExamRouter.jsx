@@ -126,8 +126,12 @@ function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, user }
     onRetry();
   };
 
-  return (
-    <div className="results-panel">
+  const hasFocus = objective_breakdowns && objective_breakdowns.length > 0;
+
+  // Left column — the score overview, always visible (sticky) while the
+  // right-hand lesson accordion scrolls independently.
+  const overview = (
+    <div className="exam-results-overview">
       <div className="results-score" style={{ color: scoreColor }}>
         {score}/{total} <span className="results-score-pct">({score_pct}%)</span>
       </div>
@@ -149,15 +153,6 @@ function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, user }
         </table>
       )}
 
-      {objective_breakdowns && objective_breakdowns.length > 0 && (
-        <TeachingNotes
-          objectiveBreakdowns={objective_breakdowns}
-          chapterStats={chapter_stats}
-          onSelectChapter={onSelectChapter}
-          user={user}
-        />
-      )}
-
       {next_attempt_allocation && (
         <NextAttemptPreview
           nextAttemptAllocation={next_attempt_allocation}
@@ -177,6 +172,21 @@ function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, user }
           <p className="results-retry-hint">
             Your next exam will pull more questions from chapters you struggled with.
           </p>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className={`results-panel${hasFocus ? ' results-panel--split' : ''}`}>
+      {overview}
+      {hasFocus && (
+        <div className="exam-results-focus">
+          <TeachingNotes
+            objectiveBreakdowns={objective_breakdowns}
+            chapterStats={chapter_stats}
+            onSelectChapter={onSelectChapter}
+          />
         </div>
       )}
     </div>
@@ -494,8 +504,8 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
         </div>
       </div>
 
-      <div className="quizexam-body" style={{ display: 'block' }}>
-        <div className="quizexam-question-panel" style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
+      <div className="quizexam-body" style={{ display: 'block', overflowY: 'auto' }}>
+        <div className="quizexam-question-panel" style={{ width: '100%', maxWidth: isExam && isDone ? '1180px' : '800px', margin: '0 auto', borderRight: 'none' }}>
           <QuizExamDisplaySection
             displayContent={displayContent}
             onAnswer={sendAnswer}
@@ -507,9 +517,11 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
         </div>
       </div>
 
-      {/* Floating chat button */}
+      {/* Floating chat button — pulses to draw attention once the exam
+          review is on screen and the tutor's debrief is waiting. */}
       <button
         onClick={() => setChatOpen(o => !o)}
+        className={isExam && isDone && !chatOpen ? 'tutor-fab tutor-fab--pulse' : 'tutor-fab'}
         style={{
           position: 'fixed', bottom: '24px', right: '24px',
           width: '56px', height: '56px', borderRadius: '50%',
@@ -526,7 +538,7 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
       {chatOpen && (
         <div style={{
           position: 'fixed', bottom: '90px', right: '24px',
-          width: '350px', height: '500px',
+          width: '700px', maxWidth: 'calc(100vw - 48px)', height: '520px',
           background: '#1e293b', border: '1px solid #334155', borderRadius: '12px',
           display: 'flex', flexDirection: 'column', zIndex: 99,
           boxShadow: '0 8px 32px rgba(0,0,0,0.4)',

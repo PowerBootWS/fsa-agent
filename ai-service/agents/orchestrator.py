@@ -1192,16 +1192,15 @@ class Orchestrator:
             )
         else:
             debrief_prompt = (
-                f"The student {first_name} just completed a {total_q}-question practice exam for {course_id}.\n"
-                f"Overall: {total_correct}/{total_q} ({score_pct}%)\n"
-                f"Strong chapters: {strong_str}\n"
-                f"Chapters needing review: {weak_str}\n"
-                + (f"Missed objectives: {missed_str}\n" if missed_str else '')
-                + f"\nWrite a warm, concise debrief (4-6 sentences). Acknowledge their score. "
-                f"Highlight 1-2 strong chapters if any. "
-                + (f"Reference the specific missed objectives by name ({missed_str}) and say you've added teaching notes below. " if missed_str else '')
-                + f"Mention the next exam will be weighted to their weak areas. "
-                f"End by asking if they'd like to try again. Address them as {first_name}."
+                f"The student {first_name} just completed a {total_q}-question practice exam for {course_id}, "
+                f"scoring {total_correct}/{total_q} ({score_pct}%).\n"
+                f"The full score breakdown, per-chapter results, and per-objective teaching notes are ALREADY "
+                f"displayed on screen next to this chat, so do NOT repeat or list them.\n"
+                f"\nWrite a very brief, high-level reaction — 1 to 2 short sentences, no more. "
+                f"Acknowledge the result warmly at a high level (e.g. strong work / solid progress / room to grow) "
+                f"without naming specific chapters, objectives, scores, or percentages. "
+                f"Then offer to start another practice exam, noting it will focus more on their weaker areas. "
+                f"Address them as {first_name}."
             )
 
         debrief_state = {

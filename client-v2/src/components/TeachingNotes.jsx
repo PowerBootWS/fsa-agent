@@ -1,6 +1,11 @@
+import { useState } from 'react';
 import { MathContent } from './MathContent.jsx';
+import { InlineLessonPlayer } from './InlineLessonPlayer.jsx';
 
-export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapter, user }) {
+export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapter }) {
+  // Which card's lesson is expanded — accordion: only one open at a time.
+  const [openIdx, setOpenIdx] = useState(null);
+
   if (!objectiveBreakdowns || objectiveBreakdowns.length === 0) return null;
 
   const chapterPctMap = {};
@@ -12,6 +17,7 @@ export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapt
       {objectiveBreakdowns.map((obj, i) => {
         const chapterPct = chapterPctMap[obj.chapter_id] ?? 100;
         const showQuizBtn = chapterPct < 50;
+        const isOpen = openIdx === i;
         return (
           <div key={i} className="teaching-card">
             <div className="teaching-card-header">
@@ -27,9 +33,10 @@ export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapt
               {obj.lesson_code && (
                 <button
                   className="teaching-card-lesson-btn"
-                  onClick={() => window.open(`/v2/?lesson=${obj.lesson_code}&user=${encodeURIComponent(user || '')}`, '_blank')}
+                  onClick={() => setOpenIdx(isOpen ? null : i)}
+                  aria-expanded={isOpen}
                 >
-                  📖 Review this Lesson →
+                  {isOpen ? '▲ Hide lesson' : '▶ Watch a lesson on this'}
                 </button>
               )}
               {showQuizBtn && onSelectChapter && (
@@ -41,6 +48,9 @@ export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapt
                 </button>
               )}
             </div>
+            {isOpen && obj.lesson_code && (
+              <InlineLessonPlayer lessonCode={obj.lesson_code} />
+            )}
           </div>
         );
       })}

@@ -783,6 +783,36 @@ body {
   box-shadow: 0 2px 12px rgba(0,0,0,0.3);
 }
 
+/* Two-column exam results: overview (left, sticky) + lesson accordion (right). */
+.results-panel--split {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(380px, 1.2fr);
+  gap: 28px;
+  align-items: start;
+}
+.exam-results-overview {
+  position: sticky;
+  top: 0;
+  align-self: start;
+}
+.exam-results-focus {
+  min-width: 0;
+}
+.exam-results-focus .teaching-notes { margin-top: 0; }
+/* Stack to one column on narrow viewports. */
+@media (max-width: 860px) {
+  .results-panel--split { grid-template-columns: 1fr; }
+  .exam-results-overview { position: static; }
+}
+
+/* Floating tutor button — pulse to draw attention when the debrief is ready. */
+.tutor-fab--pulse { animation: tutor-fab-pulse 1.4s ease-out infinite; }
+@keyframes tutor-fab-pulse {
+  0%   { box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 0 0 rgba(29,78,216,0.55); }
+  70%  { box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 0 16px rgba(29,78,216,0); }
+  100% { box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 0 0 rgba(29,78,216,0); }
+}
+
 .results-score {
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 36px;
