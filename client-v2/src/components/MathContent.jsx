@@ -1,5 +1,15 @@
 import { InlineMath, BlockMath } from 'react-katex';
 
+// Render a plain-text run, converting **bold** markdown to <strong>.
+function renderText(str, keyPrefix) {
+  return str.split(/(\*\*[^*]+\*\*)/g).map((p, j) => {
+    if (p.startsWith('**') && p.endsWith('**')) {
+      return <strong key={`${keyPrefix}-b${j}`}>{p.slice(2, -2)}</strong>;
+    }
+    return <span key={`${keyPrefix}-s${j}`}>{p}</span>;
+  });
+}
+
 export function MathContent({ text }) {
   if (!text) return null;
 
@@ -22,12 +32,12 @@ export function MathContent({ text }) {
 
   let cursor = 0;
   segments.forEach((seg, i) => {
-    if (seg.start > cursor) parts.push(<span key={`t${i}`}>{text.slice(cursor, seg.start)}</span>);
+    if (seg.start > cursor) parts.push(<span key={`t${i}`}>{renderText(text.slice(cursor, seg.start), `t${i}`)}</span>);
     if (seg.type === 'block') parts.push(<BlockMath key={`b${i}`} math={seg.math} />);
     else parts.push(<InlineMath key={`il${i}`} math={seg.math} />);
     cursor = seg.end;
   });
-  if (cursor < text.length) parts.push(<span key="tail">{text.slice(cursor)}</span>);
+  if (cursor < text.length) parts.push(<span key="tail">{renderText(text.slice(cursor), 'tail')}</span>);
 
-  return parts.length > 0 ? <>{parts}</> : <span>{text}</span>;
+  return parts.length > 0 ? <>{parts}</> : <span>{renderText(text, 'only')}</span>;
 }
