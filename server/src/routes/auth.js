@@ -18,6 +18,21 @@ function cookieOptions() {
   };
 }
 
+// Real visitor IP behind the Cloudflare Tunnel rides in CF-Connecting-IP;
+// req.ip would be Cloudflare's edge for everyone. Falls back to req.ip, then null.
+function clientIp(req) {
+  return req.headers['cf-connecting-ip'] || req.ip || null;
+}
+
+// Records a successful login with originating IP + user agent (both nullable).
+// Additive/best-effort — captured for account-sharing review (scripts/login_audit.js).
+async function recordLoginEvent(userId, req) {
+  await pool.query(
+    `INSERT INTO login_events (user_id, ip_address, user_agent) VALUES ($1, $2, $3)`,
+    [userId, clientIp(req), req.headers['user-agent'] || null]
+  );
+}
+
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
@@ -59,7 +74,7 @@ router.post('/login', async (req, res) => {
       `UPDATE platform_users SET current_session_token = $1, last_login_at = now() WHERE id = $2`,
       [sessionToken, user.id]
     );
-    await pool.query(`INSERT INTO login_events (user_id) VALUES ($1)`, [user.id]);
+    await recordLoginEvent(user.id, req);
 
     res.cookie(COOKIE_NAME, sessionToken, cookieOptions());
 
@@ -278,7 +293,7 @@ router.post('/setup', async (req, res) => {
        WHERE id = $3`,
       [passwordHash, sessionToken, row.user_id]
     );
-    await pool.query(`INSERT INTO login_events (user_id) VALUES ($1)`, [row.user_id]);
+    await recordLoginEvent(row.user_id, req);
 
     await pool.query(
       `UPDATE auth_tokens SET used_at = now() WHERE id = $1`,
