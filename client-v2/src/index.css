@@ -69,6 +69,20 @@ body {
   padding: 20px 32px 12px;
 }
 
+/* Inline lesson player (exam-results "Where to Focus"): shrink-to-fit instead
+   of fixed-height + inner scroll. The card grows to contain content-scroll +
+   audio controls + nav, and content-scroll renders at its natural height. */
+.inline-lesson-player .content-panel {
+  flex: 1 1 auto;
+  overflow: visible;
+  border-right: none;
+}
+
+.inline-lesson-player .content-scroll {
+  flex: 0 0 auto;
+  overflow-y: visible;
+}
+
 .tutor-panel {
   flex: 0 0 40%;
   display: flex;

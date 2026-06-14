@@ -3,9 +3,12 @@ import { ContentPanel } from './ContentPanel';
 
 // Inline lesson player for the exam-results accordion. Plays slides + narration
 // audio for a single objective, using the real ContentPanel (no AI tutor panel).
-// Decoupled from course state: no progress written, no gating. The host card
-// gives this a bounded height so ContentPanel's own .content-scroll scrolls.
-export function InlineLessonPlayer({ lessonCode, height = 530 }) {
+// Decoupled from course state: no progress written, no gating. The container
+// shrink-wraps its content: .content-scroll renders at full height (no inner
+// scroll) so the whole slide is visible, and the card grows to contain the
+// scroll section, audio controls and nav. See the .inline-lesson-player
+// overrides in index.css.
+export function InlineLessonPlayer({ lessonCode }) {
   const [sections, setSections] = useState(null);
   const [idx, setIdx] = useState(0);
   const [autoPlay, setAutoPlay] = useState(false);
@@ -43,9 +46,8 @@ export function InlineLessonPlayer({ lessonCode, height = 530 }) {
   };
 
   return (
-    <div style={{
+    <div className="inline-lesson-player" style={{
       marginTop: '12px',
-      height: `${height}px`,
       display: 'flex',
       flexDirection: 'column',
       background: '#0D1117',
