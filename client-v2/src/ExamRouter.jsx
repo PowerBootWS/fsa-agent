@@ -12,7 +12,7 @@ import { CountdownTimer } from './components/CountdownTimer.jsx';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function extractResponse(tutor_response) {
+export function extractResponse(tutor_response) {
   if (tutor_response == null) return '';
   if (typeof tutor_response === 'string') return sanitizeText(tutor_response);
   if (typeof tutor_response === 'object') {
@@ -44,7 +44,7 @@ function ThinkingDots() {
 // Typewriter tutor message
 // ---------------------------------------------------------------------------
 
-function TutorMessage({ content, animate = false }) {
+export function TutorMessage({ content, animate = false }) {
   const safeContent = (typeof content === 'string' && content) ? content : '';
   const [displayed, setDisplayed] = useState(animate ? '' : safeContent);
   const [done, setDone] = useState(!animate);
@@ -115,7 +115,7 @@ function ExamProgressBar({ current, total, correct }) {
 // Results panel
 // ---------------------------------------------------------------------------
 
-function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, user }) {
+export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, user }) {
   const { score, total, score_pct, chapter_stats,
           objective_breakdowns, next_attempt_allocation } = displayContent;
   const scoreColor = score_pct >= 75 ? '#16a34a' : score_pct >= 55 ? '#d97706' : '#dc2626';
@@ -268,7 +268,7 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSele
 // Quiz/exam chat section (tutor panel for exams)
 // ---------------------------------------------------------------------------
 
-function QuizExamChatSection({ messages, setMessages, user, lessonId, setChatState, isExam, isDone }) {
+export function QuizExamChatSection({ messages, setMessages, user, lessonId, setChatState, isExam, isDone }) {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
@@ -373,7 +373,7 @@ function QuizExamChatSection({ messages, setMessages, user, lessonId, setChatSta
 // QuizExamView — full exam/quiz page
 // ---------------------------------------------------------------------------
 
-function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter }) {
+function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter, onComplete }) {
   const isExam = mode === 'practice_exam';
   const examProgress = chatState.examProgress;
   const [chatOpen, setChatOpen] = useState(false);
@@ -420,9 +420,16 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
   const displayContent = chatState.displayContent;
   const isDone = displayContent?.type === 'exam_done' || displayContent?.type === 'quiz_done';
 
-  // Store exam results in localStorage when exam completes
+  // Store exam results in localStorage when exam completes, then (in the
+  // platform app) hand off to the durable /exam/results page via onComplete.
   useEffect(() => {
     if (isExam && displayContent?.type === 'exam_done') {
+      const date = new Date().toISOString();
+      // Pull the tutor's debrief summary (latest tutor message) to cache too.
+      const tutorMsg = [...(chatState.messages || [])]
+        .reverse()
+        .find(m => m.role === 'tutor' && m.content && m.content !== '...thinking...');
+      const tutorResponse = tutorMsg?.content || '';
       try {
         localStorage.setItem('fsa_last_exam', JSON.stringify({
           score: displayContent.score_pct,
@@ -434,10 +441,25 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
             correct: row.correct,
             total: row.total,
           })),
-          date: new Date().toISOString(),
+          date,
+        }));
+        // Full debrief — drives the unified /exam/results review surface.
+        localStorage.setItem('fsa_last_exam_full', JSON.stringify({
+          courseId: lessonId,
+          display_update: displayContent,
+          tutor_response: tutorResponse,
+          date,
         }));
       } catch (e) {
         console.error('Failed to save exam results:', e);
+      }
+      if (onComplete) {
+        onComplete({
+          courseId: lessonId,
+          display_update: displayContent,
+          tutor_response: tutorResponse,
+          date,
+        });
       }
     }
   }, [displayContent?.type]);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -593,7 +615,7 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
 // PracticeExamRouter — orchestrates lobby → exam → results flow
 // ---------------------------------------------------------------------------
 
-function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState, startPhase, initialConfig, onExit }) {
+function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState, startPhase, initialConfig, onExit, onComplete }) {
   const [phase, setPhase] = useState(startPhase || 'lobby');
   const [examConfig, setExamConfig] = useState(initialConfig || null);
   const [activeChapterId, setActiveChapterId] = useState(null);
@@ -720,6 +742,7 @@ function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState, s
         setChatState={setChatState}
         examConfig={examConfig}
         onSelectChapter={handleSelectChapter}
+        onComplete={onComplete}
       />
     </div>
   );
@@ -729,7 +752,7 @@ function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState, s
 // ExamRouter — top-level export, receives courseId + learnerId from App.jsx
 // ---------------------------------------------------------------------------
 
-export function ExamRouter({ courseId, learnerId, initialConfig, onExit }) {
+export function ExamRouter({ courseId, learnerId, initialConfig, onExit, onComplete }) {
   const [chatState, setChatState] = useState({
     messages: [],
     displayContent: null,
@@ -748,6 +771,7 @@ export function ExamRouter({ courseId, learnerId, initialConfig, onExit }) {
         startPhase={initialConfig ? 'exam' : 'lobby'}
         initialConfig={initialConfig}
         onExit={onExit}
+        onComplete={onComplete}
       />
     </div>
   );

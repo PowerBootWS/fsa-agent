@@ -138,6 +138,10 @@ class Orchestrator:
                 state, user, lesson_id, message, researcher, display
             )
         if mode == 'practice_exam':
+            # examConfig is only sent when the lobby is starting a brand-new exam.
+            # A bare 'hello' with no examConfig is a refresh/review and must NOT
+            # spin up a new exam (see the DB-restore guard in _process_practice_exam).
+            state['_starting_new_exam'] = exam_config is not None
             # If the lobby is starting a fresh exam (examConfig provided) and the previous
             # session is in the debrief/done state, reset exam-specific state now so that
             # _process_practice_exam sees a clean slate and doesn't re-run the debrief LLM call.
@@ -795,6 +799,31 @@ class Orchestrator:
         first_name = state['first_name']
         course_id = lesson_id  # e.g. '2B1'
 
+        # Refresh / review resume: a bare 'hello' with no fresh examConfig and no
+        # exam in progress means the page reloaded (or the lobby "Review most
+        # recent results" opened) after the in-memory session was lost (e.g. an
+        # AI-service restart). Restore the last debrief from the DB instead of
+        # starting a brand-new exam. New exams always carry examConfig, so this
+        # never hijacks a genuine start.
+        if (message.strip().lower() == 'hello'
+                and not state.get('_starting_new_exam')
+                and not state.get('exam_questions')
+                and not state.get('exam_done')):
+            db_debrief = researcher.get_last_debrief(user, course_id)
+            if db_debrief:
+                state['exam_done'] = True
+                state['exam_phase'] = 'debrief'
+                state['last_debrief'] = db_debrief
+                return {
+                    'tutor_response': db_debrief.get('tutor_response', ''),
+                    'display_update': db_debrief.get('display_update'),
+                    'progress_update': {},
+                    'complexity_level': state['complexity_level'],
+                    'first_name': first_name,
+                    'action': None,
+                    'mode': 'practice_exam',
+                }
+
         # Load questions on first message
         if not state['exam_questions'] and not state.get('exam_done'):
             weights = researcher.get_chapter_weights(user, course_id)
@@ -831,8 +860,17 @@ class Orchestrator:
                     'action': None,
                     'mode': 'practice_exam',
                 }
-            return self._generate_exam_debrief(
-                state, user, course_id, first_name, researcher, tutor, lesson_context, progress
+            # First arrival at the debrief (no cached result yet): generate it.
+            if not state.get('last_debrief'):
+                return self._generate_exam_debrief(
+                    state, user, course_id, first_name, researcher, tutor, lesson_context, progress
+                )
+            # Otherwise the student is asking a follow-up question about their
+            # results — answer it as a normal tutoring turn (the debrief prompt
+            # invites this), and keep the results panel on screen unchanged.
+            return self._answer_exam_followup(
+                state, user, course_id, first_name, message,
+                researcher, tutor, lesson_context, progress
             )
 
         # ---- No questions ----
@@ -1196,11 +1234,13 @@ class Orchestrator:
                 f"scoring {total_correct}/{total_q} ({score_pct}%).\n"
                 f"The full score breakdown, per-chapter results, and per-objective teaching notes are ALREADY "
                 f"displayed on screen next to this chat, so do NOT repeat or list them.\n"
-                f"\nWrite a very brief, high-level reaction — 1 to 2 short sentences, no more. "
-                f"Acknowledge the result warmly at a high level (e.g. strong work / solid progress / room to grow) "
-                f"without naming specific chapters, objectives, scores, or percentages. "
-                f"Then offer to start another practice exam, noting it will focus more on their weaker areas. "
-                f"Address them as {first_name}."
+                f"\nKeep your reply very brief — 2 to 3 short sentences total, no more. Do this in order:\n"
+                f"1. Summarize their performance in one short sentence at a high level "
+                f"(e.g. strong work / solid progress / room to grow) WITHOUT naming specific chapters, "
+                f"objectives, scores, or percentages.\n"
+                f"2. Encourage them to review the lessons in the \"Where to focus\" section shown on this page.\n"
+                f"3. Ask if there's anything they'd like explained in more detail.\n"
+                f"Address them as {first_name}. Do NOT list their weak areas or offer another exam."
             )
 
         debrief_state = {
@@ -1244,9 +1284,70 @@ class Orchestrator:
             'tutor_response': tutor_response,
             'display_update': display_update,
         }
+        # Persist durably so the lobby review button and refreshes survive an
+        # AI-service restart (in-memory state is lost on every deploy).
+        researcher.save_last_debrief(user, course_id, state['last_debrief'])
         return {
             'tutor_response': tutor_response,
             'display_update': display_update,
+            'progress_update': {},
+            'complexity_level': state['complexity_level'],
+            'first_name': first_name,
+            'action': None,
+            'mode': 'practice_exam',
+        }
+
+    def _answer_exam_followup(self, state, user, course_id, first_name, message,
+                              researcher, tutor, lesson_context, progress):
+        """
+        Answer a free-form follow-up question after the exam debrief without
+        regenerating the debrief or disturbing the on-screen results panel.
+        Returns no display_update so the client keeps showing the results.
+        """
+        # Search content across the whole course (there's no single active
+        # lesson here), and feed it to the tutor as context so it can actually
+        # explain topics rather than claim the lesson notes are missing.
+        relevant_chunks = researcher.get_course_chunks(
+            course_id=course_id, context_hint=message, limit=5,
+        )
+        combined = '\n\n'.join(
+            c.get('body') or c.get('narration') or c.get('source_content') or ''
+            for c in relevant_chunks
+        ).strip()
+        followup_context = {
+            'title': f'{course_id} Exam Review',
+            'summary': combined[:2000],
+            'key_points': [],
+            'narration_text': combined,
+            'video_transcript': '',
+        } if combined else lesson_context
+        followup_state = {
+            'activity': 'free_discussion',
+            'mode': 'practice_exam',
+            'complexity_level': state.get('complexity_level', 3),
+            'questions_done': state.get('questions_done', 0),
+            'session_limit_reached': False,
+            'chat_history': state.get('chat_history', []),
+            'relevant_chunks': relevant_chunks,
+            'display_is_question': False,
+            'awaiting_next_question': False,
+            'is_resume': False,
+            'no_questions_available': False,
+            'first_name': first_name,
+            'exam_post_debrief': True,
+        }
+        tutor_result = tutor.respond(
+            user_message=message,
+            lesson_context=followup_context,
+            progress=progress,
+            state=followup_state,
+            first_name=first_name,
+        )
+        tutor_response = (tutor_result.get('response', '')
+                          if isinstance(tutor_result, dict) else str(tutor_result))
+        return {
+            'tutor_response': tutor_response,
+            'display_update': None,  # keep the results panel as-is
             'progress_update': {},
             'complexity_level': state['complexity_level'],
             'first_name': first_name,
@@ -1259,14 +1360,26 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def _is_exam_retry(self, message):
-        msg = message.strip().lower()
-        retry_keywords = [
-            'yes', 'yeah', 'yep', 'yup', 'sure', 'ok', 'okay',
-            'again', 'retry', 'another', 'one more', 'go again',
-            "let's go", 'lets go', 'ready', 'start', 'begin',
-            'please', 'do it', 'let\'s do it',
-        ]
-        return any(kw in msg for kw in retry_keywords)
+        # The "Retake Exam" button sends a bare affirmative. Match only short,
+        # clearly-affirmative messages — NOT longer follow-up questions, which
+        # the post-debrief chat now routes to the tutor (a question like
+        # "can you explain that please?" must not start a new exam).
+        msg = message.strip().lower().rstrip('.!?')
+        exact = {
+            'yes', 'yeah', 'yep', 'yup', 'sure', 'ok', 'okay', 'okay sure',
+            'yes please', 'again', 'retry', 'retake', 'another', 'one more',
+            'go again', "let's go", 'lets go', 'ready', 'start', 'begin',
+            'do it', "let's do it", 'retake exam', 'another exam', 'start exam',
+            'new exam', 'go',
+        }
+        if msg in exact:
+            return True
+        # Very short phrase with a strong retry verb (e.g. "retake please").
+        if len(msg.split()) <= 3 and any(
+            k in msg for k in ('retake', 'retry', 'another exam', 'go again')
+        ):
+            return True
+        return False
 
     def _reset_and_start_exam(self, state, user, course_id, first_name, researcher, display):
         weights = researcher.get_chapter_weights(user, course_id)

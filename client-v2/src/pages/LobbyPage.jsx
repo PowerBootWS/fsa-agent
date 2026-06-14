@@ -891,6 +891,15 @@ export default function LobbyPage() {
             <button style={{ ...s.btnPrimary, width: '100%' }} onClick={handleStartExam}>
               Start Practice Exam
             </button>
+
+            {last_exam && (
+              <button
+                style={{ ...s.btnSecondary, width: '100%', marginTop: '10px' }}
+                onClick={() => navigate(`/exam/results?paper=${encodeURIComponent(paper)}`)}
+              >
+                Review most recent results
+              </button>
+            )}
           </div>
         </div>
 

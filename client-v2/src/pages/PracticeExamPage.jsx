@@ -16,6 +16,9 @@ export default function PracticeExamPage() {
       learnerId={user.email}
       initialConfig={{ count, timed }}
       onExit={() => navigate('/lobby')}
+      onComplete={(debrief) =>
+        navigate(`/exam/results?paper=${encodeURIComponent(paper)}`, { state: { debrief } })
+      }
     />
   );
 }

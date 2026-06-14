@@ -83,6 +83,10 @@ def get_last_results(course_id):
     state_key = f'{user}:{course_id}'
     state = orchestrator.conversation_state.get(state_key, {})
     last_debrief = state.get('last_debrief')
+    # Fall back to the durable DB copy when the in-memory session is gone
+    # (first load on a new device, or after an AI-service restart/deploy).
+    if not last_debrief:
+        last_debrief = researcher.get_last_debrief(user, course_id)
     if not last_debrief:
         return jsonify({'available': False})
     return jsonify({'available': True, **last_debrief})

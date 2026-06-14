@@ -353,6 +353,70 @@ class Researcher:
             print(f'Researcher.get_relevant_chunks error: {e}')
             return []
 
+    def get_course_chunks(self, course_id, context_hint, limit=4):
+        """
+        Full-text search lesson_chunks across an ENTIRE course (all lessons
+        whose lesson_code starts with the course code, e.g. '2B1-%'). Used for
+        post-exam follow-up questions, where there is no single active lesson.
+        Returns the same chunk dict shape as get_relevant_chunks.
+        """
+        if not context_hint:
+            return []
+        # Build an OR query from the significant words so a natural-language
+        # question ("explain how a safety valve works") matches chunks about
+        # any of its key terms, ranked by relevance — plainto_tsquery would AND
+        # every word and almost always miss.
+        import re
+        words = re.findall(r'[a-z0-9]{3,}', context_hint.lower())
+        stop = {'the', 'and', 'how', 'why', 'what', 'does', 'can', 'you', 'are',
+                'for', 'this', 'that', 'with', 'from', 'explain', 'tell', 'about',
+                'more', 'detail', 'please', 'work', 'works', 'would', 'like'}
+        terms = [w for w in dict.fromkeys(words) if w not in stop]
+        if not terms:
+            return []
+        tsquery = ' | '.join(terms)
+        try:
+            conn = self._get_connection()
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT slide_number, title, body, narration, source_content,
+                       ts_rank(
+                           to_tsvector('english',
+                               coalesce(title,'') || ' ' ||
+                               coalesce(body,'') || ' ' ||
+                               coalesce(narration,'')),
+                           to_tsquery('english', %s)
+                       ) AS rank
+                FROM lesson_chunks
+                WHERE lesson_code LIKE %s
+                  AND to_tsvector('english',
+                          coalesce(title,'') || ' ' ||
+                          coalesce(body,'') || ' ' ||
+                          coalesce(narration,''))
+                      @@ to_tsquery('english', %s)
+                ORDER BY rank DESC
+                LIMIT %s
+                """,
+                (tsquery, f'{course_id}-%', tsquery, limit)
+            )
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+            return [
+                {
+                    'slide_number': r['slide_number'],
+                    'title': r['title'] or '',
+                    'body': r['body'] or '',
+                    'narration': r['narration'] or '',
+                    'source_content': r['source_content'] or '',
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            print(f'Researcher.get_course_chunks error: {e}')
+            return []
+
     # ------------------------------------------------------------------
     # Questions
     # ------------------------------------------------------------------
@@ -457,6 +521,59 @@ class Researcher:
             conn.close()
         except Exception as e:
             print(f'Researcher.record_response error (non-fatal): {e}')
+
+    def save_last_debrief(self, user_email, course_id, debrief):
+        """
+        Persist the most recent completed-exam debrief (full results + tutor
+        summary) so the lobby "Review most recent results" button and page
+        refreshes can restore it even after the AI service restarts.
+        One row per (user, course) — upserted on each completed exam.
+        Silently ignores errors (non-critical path).
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO exam_last_debrief (user_email, course_id, debrief, updated_at)
+                VALUES (%s, %s, %s, NOW())
+                ON CONFLICT (user_email, course_id)
+                DO UPDATE SET debrief = EXCLUDED.debrief, updated_at = NOW()
+                """,
+                (user_email, course_id, json.dumps(debrief))
+            )
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f'Researcher.save_last_debrief error (non-fatal): {e}')
+
+    def get_last_debrief(self, user_email, course_id):
+        """
+        Return the persisted {tutor_response, display_update} debrief for the
+        most recent completed exam, or None when there isn't one.
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT debrief FROM exam_last_debrief
+                WHERE user_email = %s AND course_id = %s
+                """,
+                (user_email, course_id)
+            )
+            row = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            if not row:
+                return None
+            debrief = row['debrief']
+            # psycopg2 returns jsonb as a parsed dict, but guard for str.
+            return json.loads(debrief) if isinstance(debrief, str) else debrief
+        except Exception as e:
+            print(f'Researcher.get_last_debrief error (non-fatal): {e}')
+            return None
 
     def get_chapter_weights(self, user_email, course_id):
         """
