@@ -544,12 +544,24 @@ export function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatS
 // ---------------------------------------------------------------------------
 
 function DiagnosticFlow() {
-  const [phase, setPhase] = useState('intro');
+  // Honor ?class= as the initial selection; otherwise start on the class picker.
+  const initialClass = new URLSearchParams(window.location.search).get('class');
+  const [phase, setPhase] = useState(
+    initialClass === 'second' || initialClass === 'third' ? 'intro' : 'class'
+  );
+  const [classCode, setClassCode] = useState(
+    initialClass === 'third' ? 'third' : 'second'
+  );
   const [quizCount, setQuizCount] = useState(30);
   const [user, setUser] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [results, setResults] = useState(null);
   const [loadError, setLoadError] = useState(null);
+
+  const handleClassSelect = (code) => {
+    setClassCode(code);
+    setPhase('intro');
+  };
 
   const handleCountSelect = (count) => {
     setQuizCount(count);
@@ -566,7 +578,7 @@ function DiagnosticFlow() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, first_name, tags: ["Paper_Planner"] }),
       }),
-      fetch(`/api/diagnostic/questions?count=${quizCount}`),
+      fetch(`/api/diagnostic/questions?count=${quizCount}&class=${classCode}`),
     ]);
 
     if (!questionsRes.ok) throw new Error('Failed to load questions');
@@ -581,7 +593,7 @@ function DiagnosticFlow() {
       const res = await fetch('/api/diagnostic/results', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_email: user.email, responses: finalResponses }),
+        body: JSON.stringify({ user_email: user.email, responses: finalResponses, class_code: classCode }),
       });
       const data = await res.json();
       setResults(data);
@@ -604,7 +616,8 @@ function DiagnosticFlow() {
     );
   }
 
-  if (phase === 'intro')   return <DiagnosticIntro onSelectCount={handleCountSelect} />;
+  if (phase === 'class')   return <DiagnosticClassSelect onSelectClass={handleClassSelect} />;
+  if (phase === 'intro')   return <DiagnosticIntro classCode={classCode} onSelectCount={handleCountSelect} />;
   if (phase === 'signup')  return <DiagnosticSignup quizCount={quizCount} onSubmit={handleSignup} />;
   if (phase === 'loading') return <div className="diagnostic-loading">Preparing your diagnostic…</div>;
   if (phase === 'quiz')    return <DiagnosticQuiz questions={questions} onComplete={handleQuizComplete} />;
@@ -612,24 +625,53 @@ function DiagnosticFlow() {
   return null;
 }
 
-function DiagnosticIntro({ onSelectCount }) {
+function DiagnosticClassSelect({ onSelectClass }) {
   return (
     <div className="diagnostic-page">
       <div className="diagnostic-card">
         <div className="diagnostic-badge">Free — No Credit Card Required</div>
         <h1 className="diagnostic-title">Paper Planner Diagnostic</h1>
         <p className="diagnostic-subtitle">
-          Not sure which 2nd Class papers to tackle first? Answer questions from all six
-          papers — we'll score your readiness and give you a personalized attack order.
+          Which certification are you preparing for? We'll tailor the diagnostic to your papers.
+        </p>
+        <div className="diagnostic-count-options">
+          <button className="diagnostic-count-btn" onClick={() => onSelectClass('second')}>
+            <span className="diagnostic-count-num">2nd Class</span>
+            <span className="diagnostic-count-label">Six papers — 2A1, 2A2, 2A3, 2B1, 2B2, 2B3</span>
+          </button>
+          <button className="diagnostic-count-btn" onClick={() => onSelectClass('third')}>
+            <span className="diagnostic-count-num">3rd Class</span>
+            <span className="diagnostic-count-label">Four papers — 3A1, 3A2, 3B1, 3B2</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DiagnosticIntro({ classCode, onSelectCount }) {
+  const isThird = classCode === 'third';
+  const paperCountWord = isThird ? 'four' : 'six';
+  const per30 = isThird ? 7 : 5;
+  const per60 = isThird ? 15 : 10;
+  return (
+    <div className="diagnostic-page">
+      <div className="diagnostic-card">
+        <div className="diagnostic-badge">Free — No Credit Card Required</div>
+        <h1 className="diagnostic-title">Paper Planner Diagnostic</h1>
+        <p className="diagnostic-subtitle">
+          Not sure which {isThird ? '3rd' : '2nd'} Class papers to tackle first? Answer questions
+          from all {paperCountWord} papers — we'll score your readiness and give you a personalized
+          attack order.
         </p>
         <div className="diagnostic-count-options">
           <button className="diagnostic-count-btn" onClick={() => onSelectCount(30)}>
             <span className="diagnostic-count-num">30 Questions</span>
-            <span className="diagnostic-count-label">Quick — 5 per paper · ~15 minutes</span>
+            <span className="diagnostic-count-label">Quick — ~{per30} per paper · ~15 minutes</span>
           </button>
           <button className="diagnostic-count-btn" onClick={() => onSelectCount(60)}>
             <span className="diagnostic-count-num">60 Questions</span>
-            <span className="diagnostic-count-label">Deep — 10 per paper · ~30 minutes</span>
+            <span className="diagnostic-count-label">Deep — ~{per60} per paper · ~30 minutes</span>
           </button>
         </div>
       </div>

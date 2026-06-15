@@ -107,8 +107,8 @@ def load_exam_style_guides() -> dict[str, str]:
     for pdf_path in sorted(EXAM_SAMPLES_DIR.glob("*.pdf")):
         name_upper = pdf_path.stem.upper()
         paper = None
-        for candidate in ["2A1", "2A2", "2A3", "2B1", "2B2", "2B3"]:
-            if candidate.replace("2", "2").replace("A", "A").replace("B", "B") in name_upper:
+        for candidate in ["2A1", "2A2", "2A3", "2B1", "2B2", "2B3", "3A1", "3A2", "3B1", "3B2"]:
+            if candidate in name_upper:
                 paper = candidate
                 break
         if not paper:

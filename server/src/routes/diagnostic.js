@@ -2,12 +2,20 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../services/database');
 
-const PAPERS = ['2A1', '2A2', '2A3', '2B1', '2B2', '2B3'];
+const PAPERS_SECOND = ['2A1', '2A2', '2A3', '2B1', '2B2', '2B3'];
+// Note: 3B1/3B2 have no questions authored yet, so a third-class diagnostic
+// effectively draws from 3A1/3A2 only until those papers are populated.
+const PAPERS_THIRD = ['3A1', '3A2', '3B1', '3B2'];
+
+function papersForClass(classCode) {
+  return classCode === 'third' ? PAPERS_THIRD : PAPERS_SECOND;
+}
 
 /**
- * GET /api/diagnostic/questions?count=30
+ * GET /api/diagnostic/questions?count=30&class=second
  * Returns a sampled set of questions for the diagnostic quiz.
- * count must be 30 or 60; questions-per-paper = count / 6 (5 or 10).
+ * count must be 30 or 60; questions-per-paper = count / PAPERS.length.
+ * class is 'second' (default, six papers) or 'third' (four papers).
  * Returns correct_answer so the client can show per-question feedback.
  * Score integrity is enforced server-side in POST /api/diagnostic/results.
  */
@@ -16,9 +24,26 @@ router.get('/questions', async (req, res) => {
   if (count !== 30 && count !== 60) {
     return res.status(400).json({ error: 'count must be 30 or 60' });
   }
-  const perPaper = count / 6; // 5 or 10
+  const classPapers = papersForClass(req.query.class);
 
   try {
+    // Only sample papers that actually have questions. For third class this means
+    // the diagnostic draws from 3A1/3A2 until 3B1/3B2 are authored, and silently
+    // starts including them once they exist — no code change needed at that point.
+    const availRes = await pool.query(
+      `SELECT DISTINCT course_id FROM questions
+       WHERE course_id = ANY($1::text[])
+         AND question_type IN ('objective_practice', 'chapter_quiz')
+         AND standalone = TRUE`,
+      [classPapers]
+    );
+    const availSet = new Set(availRes.rows.map(r => r.course_id));
+    const PAPERS = classPapers.filter(p => availSet.has(p));
+    if (PAPERS.length === 0) {
+      return res.status(503).json({ error: 'No questions available for this class yet' });
+    }
+    const perPaper = Math.ceil(count / PAPERS.length);
+
     const paperResults = await Promise.all(PAPERS.map(async (paper) => {
       // Primary: difficulty 3-4
       const primary = await pool.query(
@@ -131,8 +156,13 @@ router.post('/results', async (req, res) => {
       );
     }
 
-    // Compute per-paper stats
-    const paperStats = PAPERS.map(paper => {
+    // Compute per-paper stats. Papers are taken from class_code when supplied,
+    // otherwise inferred from the papers actually present in the responses, so
+    // this stays correct for both second- and third-class diagnostics.
+    const papers = req.body.class_code
+      ? papersForClass(req.body.class_code)
+      : [...new Set(enriched.map(r => r.course_id).filter(Boolean))];
+    const paperStats = papers.map(paper => {
       const paperResponses = enriched.filter(r => r.course_id === paper);
       const total = paperResponses.length;
       const correct = paperResponses.filter(r => r.correct).length;

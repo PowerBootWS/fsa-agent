@@ -28,7 +28,7 @@ function requireInternalSecret(req, res, next) {
 // POST /api/platform/provision-user
 router.post('/provision-user', requireInternalSecret, async (req, res) => {
   try {
-    const { email, first_name, last_name, class_code, stripe_subscription_id } = req.body;
+    const { email, first_name, last_name, class_code, stripe_subscription_id, phone, address } = req.body;
 
     if (!email || !first_name || !class_code) {
       return res.status(400).json({ error: 'email, first_name, and class_code are required' });
@@ -38,11 +38,11 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
 
     // Upsert platform_users — RETURNING id tells us if the row was just created
     const userInsert = await pool.query(
-      `INSERT INTO platform_users (email, first_name, last_name)
-       VALUES ($1, $2, $3)
+      `INSERT INTO platform_users (email, first_name, last_name, phone, address)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (email) DO NOTHING
        RETURNING id`,
-      [normalizedEmail, first_name, last_name || null]
+      [normalizedEmail, first_name, last_name || null, phone || null, address || null]
     );
     const userIsNew = userInsert.rowCount > 0;
 
@@ -51,6 +51,17 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
       [normalizedEmail]
     );
     const user = userResult.rows[0];
+
+    // For a returning contact (no insert above), still backfill phone/address from
+    // Stripe when provided — COALESCE keeps any existing value if a field is null.
+    if (!userIsNew && (phone || address)) {
+      await pool.query(
+        `UPDATE platform_users
+            SET phone = COALESCE($2, phone), address = COALESCE($3, address)
+          WHERE id = $1`,
+        [user.id, phone || null, address || null]
+      );
+    }
 
     // Insert active subscription if none exists — RETURNING id tells us if it was just created.
     // Covers both new subscribers and re-enrollment after cancellation.
