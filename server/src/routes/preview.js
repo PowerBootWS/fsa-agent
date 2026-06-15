@@ -61,6 +61,27 @@ router.post('/signup', async (req, res) => {
   res.json({ success: true });
 });
 
+// GET /api/preview/papers?class=second|third
+// Returns the papers for the given class that actually have questions, so the
+// paper picker only offers practiceable papers. For third class this means
+// 3A1/3A2 until 3B1/3B2 are authored, then they appear automatically.
+const PAPERS_SECOND = ['2A1', '2A2', '2A3', '2B1', '2B2', '2B3'];
+const PAPERS_THIRD = ['3A1', '3A2', '3B1', '3B2'];
+router.get('/papers', async (req, res) => {
+  const classPapers = req.query.class === 'third' ? PAPERS_THIRD : PAPERS_SECOND;
+  try {
+    const avail = await pool.query(
+      `SELECT DISTINCT course_id FROM questions WHERE course_id = ANY($1::text[])`,
+      [classPapers]
+    );
+    const set = new Set(avail.rows.map(r => r.course_id));
+    res.json({ papers: classPapers.filter(p => set.has(p)) });
+  } catch (err) {
+    console.error('preview/papers error:', err.message);
+    res.status(500).json({ error: 'Failed to load papers' });
+  }
+});
+
 // POST /api/preview/send-results
 // Body: { email, first_name, course_id, score, total, score_pct, chapter_stats }
 // Looks up the GHL contact and sends a personalized results email.

@@ -2,12 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PracticeExamLobby } from './PracticeExamLobby.jsx';
 import { QuizExamView } from './App.jsx';
 
-const PAPERS = ['2A1', '2A2', '2A3', '2B1', '2B2', '2B3'];
-
 export function PracticePreviewFlow() {
-  const [phase, setPhase] = useState('signup'); // 'signup' | 'paper_picker' | 'lobby' | 'exam' | 'already_used'
+  // Honor ?class= so a deep link can skip the class picker.
+  const initialClass = new URLSearchParams(window.location.search).get('class');
+  const hasExplicitClass = initialClass === 'second' || initialClass === 'third';
+
+  const [phase, setPhase] = useState('signup'); // 'signup' | 'class_select' | 'paper_picker' | 'lobby' | 'exam' | 'already_used'
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
+  const [classCode, setClassCode] = useState(hasExplicitClass ? initialClass : 'second');
+  const [papers, setPapers] = useState([]);
+  const [papersError, setPapersError] = useState(null);
   const [selectedPaper, setSelectedPaper] = useState(null);
   const [examConfig, setExamConfig] = useState(null);
   const [signupLoading, setSignupLoading] = useState(false);
@@ -54,7 +59,12 @@ export function PracticePreviewFlow() {
       });
       const data = await res.json();
       if (data.success) {
-        setPhase('paper_picker');
+        // With an explicit ?class=, skip the picker and load that class's papers.
+        if (hasExplicitClass) {
+          loadPapers(classCode);
+        } else {
+          setPhase('class_select');
+        }
       } else if (data.already_used) {
         setPhase('already_used');
       } else {
@@ -64,6 +74,24 @@ export function PracticePreviewFlow() {
       setSignupError('Something went wrong. Please try again.');
     } finally {
       setSignupLoading(false);
+    }
+  };
+
+  // ── Class select → load papers ───────────────────────────────────────────────
+  const loadPapers = async (code) => {
+    setClassCode(code);
+    setPapersError(null);
+    try {
+      const res = await fetch(`/api/preview/papers?class=${code}`);
+      const data = await res.json();
+      if (!res.ok || !Array.isArray(data.papers) || data.papers.length === 0) {
+        throw new Error('no papers');
+      }
+      setPapers(data.papers);
+      setPhase('paper_picker');
+    } catch {
+      setPapersError("We couldn't load papers for that program. Please try again.");
+      setPhase('class_select');
     }
   };
 
@@ -161,8 +189,9 @@ export function PracticePreviewFlow() {
             Each visitor gets one free attempt — but the real thing is even better.
           </p>
           <p className="diagnostic-intro">
-            A Full Steam Ahead subscription gives you unlimited adaptive practice exams for all
-            six papers, full course content with step-by-step lessons, and AI tutoring — all for $149/month.
+            A Full Steam Ahead subscription gives you unlimited adaptive practice exams for every
+            paper in your certificate, full course content with step-by-step lessons, and AI tutoring —
+            from $99/month.
           </p>
           <a
             href="https://enrollment.fullsteamahead.ca"
@@ -172,7 +201,23 @@ export function PracticePreviewFlow() {
           >
             Start Your Subscription →
           </a>
-          <p className="diagnostic-cta-fine">$149/month · all 6 papers · cancel anytime</p>
+          <p className="diagnostic-cta-fine">From $99/month · every paper included · cancel anytime</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === 'class_select') {
+    return (
+      <div className="diagnostic-page">
+        <div className="diagnostic-card">
+          <h1 className="diagnostic-heading">Which certification are you preparing for?</h1>
+          <p className="diagnostic-intro">We'll show you the practice papers for your program.</p>
+          {papersError && <p className="diagnostic-error">{papersError}</p>}
+          <div className="preview-paper-grid">
+            <button className="preview-paper-btn" onClick={() => loadPapers('second')}>2nd Class</button>
+            <button className="preview-paper-btn" onClick={() => loadPapers('third')}>3rd Class</button>
+          </div>
         </div>
       </div>
     );
@@ -185,7 +230,7 @@ export function PracticePreviewFlow() {
           <h1 className="diagnostic-heading">Choose Your Exam Paper</h1>
           <p className="diagnostic-intro">Select the paper you'd like to practice</p>
           <div className="preview-paper-grid">
-            {PAPERS.map(paper => (
+            {papers.map(paper => (
               <button
                 key={paper}
                 className="preview-paper-btn"
