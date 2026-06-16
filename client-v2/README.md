@@ -1,16 +1,37 @@
-# React + Vite
+# client-v2 — FSA platform front end
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React (Vite) front end for the Full Steam Ahead learning platform, served at **learn.fullsteamahead.ca** (and `/v2/*`). This is the **only active** client — `../client/` is retired v1 dead code.
 
-Currently, two official plugins are available:
+See `../README.md` and `wiki/projects/fsa-agent.md` for the full picture.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Build & deploy
 
-## React Compiler
+```bash
+npm run build          # outputs to build/ (Vite base: /v2/)
+# then rebuild the api image from the repo root — see ../README.md
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The Express API serves `build/` at the site root on `learn.*` (and at `/v2`). Build assets are referenced from `/v2/assets/`; files in `public/` (manifest, service worker, icons) land at `build/` root and are served at the **site root**.
 
-## Expanding the ESLint configuration
+## Conventions
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- **Styling:** the lesson-player/exam stack uses global classes in `src/index.css`. **Page screens use co-located `*.css` files** (`pages/<Page>.css`, global classes with per-page prefixes `lb-`/`pf-`/`sp-`/`ac-`/`er-`). Do **not** use JS inline-style objects for layout — they can't carry `@media` and break responsive/mobile.
+- **Mobile:** lesson player switches to a Lesson / AI Tutor tab toggle `≤768px`; pages have their own breakpoints. Verify changes at ~390px width.
+- **PWA:** `public/manifest.webmanifest`, `public/sw.js` (root-scoped service worker), `public/offline.html`, and icons. SW registration + `beforeinstallprompt` capture are in `src/main.jsx`; install UI is in `pages/LobbyPage.jsx` (`hooks/useInstall.js`). SW is network-first for navigations, cache-first for immutable `/v2/assets/`; not offline-capable for lessons/tutor/exams by design.
+
+## Structure
+
+```
+index.html            PWA <head> (manifest, theme-color, apple meta) + GA4 tag
+public/               manifest.webmanifest, sw.js, offline.html, icons
+src/
+  main.jsx            mount + SW registration + install-prompt capture
+  App.jsx             routing
+  index.css           global + lesson-player/exam styles + mobile breakpoints
+  LessonPlayer.jsx    lesson player (Content/AI-tutor tabs on mobile)
+  ExamRouter.jsx      exam/quiz mode
+  hooks/              useAudio, useNarrationSync, useInstall
+  components/         ContentPanel, TutorPanel, NavigationHeader, ProtectedRoute, ...
+  pages/              Login, Setup, ForgotPassword, SelectPaper, Lobby, Profile,
+                      AllChapters, LessonPlayer, ExamResults (each with a co-located .css)
+```
