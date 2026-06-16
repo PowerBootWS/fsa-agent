@@ -228,7 +228,7 @@ export default function ExamResultsPage() {
         {chatOpen && (
           <div style={{
             position: 'fixed', bottom: '90px', right: '24px', width: '700px',
-            maxWidth: 'calc(100vw - 48px)', height: '520px', background: '#1e293b',
+            maxWidth: 'calc(100vw - 48px)', height: '520px', maxHeight: 'calc(100vh - 120px)', background: '#1e293b',
             border: '1px solid #334155', borderRadius: '12px', display: 'flex',
             flexDirection: 'column', zIndex: 99, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           }}>

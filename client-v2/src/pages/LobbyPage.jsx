@@ -271,13 +271,8 @@ const s = {
     fontWeight: '600',
   },
 
-  // 4-tile grid
-  tileGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '20px',
-    marginBottom: '32px',
-  },
+  // 4-tile grid — layout lives in index.css (.lobby-tile-grid) so it can
+  // respond to viewport; inline styles can't carry @media queries.
   tile: {
     background: '#1C2333',
     border: '1px solid #252F42',
@@ -765,7 +760,9 @@ export default function LobbyPage() {
         </div>
 
         {/* ── 4 Tiles ── */}
-        <div style={s.tileGrid}>
+        {/* className (not inline) so the CSS media query can collapse to one
+            column on phones — inline styles can't carry @media. */}
+        <div className="lobby-tile-grid">
           {/* Tile 1 — Chapter Quizzes */}
           <div style={s.tile}>
             <h3 style={s.tileTitle}>Chapter Quizzes</h3>

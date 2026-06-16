@@ -17,6 +17,10 @@ function isCourseCode(lessonCode) {
 export function LessonPlayer({ lessonCode: initialLessonCode, learnerId }) {
   const courseId = parseCourseId(initialLessonCode);
 
+  // Mobile-only view toggle: the content + tutor panels sit side-by-side on
+  // desktop, but stack to a single full-width panel on phones (CSS hides the
+  // inactive one). Desktop ignores this entirely — the tab bar is display:none.
+  const [mobileTab, setMobileTab] = useState('lesson');
   const [courseOutline, setCourseOutline] = useState(null);
   const [activeLessonCode, setActiveLessonCode] = useState(null);
   const [sections, setSections] = useState([]);
@@ -257,7 +261,25 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId }) {
   const isComplete = sectionIndex === sections.length;
 
   return (
-    <div className="lesson-player">
+    <div className={`lesson-player lesson-player--show-${mobileTab}`}>
+      <div className="lesson-mobile-tabs" role="tablist">
+        <button
+          role="tab"
+          aria-selected={mobileTab === 'lesson'}
+          className={mobileTab === 'lesson' ? 'active' : ''}
+          onClick={() => setMobileTab('lesson')}
+        >
+          📖 Lesson
+        </button>
+        <button
+          role="tab"
+          aria-selected={mobileTab === 'tutor'}
+          className={mobileTab === 'tutor' ? 'active' : ''}
+          onClick={() => setMobileTab('tutor')}
+        >
+          💬 AI Tutor
+        </button>
+      </div>
       <ContentPanel
         section={sections[sectionIndex] || null}
         sectionIndex={sectionIndex}
