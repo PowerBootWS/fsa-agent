@@ -104,7 +104,7 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
 // at that time rather than deactivating immediately. Access continues until cancel_at.
 router.post('/deactivate-user', requireInternalSecret, async (req, res) => {
   try {
-    const { email, cancel_at, stripe_subscription_id } = req.body;
+    const { email, cancel_at, stripe_subscription_id, force_immediate } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: 'email is required' });
@@ -147,7 +147,10 @@ router.post('/deactivate-user', requireInternalSecret, async (req, res) => {
     }
 
     // Immediate deactivation path.
-    if (DEACTIVATION_REQUIRES_CONFIRMATION) {
+    // force_immediate bypasses the confirmation gate. It is used only for trial cancellations
+    // (caller: fsa-webhook-listener), where no payment was taken and there is no paying
+    // customer to protect — so the gate that guards paying customers does not apply.
+    if (DEACTIVATION_REQUIRES_CONFIRMATION && !force_immediate) {
       // Gate on: do NOT pull access. Notify the operator and keep the customer active.
       const name = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
       try {
