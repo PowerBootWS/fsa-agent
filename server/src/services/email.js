@@ -80,4 +80,9 @@ async function sendDeactivationReview(items) {
   });
 }
 
-module.exports = { sendMagicLink, sendPasswordReset, sendDeactivationReview };
+// Generic plain-text ops/report email (e.g. scheduled telemetry reports).
+async function sendOpsEmail(to, subject, text) {
+  await transporter.sendMail({ from: FROM, to, subject, text });
+}
+
+module.exports = { sendMagicLink, sendPasswordReset, sendDeactivationReview, sendOpsEmail };

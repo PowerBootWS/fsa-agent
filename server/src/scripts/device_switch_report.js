@@ -8,6 +8,11 @@
  * Usage (run inside the api container, WORKDIR /app):
  *   docker exec fsa-agent-api-1 node src/scripts/device_switch_report.js
  *   docker exec fsa-agent-api-1 node src/scripts/device_switch_report.js --days 14
+ *   docker exec fsa-agent-api-1 node src/scripts/device_switch_report.js --days 31 --email sysadmin@powerboot.ca
+ *
+ * With --email <addr> the report is emailed (via the app's SMTP transport)
+ * instead of printed — used by the monthly cron. A cron entry on the host runs
+ * this on the 1st of each month.
  *
  * Definitions:
  *   - device_type: coarse class of each login (mobile / tablet / desktop).
@@ -23,16 +28,19 @@
 const { pool } = require('../services/database');
 
 function parseArgs(argv) {
-  const args = { days: 30 };
+  const args = { days: 30, email: null };
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--days') args.days = parseInt(argv[++i], 10);
+    else if (argv[i] === '--email') args.email = argv[++i];
   }
   return args;
 }
 
 async function main() {
-  const { days } = parseArgs(process.argv);
+  const { days, email } = parseArgs(process.argv);
   const since = `${days} days`;
+  const lines = [];
+  const out = (s = '') => lines.push(s);
 
   // Logins by device type (only classified rows).
   const byDevice = await pool.query(
@@ -89,23 +97,34 @@ async function main() {
   const switchDisplaced = switchRows.filter((r) => r.displaced_active_session).length;
   const d = displaced.rows[0];
 
-  console.log(`\n=== Device-switch report — last ${days} days ===\n`);
-  console.log(`Total logins: ${totalLogins}`);
-  for (const r of byDevice.rows) console.log(`  ${r.device.padEnd(12)} ${r.n}`);
-  console.log('');
-  console.log(`Session displacements (a login that bumped another device): ${d.displaced} of ${d.measured} measured logins`);
-  console.log(`Cross-device switches (mobile↔desktop/tablet): ${switchRows.length} across ${switchUsers} user(s)`);
-  console.log(`  …of which forced a sign-out on the other device: ${switchDisplaced}`);
-  console.log('');
+  out(`=== Device-switch report — last ${days} days ===`);
+  out('');
+  out(`Total logins: ${totalLogins}`);
+  for (const r of byDevice.rows) out(`  ${r.device.padEnd(12)} ${r.n}`);
+  out('');
+  out(`Session displacements (a login that bumped another device): ${d.displaced} of ${d.measured} measured logins`);
+  out(`Cross-device switches (mobile<->desktop/tablet): ${switchRows.length} across ${switchUsers} user(s)`);
+  out(`  ...of which forced a sign-out on the other device: ${switchDisplaced}`);
+  out('');
   if (perUser.rows.length) {
-    console.log('Top switchers:');
-    for (const r of perUser.rows) console.log(`  ${String(r.switches).padStart(3)}  ${r.email}`);
+    out('Top switchers:');
+    for (const r of perUser.rows) out(`  ${String(r.switches).padStart(3)}  ${r.email}`);
   } else {
-    console.log('No cross-device switches recorded yet (data is forward-only from migration 007).');
+    out('No cross-device switches recorded yet (data is forward-only from migration 007).');
   }
-  console.log('');
+  out('');
+  out('Note: "unclassified" logins predate device-switch instrumentation (migration 007) and are excluded from the switch math.');
 
+  const report = lines.join('\n');
   await pool.end();
+
+  if (email) {
+    const { sendOpsEmail } = require('../services/email');
+    await sendOpsEmail(email, `FSA device-switch report (last ${days} days)`, report);
+    console.log(`Report emailed to ${email}.`);
+  } else {
+    console.log('\n' + report + '\n');
+  }
 }
 
 main().catch((err) => {
