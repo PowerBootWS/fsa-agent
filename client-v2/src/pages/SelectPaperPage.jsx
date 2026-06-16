@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import './SelectPaperPage.css';
 
 export default function SelectPaperPage() {
   const navigate = useNavigate();
@@ -56,70 +57,35 @@ export default function SelectPaperPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#0D1117',
-      color: '#F4F5F7',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '32px 16px',
-      fontFamily: "'Barlow', -apple-system, sans-serif",
-    }}>
+    <div className="sp-page">
       {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: '40px', maxWidth: '480px' }}>
-        <div style={{ color: '#E8720C', fontFamily: "'Barlow Condensed', sans-serif", fontSize: '13px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '12px' }}>
+      <div className="sp-header">
+        <div className="sp-eyebrow">
           Full Steam Ahead
         </div>
-        <h1 style={{
-          fontFamily: "'Barlow Condensed', sans-serif",
-          fontSize: '30px',
-          fontWeight: '700',
-          color: '#F4F5F7',
-          margin: '0 0 12px 0',
-          textTransform: 'uppercase',
-          letterSpacing: '0.03em',
-        }}>
+        <h1 className="sp-title">
           Select Your Study Paper
         </h1>
-        <p style={{ color: '#a8b4c0', fontSize: '15px', margin: 0 }}>
+        <p className="sp-subtitle">
           Choose which exam paper you want to study
         </p>
       </div>
 
       {/* Loading state */}
       {loading && (
-        <div style={{ color: '#a8b4c0', fontSize: '16px' }}>Loading papers…</div>
+        <div className="sp-loading">Loading papers…</div>
       )}
 
       {/* Error message */}
       {error && (
-        <div style={{
-          background: 'rgba(220,38,38,0.12)',
-          border: '1px solid rgba(220,38,38,0.3)',
-          color: '#fca5a5',
-          borderRadius: '4px',
-          padding: '12px 20px',
-          marginBottom: '24px',
-          maxWidth: '480px',
-          width: '100%',
-          textAlign: 'center',
-          fontSize: '14px',
-        }}>
+        <div className="sp-error">
           {error}
         </div>
       )}
 
       {/* Paper grid */}
       {!loading && papers.length > 0 && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: '16px',
-          maxWidth: '480px',
-          width: '100%',
-        }}>
+        <div className="sp-paper-grid">
           {papers.map((paper) => {
             const isSelecting = switching === paper;
             return (
@@ -127,50 +93,12 @@ export default function SelectPaperPage() {
                 key={paper}
                 onClick={() => handleSelectPaper(paper)}
                 disabled={switching !== null}
-                style={{
-                  background: isSelecting ? 'rgba(232,114,12,0.15)' : '#1C2333',
-                  border: `2px solid ${isSelecting ? '#E8720C' : '#252F42'}`,
-                  borderRadius: '4px',
-                  padding: '28px 16px',
-                  cursor: switching !== null ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '8px',
-                  transition: 'border-color 0.15s, background 0.15s',
-                  opacity: switching !== null && !isSelecting ? 0.5 : 1,
-                  fontFamily: 'inherit',
-                }}
-                onMouseEnter={(e) => {
-                  if (switching === null) {
-                    e.currentTarget.style.borderColor = '#E8720C';
-                    e.currentTarget.style.background = 'rgba(232,114,12,0.1)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (switching === null) {
-                    e.currentTarget.style.borderColor = '#252F42';
-                    e.currentTarget.style.background = '#1C2333';
-                  }
-                }}
+                className={`sp-paper-btn${isSelecting ? ' sp-paper-btn--selecting' : ''}`}
               >
-                <span style={{
-                  fontFamily: "'Barlow Condensed', sans-serif",
-                  fontSize: '32px',
-                  fontWeight: '800',
-                  color: isSelecting ? '#E8720C' : '#F4F5F7',
-                  letterSpacing: '1px',
-                }}>
+                <span className="sp-paper-code">
                   {isSelecting ? '…' : paper}
                 </span>
-                <span style={{
-                  fontSize: '11px',
-                  color: '#a8b4c0',
-                  textAlign: 'center',
-                  lineHeight: '1.4',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                }}>
+                <span className="sp-paper-label">
                   Power Engineering{'\n'}Exam Paper
                 </span>
               </button>

@@ -1,0 +1,237 @@
+.pf-page {
+  min-height: 100vh;
+  background: #0D1117;
+  color: #F4F5F7;
+  font-family: 'Barlow', -apple-system, sans-serif;
+}
+
+.pf-header {
+  background: #1C2333;
+  border-bottom: 2px solid #E8720C;
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pf-brand {
+  color: #E8720C;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.pf-back-btn {
+  background: transparent;
+  border: 1px solid #252F42;
+  border-radius: 4px;
+  color: #a8b4c0;
+  font-size: 13px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pf-content {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+}
+
+.pf-page-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: #F4F5F7;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 8px;
+}
+
+.pf-page-subtitle {
+  color: #a8b4c0;
+  font-size: 14px;
+  margin-bottom: 32px;
+}
+
+.pf-card {
+  background: #1C2333;
+  border: 1px solid #252F42;
+  border-radius: 4px;
+  padding: 28px 32px;
+  margin-bottom: 24px;
+}
+
+.pf-card-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #a8b4c0;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 20px;
+}
+
+.pf-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.pf-field {
+  margin-bottom: 16px;
+}
+
+.pf-label {
+  display: block;
+  color: #a8b4c0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.pf-input {
+  width: 100%;
+  background: #0D1117;
+  border: 1px solid #252F42;
+  border-radius: 4px;
+  color: #F4F5F7;
+  font-size: 14px;
+  padding: 10px 12px;
+  font-family: inherit;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.pf-input-readonly {
+  width: 100%;
+  background: #0a0e17;
+  border: 1px solid #1a2030;
+  border-radius: 4px;
+  color: #616f80;
+  font-size: 14px;
+  padding: 10px 12px;
+  font-family: inherit;
+  box-sizing: border-box;
+  cursor: not-allowed;
+}
+
+.pf-textarea {
+  width: 100%;
+  background: #0D1117;
+  border: 1px solid #252F42;
+  border-radius: 4px;
+  color: #F4F5F7;
+  font-size: 14px;
+  padding: 10px 12px;
+  font-family: inherit;
+  box-sizing: border-box;
+  outline: none;
+  min-height: 80px;
+  resize: vertical;
+}
+
+.pf-readonly-note {
+  color: #4a5568;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.pf-btn-primary {
+  background: #E8720C;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 24px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pf-btn-secondary {
+  background: transparent;
+  color: #a8b4c0;
+  border: 1px solid #252F42;
+  border-radius: 4px;
+  font-size: 14px;
+  padding: 10px 24px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pf-btn-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.pf-success-banner {
+  background: rgba(82,168,130,0.12);
+  border: 1px solid rgba(82,168,130,0.3);
+  color: #52A882;
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.pf-error-banner {
+  background: rgba(220,38,38,0.12);
+  border: 1px solid rgba(220,38,38,0.25);
+  color: #f87171;
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.pf-password-btn {
+  background: transparent;
+  border: none;
+  color: #E8720C;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  text-decoration: underline;
+}
+
+.pf-loading-wrap {
+  min-height: 100vh;
+  background: #0D1117;
+  color: #a8b4c0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-family: 'Barlow', -apple-system, sans-serif;
+}
+
+/* Inline-style replacements */
+.pf-optional {
+  color: #4a5568;
+  font-weight: 400;
+}
+
+.pf-password-desc {
+  color: #a8b4c0;
+  font-size: 14px;
+  margin: 0 0 16px 0;
+}
+
+@media (max-width: 600px) {
+  .pf-field-row {
+    grid-template-columns: 1fr;
+  }
+  .pf-card {
+    padding: 24px 18px;
+  }
+}

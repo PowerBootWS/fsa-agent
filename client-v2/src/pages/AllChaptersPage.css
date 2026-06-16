@@ -1,0 +1,222 @@
+/* AllChaptersPage styles — converted from inline styles. Colors baked from COLORS object. */
+
+/* Loading / error states */
+.ac-status {
+  min-height: 100vh;
+  background: #0D1117;
+  color: #F4F5F7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ac-status--error {
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ac-loading-text {
+  color: #a8b4c0;
+}
+
+.ac-error-text {
+  color: #f87171;
+}
+
+.ac-retry-btn {
+  background: #E8720C;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  cursor: pointer;
+}
+
+/* Page shell */
+.ac-page {
+  min-height: 100vh;
+  background: #0D1117;
+  color: #F4F5F7;
+}
+
+/* Header */
+.ac-header {
+  padding: 16px 24px;
+  background: #1C2333;
+  border-bottom: 1px solid #252F42;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ac-back-btn {
+  background: none;
+  border: none;
+  color: #a8b4c0;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+}
+
+.ac-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #F4F5F7;
+}
+
+/* Chapter list */
+.ac-list {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Chapter card */
+.ac-chapter {
+  background: #1C2333;
+  border: 1px solid #252F42;
+  border-radius: 8px;
+  overflow: hidden;
+  opacity: 1;
+}
+
+.ac-chapter--locked {
+  background: #141A24;
+  opacity: 0.65;
+}
+
+/* Chapter header row */
+.ac-chapter-header {
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ac-chapter--locked .ac-chapter-header {
+  cursor: default;
+}
+
+.ac-chapter-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.ac-chapter-icon {
+  font-size: 16px;
+}
+
+.ac-chapter-count {
+  font-size: 13px;
+  color: #a8b4c0;
+  min-width: 20px;
+  text-align: center;
+}
+
+.ac-chapter-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: #F4F5F7;
+}
+
+.ac-chapter-hint {
+  font-size: 12px;
+  color: #a8b4c0;
+  margin-top: 2px;
+}
+
+.ac-chapter-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Quiz score pill */
+.ac-quiz-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+}
+
+.ac-quiz-pill--passed {
+  background: #14532d;
+  color: #86efac;
+}
+
+.ac-quiz-pill--failed {
+  background: #7f1d1d;
+  color: #fca5a5;
+}
+
+.ac-chapter-caret {
+  color: #a8b4c0;
+  font-size: 12px;
+}
+
+/* Objectives accordion */
+.ac-obj-list {
+  border-top: 1px solid #252F42;
+  padding: 8px 0;
+}
+
+.ac-obj-row {
+  padding: 10px 18px 10px 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  opacity: 1;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+
+.ac-obj-row--locked {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.ac-obj-row:not(.ac-obj-row--locked):hover {
+  background: rgba(232, 114, 12, 0.07);
+}
+
+.ac-obj-icon {
+  font-size: 13px;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.ac-obj-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ac-obj-title {
+  font-size: 13px;
+  color: #F4F5F7;
+}
+
+.ac-obj-title--locked {
+  color: #a8b4c0;
+}
+
+.ac-obj-code {
+  font-size: 11px;
+  color: #a8b4c0;
+}
+
+@media (max-width: 600px) {
+  .ac-list {
+    padding: 24px 12px;
+  }
+}

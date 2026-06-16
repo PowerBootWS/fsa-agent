@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import './LobbyPage.css';
 
 // Maps paper codes to human-readable names
 const PAPER_NAMES = {
@@ -26,479 +27,6 @@ function formatDate(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
 }
-
-// ── Styles ──────────────────────────────────────────────────────────────────
-
-const s = {
-  page: {
-    minHeight: '100vh',
-    background: '#0D1117',
-    color: '#F4F5F7',
-    fontFamily: "'Barlow', -apple-system, sans-serif",
-  },
-
-  // Header
-  header: {
-    background: '#1C2333',
-    borderBottom: '2px solid #E8720C',
-    padding: '0 24px',
-    height: '56px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  brand: {
-    color: '#E8720C',
-    fontFamily: "'Barlow Condensed', sans-serif",
-    fontWeight: '700',
-    fontSize: '20px',
-    letterSpacing: '0.03em',
-    textTransform: 'uppercase',
-  },
-  headerRight: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-  },
-
-  // User menu dropdown
-  userMenuWrap: {
-    position: 'relative',
-  },
-  userMenuBtn: {
-    background: 'transparent',
-    border: '1px solid #252F42',
-    borderRadius: '4px',
-    color: '#F4F5F7',
-    fontSize: '13px',
-    fontWeight: '500',
-    padding: '6px 14px',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-  },
-  userMenuDropdown: {
-    position: 'absolute',
-    top: 'calc(100% + 8px)',
-    right: 0,
-    background: '#1C2333',
-    border: '1px solid #252F42',
-    borderRadius: '4px',
-    minWidth: '200px',
-    zIndex: 100,
-    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-    overflow: 'hidden',
-  },
-  menuItem: {
-    display: 'block',
-    width: '100%',
-    background: 'transparent',
-    border: 'none',
-    textAlign: 'left',
-    color: '#F4F5F7',
-    fontSize: '14px',
-    padding: '10px 16px',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    textDecoration: 'none',
-  },
-  menuItemDisabled: {
-    display: 'block',
-    width: '100%',
-    background: 'transparent',
-    border: 'none',
-    textAlign: 'left',
-    color: '#4a5568',
-    fontSize: '14px',
-    padding: '10px 16px',
-    cursor: 'not-allowed',
-    fontFamily: 'inherit',
-  },
-  menuItemDanger: {
-    display: 'block',
-    width: '100%',
-    background: 'transparent',
-    border: 'none',
-    textAlign: 'left',
-    color: '#f87171',
-    fontSize: '14px',
-    padding: '10px 16px',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-  },
-  menuDivider: {
-    height: '1px',
-    background: '#252F42',
-    margin: '4px 0',
-  },
-  menuNote: {
-    color: '#4a5568',
-    fontSize: '11px',
-    padding: '2px 16px 8px',
-  },
-
-  // Main content
-  content: {
-    maxWidth: '1080px',
-    margin: '0 auto',
-    padding: '32px 24px 48px',
-  },
-
-  // Big course card
-  courseCard: {
-    background: '#1C2333',
-    border: '1px solid #252F42',
-    borderRadius: '4px',
-    padding: '28px 32px',
-    marginBottom: '24px',
-  },
-  courseCardTop: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '20px',
-    flexWrap: 'wrap',
-    gap: '16px',
-  },
-  paperTitle: {
-    fontFamily: "'Barlow Condensed', sans-serif",
-    fontSize: '24px',
-    fontWeight: '700',
-    color: '#F4F5F7',
-    margin: '0 0 4px 0',
-    letterSpacing: '0.02em',
-    textTransform: 'uppercase',
-  },
-  paperSubtitle: {
-    color: '#a8b4c0',
-    fontSize: '14px',
-    margin: 0,
-  },
-  courseCardActions: {
-    display: 'flex',
-    gap: '12px',
-    flexShrink: 0,
-  },
-  btnPrimary: {
-    background: '#E8720C',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: '14px',
-    fontWeight: '600',
-    padding: '10px 20px',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    fontFamily: 'inherit',
-    transition: 'background 0.2s',
-  },
-  btnSecondary: {
-    background: 'transparent',
-    color: '#a8b4c0',
-    border: '1px solid #252F42',
-    borderRadius: '4px',
-    fontSize: '14px',
-    fontWeight: '500',
-    padding: '10px 20px',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    fontFamily: 'inherit',
-    transition: 'border-color 0.2s, color 0.2s',
-  },
-
-  // Progress bar
-  progressBarWrap: {
-    marginBottom: '16px',
-  },
-  progressBarRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '6px',
-  },
-  progressLabel: {
-    color: '#a8b4c0',
-    fontSize: '13px',
-  },
-  progressPct: {
-    color: '#F4F5F7',
-    fontSize: '13px',
-    fontWeight: '600',
-  },
-  progressTrack: {
-    height: '8px',
-    background: '#0D1117',
-    borderRadius: '4px',
-    overflow: 'hidden',
-  },
-  progressFill: (pct) => ({
-    height: '100%',
-    width: `${pct}%`,
-    background: pct >= 100 ? '#52A882' : '#E8720C',
-    borderRadius: '4px',
-    transition: 'width 0.4s ease',
-  }),
-
-  // Last visited
-  lastVisited: {
-    color: '#a8b4c0',
-    fontSize: '13px',
-    marginBottom: '20px',
-  },
-  lastVisitedTitle: {
-    color: '#F4F5F7',
-    fontWeight: '500',
-  },
-
-  // Stat chips
-  chipRow: {
-    display: 'flex',
-    gap: '10px',
-    flexWrap: 'wrap',
-  },
-  chip: {
-    background: '#0D1117',
-    border: '1px solid #252F42',
-    borderRadius: '20px',
-    padding: '5px 14px',
-    fontSize: '13px',
-    color: '#a8b4c0',
-  },
-  chipValue: {
-    color: '#F4F5F7',
-    fontWeight: '600',
-  },
-
-  // 4-tile grid — layout lives in index.css (.lobby-tile-grid) so it can
-  // respond to viewport; inline styles can't carry @media queries.
-  tile: {
-    background: '#1C2333',
-    border: '1px solid #252F42',
-    borderRadius: '4px',
-    padding: '24px',
-  },
-  tileTitle: {
-    fontFamily: "'Barlow Condensed', sans-serif",
-    fontSize: '13px',
-    fontWeight: '700',
-    color: '#a8b4c0',
-    textTransform: 'uppercase',
-    letterSpacing: '0.1em',
-    margin: '0 0 16px 0',
-  },
-
-  // Quiz results list
-  quizList: {
-    listStyle: 'none',
-    margin: '0 0 16px 0',
-    padding: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-  },
-  quizRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  quizChapterId: {
-    color: '#F4F5F7',
-    fontSize: '14px',
-  },
-  quizRowRight: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-  },
-  badgePass: {
-    background: 'rgba(82,168,130,0.15)',
-    color: '#52A882',
-    border: '1px solid rgba(82,168,130,0.3)',
-    borderRadius: '3px',
-    padding: '2px 9px',
-    fontSize: '12px',
-    fontWeight: '600',
-  },
-  badgeFail: {
-    background: 'rgba(220,38,38,0.12)',
-    color: '#f87171',
-    border: '1px solid rgba(220,38,38,0.25)',
-    borderRadius: '3px',
-    padding: '2px 9px',
-    fontSize: '12px',
-    fontWeight: '600',
-  },
-  scoreText: {
-    color: '#F4F5F7',
-    fontSize: '14px',
-    fontWeight: '600',
-    minWidth: '40px',
-    textAlign: 'right',
-  },
-
-  // Exam launcher
-  countGroup: {
-    display: 'flex',
-    gap: '8px',
-    marginBottom: '16px',
-  },
-  countBtn: (active) => ({
-    background: active ? '#E8720C' : '#0D1117',
-    border: `1px solid ${active ? '#E8720C' : '#252F42'}`,
-    borderRadius: '4px',
-    color: active ? '#fff' : '#a8b4c0',
-    fontSize: '14px',
-    fontWeight: '600',
-    padding: '8px 18px',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    transition: 'background 0.15s, border-color 0.15s, color 0.15s',
-  }),
-  timedRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    marginBottom: '20px',
-    cursor: 'pointer',
-  },
-  toggle: (on) => ({
-    width: '36px',
-    height: '20px',
-    borderRadius: '10px',
-    background: on ? '#E8720C' : '#252F42',
-    position: 'relative',
-    flexShrink: 0,
-    transition: 'background 0.2s',
-    cursor: 'pointer',
-    border: 'none',
-  }),
-  toggleKnob: (on) => ({
-    position: 'absolute',
-    top: '3px',
-    left: on ? '19px' : '3px',
-    width: '14px',
-    height: '14px',
-    borderRadius: '50%',
-    background: '#fff',
-    transition: 'left 0.2s',
-  }),
-  timedLabel: {
-    color: '#a8b4c0',
-    fontSize: '14px',
-  },
-
-  // Paper switch section
-  switchSection: {
-    textAlign: 'center',
-    paddingTop: '8px',
-  },
-  switchLabel: {
-    color: '#666',
-    fontSize: '13px',
-    marginBottom: '8px',
-  },
-  switchLink: {
-    color: '#E8720C',
-    fontSize: '13px',
-    background: 'transparent',
-    border: 'none',
-    cursor: 'pointer',
-    textDecoration: 'underline',
-    padding: 0,
-    fontFamily: 'inherit',
-  },
-  cooldownNote: {
-    color: '#F5A623',
-    fontSize: '12px',
-    marginTop: '4px',
-  },
-
-  // Misc
-  muted: {
-    color: '#a8b4c0',
-    fontSize: '14px',
-  },
-  bigScore: {
-    fontFamily: "'Barlow Condensed', sans-serif",
-    fontSize: '40px',
-    fontWeight: '800',
-    color: '#F4F5F7',
-    lineHeight: 1,
-    marginBottom: '4px',
-  },
-  examDate: {
-    color: '#a8b4c0',
-    fontSize: '13px',
-    marginBottom: '16px',
-  },
-  chapterScoreRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: '13px',
-    color: '#a8b4c0',
-    marginBottom: '4px',
-  },
-  btnLink: {
-    background: 'transparent',
-    border: 'none',
-    color: '#E8720C',
-    fontSize: '13px',
-    cursor: 'pointer',
-    padding: 0,
-    marginTop: '12px',
-    fontFamily: 'inherit',
-  },
-  reattemptBtn: {
-    background: 'transparent',
-    border: '1px solid #252F42',
-    borderRadius: '4px',
-    color: '#a8b4c0',
-    fontSize: '12px',
-    padding: '4px 10px',
-    cursor: 'pointer',
-    flexShrink: 0,
-    fontFamily: 'inherit',
-  },
-  nextQuizId: {
-    color: '#F4F5F7',
-    fontWeight: '600',
-    fontSize: '18px',
-    marginBottom: '6px',
-  },
-  quizPassedAll: {
-    color: '#52A882',
-    fontSize: '15px',
-    fontWeight: '600',
-    marginBottom: '6px',
-  },
-  quizPassCount: {
-    color: '#a8b4c0',
-    fontSize: '13px',
-  },
-  loadingWrap: {
-    minHeight: '100vh',
-    background: '#0D1117',
-    color: '#a8b4c0',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '16px',
-    fontFamily: "'Barlow', -apple-system, sans-serif",
-  },
-  errorWrap: {
-    background: 'rgba(220,38,38,0.12)',
-    border: '1px solid rgba(220,38,38,0.3)',
-    color: '#fca5a5',
-    borderRadius: '6px',
-    padding: '16px 20px',
-    maxWidth: '480px',
-    margin: '40px auto',
-    textAlign: 'center',
-    fontSize: '14px',
-  },
-};
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -616,13 +144,13 @@ export default function LobbyPage() {
   }
 
   if (loading) {
-    return <div style={s.loadingWrap}>Loading your dashboard…</div>;
+    return <div className="lb-loading-wrap">Loading your dashboard…</div>;
   }
 
   if (error) {
     return (
-      <div style={s.page}>
-        <div style={s.errorWrap}>{error}</div>
+      <div className="lb-page">
+        <div className="lb-error-wrap">{error}</div>
       </div>
     );
   }
@@ -637,14 +165,14 @@ export default function LobbyPage() {
     : null;
 
   return (
-    <div style={s.page}>
+    <div className="lb-page">
       {/* ── Header ── */}
-      <header style={s.header}>
-        <div style={s.brand}>Full Steam Ahead</div>
-        <div style={s.headerRight}>
-          <div style={s.userMenuWrap} ref={menuRef}>
+      <header className="lb-header">
+        <div className="lb-brand">Full Steam Ahead</div>
+        <div className="lb-header-right">
+          <div className="lb-user-menu-wrap" ref={menuRef}>
             <button
-              style={s.userMenuBtn}
+              className="lb-user-menu-btn"
               onClick={() => setMenuOpen(o => !o)}
               aria-expanded={menuOpen}
             >
@@ -654,15 +182,15 @@ export default function LobbyPage() {
               {' '}▾
             </button>
             {menuOpen && (
-              <div style={s.userMenuDropdown}>
+              <div className="lb-user-menu-dropdown">
                 <button
-                  style={s.menuItem}
+                  className="lb-menu-item"
                   onClick={() => { setMenuOpen(false); navigate('/profile'); }}
                 >
                   Profile
                 </button>
                 <button
-                  style={s.menuItem}
+                  className="lb-menu-item"
                   onClick={handleOpenBillingPortal}
                   disabled={billingLoading}
                 >
@@ -670,21 +198,21 @@ export default function LobbyPage() {
                 </button>
                 {daysUntilSwitch > 0 ? (
                   <>
-                    <button style={s.menuItemDisabled} disabled>
+                    <button className="lb-menu-item--disabled" disabled>
                       Switch Paper
                     </button>
-                    <div style={s.menuNote}>Available in {daysUntilSwitch} day{daysUntilSwitch !== 1 ? 's' : ''}</div>
+                    <div className="lb-menu-note">Available in {daysUntilSwitch} day{daysUntilSwitch !== 1 ? 's' : ''}</div>
                   </>
                 ) : (
                   <button
-                    style={s.menuItem}
+                    className="lb-menu-item"
                     onClick={() => { setMenuOpen(false); navigate('/select-paper'); }}
                   >
                     Switch Paper
                   </button>
                 )}
-                <div style={s.menuDivider} />
-                <button style={s.menuItemDanger} onClick={handleLogout}>
+                <div className="lb-menu-divider" />
+                <button className="lb-menu-item--danger" onClick={handleLogout}>
                   Sign Out
                 </button>
               </div>
@@ -693,66 +221,69 @@ export default function LobbyPage() {
         </div>
       </header>
 
-      <div style={s.content}>
+      <div className="lb-content">
         {/* ── Big Course Card ── */}
-        <div style={s.courseCard}>
-          <div style={s.courseCardTop}>
+        <div className="lb-course-card">
+          <div className="lb-course-card-top">
             <div>
-              <h2 style={s.paperTitle}>
+              <h2 className="lb-paper-title">
                 {paper} — {getPaperLabel(paper)}
               </h2>
-              <p style={s.paperSubtitle}>Power Engineering Exam Prep</p>
+              <p className="lb-paper-subtitle">Power Engineering Exam Prep</p>
             </div>
-            <div style={s.courseCardActions}>
-              <button style={s.btnPrimary} onClick={handleContinue}>
+            <div className="lb-course-card-actions">
+              <button className="lb-btn-primary" onClick={handleContinue}>
                 ▶ Continue
               </button>
-              <button style={s.btnSecondary} onClick={() => navigate('/chapters')}>
+              <button className="lb-btn-secondary" onClick={() => navigate('/chapters')}>
                 All Chapters
               </button>
             </div>
           </div>
 
           {/* Progress bar */}
-          <div style={s.progressBarWrap}>
-            <div style={s.progressBarRow}>
-              <span style={s.progressLabel}>Course Progress</span>
-              <span style={s.progressPct}>{progress.percent}%</span>
+          <div className="lb-progress-bar-wrap">
+            <div className="lb-progress-bar-row">
+              <span className="lb-progress-label">Course Progress</span>
+              <span className="lb-progress-pct">{progress.percent}%</span>
             </div>
-            <div style={s.progressTrack}>
-              <div style={s.progressFill(progress.percent)} />
+            <div className="lb-progress-track">
+              <div
+                className={`lb-progress-fill${progress.percent >= 100 ? ' lb-progress-fill--complete' : ''}`}
+                style={{ width: `${progress.percent}%` }}
+              />
             </div>
           </div>
 
           {/* Last visited */}
-          <div style={s.lastVisited}>
+          <div className="lb-last-visited">
             {progress.last_visited ? (
               <>
                 Last studied:{' '}
-                <span style={s.lastVisitedTitle}>
+                <span className="lb-last-visited-title">
                   {progress.last_visited.title || progress.last_visited.lesson_code}
                 </span>
               </>
             ) : (
-              <span style={{ color: '#666' }}>Start studying to track your progress</span>
+              <span className="lb-muted-666">Start studying to track your progress</span>
             )}
           </div>
 
           {/* Stat chips */}
-          <div style={s.chipRow}>
-            <span style={s.chip}>
+          <div className="lb-chip-row">
+            <span className="lb-chip">
               Objectives Done:{' '}
-              <span style={s.chipValue}>
+              <span className="lb-chip-value">
                 {stats.objectives_done}/{progress.total_objectives}
               </span>
             </span>
-            <span style={s.chip}>
+            <span className="lb-chip">
               Quizzes Passed:{' '}
-              <span style={s.chipValue}>{stats.quizzes_passed}</span>
+              <span className="lb-chip-value">{stats.quizzes_passed}</span>
             </span>
-            <span style={s.chip}>
+            <span className="lb-chip">
               Avg Score:{' '}
-              <span style={s.chipValue}>
+              <span className="lb-chip-value">
                 {stats.avg_quiz_score !== null ? `${stats.avg_quiz_score}%` : '—'}
               </span>
             </span>
@@ -764,21 +295,21 @@ export default function LobbyPage() {
             column on phones — inline styles can't carry @media. */}
         <div className="lobby-tile-grid">
           {/* Tile 1 — Chapter Quizzes */}
-          <div style={s.tile}>
-            <h3 style={s.tileTitle}>Chapter Quizzes</h3>
+          <div className="lb-tile">
+            <h3 className="lb-tile-title">Chapter Quizzes</h3>
             {next_quiz_chapter_id ? (
               <div>
-                <div style={s.nextQuizId}>
+                <div className="lb-next-quiz-id">
                   Next: {next_quiz_chapter_id}
                 </div>
-                <div style={s.quizPassCount}>
+                <div className="lb-quiz-pass-count">
                   {stats.quizzes_passed} of {stats.total_chapters} chapters with passing score
                 </div>
               </div>
             ) : (
               <div>
-                <div style={s.quizPassedAll}>All quizzes passed! 🎉</div>
-                <div style={s.quizPassCount}>
+                <div className="lb-quiz-passed-all">All quizzes passed! 🎉</div>
+                <div className="lb-quiz-pass-count">
                   {stats.quizzes_passed} of {stats.total_chapters} chapters completed
                 </div>
               </div>
@@ -786,19 +317,19 @@ export default function LobbyPage() {
           </div>
 
           {/* Tile 2 — Quiz Results */}
-          <div style={s.tile}>
-            <h3 style={s.tileTitle}>Quiz Results</h3>
+          <div className="lb-tile">
+            <h3 className="lb-tile-title">Quiz Results</h3>
             {chapter_quizzes.length === 0 ? (
-              <p style={s.muted}>No quizzes attempted yet</p>
+              <p className="lb-muted">No quizzes attempted yet</p>
             ) : (
               <>
-                <ul style={s.quizList}>
+                <ul className="lb-quiz-list">
                   {chapter_quizzes.map(q => (
-                    <li key={q.chapter_id} style={s.quizRow}>
-                      <span style={s.quizChapterId}>{q.chapter_id}</span>
-                      <div style={s.quizRowRight}>
-                        <span style={s.scoreText}>{q.score}%</span>
-                        <span style={q.passed ? s.badgePass : s.badgeFail}>
+                    <li key={q.chapter_id} className="lb-quiz-row">
+                      <span className="lb-quiz-chapter-id">{q.chapter_id}</span>
+                      <div className="lb-quiz-row-right">
+                        <span className="lb-score-text">{q.score}%</span>
+                        <span className={q.passed ? 'lb-badge-pass' : 'lb-badge-fail'}>
                           {q.passed ? 'Pass' : 'Fail'}
                         </span>
                       </div>
@@ -806,12 +337,12 @@ export default function LobbyPage() {
                   ))}
                 </ul>
                 {lowestQuiz && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '13px' }}>Lowest:</span>
-                    <span style={{ color: '#e2e8f0', fontSize: '13px', fontWeight: '600' }}>
+                  <div className="lb-lowest-row">
+                    <span className="lb-lowest-label">Lowest:</span>
+                    <span className="lb-lowest-value">
                       {lowestQuiz.chapter_id} ({lowestQuiz.score}%)
                     </span>
-                    <button style={s.reattemptBtn} onClick={handleReattemptLowest}>
+                    <button className="lb-reattempt-btn" onClick={handleReattemptLowest}>
                       Reattempt
                     </button>
                   </div>
@@ -821,29 +352,29 @@ export default function LobbyPage() {
           </div>
 
           {/* Tile 3 — Last Exam Attempt */}
-          <div style={s.tile}>
-            <h3 style={s.tileTitle}>Last Practice Exam</h3>
+          <div className="lb-tile">
+            <h3 className="lb-tile-title">Last Practice Exam</h3>
             {!last_exam ? (
-              <p style={s.muted}>No practice exam attempted yet</p>
+              <p className="lb-muted">No practice exam attempted yet</p>
             ) : (
               <>
-                <div style={s.bigScore}>{last_exam.score}%</div>
-                <div style={s.examDate}>{formatDate(last_exam.date)}</div>
+                <div className="lb-big-score">{last_exam.score}%</div>
+                <div className="lb-exam-date">{formatDate(last_exam.date)}</div>
                 <div>
                   {last_exam.chapters.slice(0, 3).map(ch => (
-                    <div key={ch.chapter_id} style={s.chapterScoreRow}>
+                    <div key={ch.chapter_id} className="lb-chapter-score-row">
                       <span>{ch.chapter_id}</span>
-                      <span style={{ color: '#e2e8f0', fontWeight: '500' }}>{ch.score}%</span>
+                      <span className="lb-chapter-score-value">{ch.score}%</span>
                     </div>
                   ))}
                   {last_exam.chapters.length > 3 && (
-                    <div style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>
+                    <div className="lb-more-chapters">
                       +{last_exam.chapters.length - 3} more chapters
                     </div>
                   )}
                 </div>
                 <button
-                  style={s.btnLink}
+                  className="lb-btn-link"
                   onClick={() => navigate('/exam/results')}
                 >
                   Full breakdown ↓
@@ -853,19 +384,19 @@ export default function LobbyPage() {
           </div>
 
           {/* Tile 4 — Practice Exam Launcher */}
-          <div style={s.tile}>
-            <h3 style={s.tileTitle}>Practice Exam</h3>
+          <div className="lb-tile">
+            <h3 className="lb-tile-title">Practice Exam</h3>
 
             {/* Question count selector */}
-            <div style={{ marginBottom: '6px' }}>
-              <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '8px' }}>
+            <div className="lb-count-section">
+              <div className="lb-count-section-label">
                 Question count
               </div>
-              <div style={s.countGroup}>
+              <div className="lb-count-group">
                 {[25, 50, 100].map(n => (
                   <button
                     key={n}
-                    style={s.countBtn(examCount === n)}
+                    className={`lb-count-btn${examCount === n ? ' lb-count-btn--active' : ''}`}
                     onClick={() => setExamCount(n)}
                   >
                     {n}
@@ -876,22 +407,22 @@ export default function LobbyPage() {
 
             {/* Timed toggle */}
             <div
-              style={s.timedRow}
+              className="lb-timed-row"
               onClick={() => setTimedMode(t => !t)}
             >
-              <button style={s.toggle(timedMode)} type="button">
-                <span style={s.toggleKnob(timedMode)} />
+              <button className={`lb-toggle${timedMode ? ' lb-toggle--on' : ''}`} type="button">
+                <span className={`lb-toggle-knob${timedMode ? ' lb-toggle-knob--on' : ''}`} />
               </button>
-              <span style={s.timedLabel}>Timed mode</span>
+              <span className="lb-timed-label">Timed mode</span>
             </div>
 
-            <button style={{ ...s.btnPrimary, width: '100%' }} onClick={handleStartExam}>
+            <button className="lb-btn-primary lb-btn-block" onClick={handleStartExam}>
               Start Practice Exam
             </button>
 
             {last_exam && (
               <button
-                style={{ ...s.btnSecondary, width: '100%', marginTop: '10px' }}
+                className="lb-btn-secondary lb-btn-block lb-btn-block--mt"
                 onClick={() => navigate(`/exam/results?paper=${encodeURIComponent(paper)}`)}
               >
                 Review most recent results

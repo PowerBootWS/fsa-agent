@@ -1099,18 +1099,6 @@ body {
 .exam-timer--warn { color: var(--amber); }
 .exam-timer--over { color: #f87171; }
 
-/* Lobby 4-tile dashboard grid (client-v2 LobbyPage). 2-up on desktop,
-   single column on phones so the right column can't clip off-screen. */
-.lobby-tile-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  margin-bottom: 32px;
-}
-@media (max-width: 768px) {
-  .lobby-tile-grid { grid-template-columns: 1fr; }
-}
-
 /* Lobby (old CSS path — client-v1 compat) */
 .lobby-page { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; }
 .lobby-title {

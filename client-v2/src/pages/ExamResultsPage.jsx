@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { InlineLessonPlayer } from '../components/InlineLessonPlayer';
 import { ResultsPanel, QuizExamChatSection } from '../ExamRouter';
+import './ExamResultsPage.css';
 
 // ── Grade helpers (used by the summary fallback view) ─────────────────────────
 function getGrade(pct) {
@@ -11,17 +12,9 @@ function getGrade(pct) {
 }
 
 function GradeBadge({ grade }) {
-  const colors = {
-    A: { bg: 'rgba(82,168,130,0.18)', color: '#52A882' },
-    B: { bg: 'rgba(245,166,35,0.15)', color: '#F5A623' },
-    C: { bg: 'rgba(220,38,38,0.12)', color: '#f87171' },
-  };
-  const style = colors[grade] || colors.C;
+  const mod = grade === 'A' ? 'er-grade--a' : grade === 'B' ? 'er-grade--b' : 'er-grade--c';
   return (
-    <span style={{
-      display: 'inline-block', padding: '2px 10px', borderRadius: '12px',
-      background: style.bg, color: style.color, fontWeight: 700, fontSize: '13px',
-    }}>
+    <span className={`er-grade ${mod}`}>
       {grade}
     </span>
   );
@@ -34,14 +27,11 @@ function WeaknessCard({ chapter, openId, setOpenId }) {
     ? chapter.total - chapter.correct
     : null;
   return (
-    <div style={{
-      background: '#1C2333', border: '1px solid #252F42', borderRadius: '6px',
-      padding: '16px', marginBottom: '12px',
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="er-weakness-card">
+      <div className="er-weakness-head">
         <div>
-          <span style={{ color: '#F4F5F7', fontWeight: 600 }}>{chapter.chapter_id}</span>
-          <span style={{ color: '#666', fontSize: '13px', marginLeft: '10px' }}>
+          <span className="er-weakness-id">{chapter.chapter_id}</span>
+          <span className="er-weakness-score">
             {chapter.score}%
             {missed != null ? ` · missed ${missed} question${missed !== 1 ? 's' : ''}` : ''}
           </span>
@@ -50,11 +40,7 @@ function WeaknessCard({ chapter, openId, setOpenId }) {
       </div>
       <button
         onClick={() => setOpenId(isOpen ? null : chapter.chapter_id)}
-        style={{
-          marginTop: '10px', background: '#E8720C', border: 'none', color: 'white',
-          padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px',
-          fontFamily: 'inherit',
-        }}
+        className="er-weakness-btn"
       >
         {isOpen ? '▲ Hide lesson' : '▶ Watch a lesson on this'}
       </button>
@@ -156,7 +142,7 @@ export default function ExamResultsPage() {
   // ── Loading ──
   if (loading && !debrief && !summary) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0D1117', color: '#a8b4c0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Barlow', -apple-system, sans-serif" }}>
+      <div className="er-loading">
         Loading your results…
       </div>
     );
@@ -165,11 +151,11 @@ export default function ExamResultsPage() {
   // ── No results at all ──
   if (!hasFull && !summary) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0D1117', padding: '48px', color: '#a8b4c0', textAlign: 'center', fontFamily: "'Barlow', -apple-system, sans-serif" }}>
+      <div className="er-empty">
         <p>No exam results found.</p>
         <button
           onClick={() => navigate('/lobby')}
-          style={{ marginTop: '16px', background: '#E8720C', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontFamily: 'inherit' }}
+          className="er-empty-btn"
         >
           ← Back to Lobby
         </button>
@@ -177,31 +163,18 @@ export default function ExamResultsPage() {
     );
   }
 
-  const pageStyle = {
-    minHeight: '100vh', background: '#0D1117', color: '#F4F5F7',
-    fontFamily: "'Barlow', -apple-system, sans-serif",
-  };
-  const headerStyle = {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '16px 24px', borderBottom: '1px solid #252F42',
-  };
-  const backBtn = {
-    background: 'transparent', color: '#a8b4c0', border: '1px solid #252F42',
-    borderRadius: '4px', padding: '8px 16px', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit',
-  };
-
   // ── Full feedback view (results + next-exam + Where to focus + tutor chat) ──
   if (hasFull) {
     return (
-      <div style={pageStyle}>
-        <header style={headerStyle}>
-          <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: '20px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+      <div className="er-page">
+        <header className="er-header">
+          <span className="er-title">
             {courseId} — Practice Exam Results
           </span>
-          <button style={backBtn} onClick={() => navigate('/lobby')}>← Back to Lobby</button>
+          <button className="er-back-btn" onClick={() => navigate('/lobby')}>← Back to Lobby</button>
         </header>
 
-        <div style={{ maxWidth: '1180px', margin: '0 auto', padding: '24px' }}>
+        <div className="er-content">
           <ResultsPanel
             displayContent={dc}
             isExam={true}
@@ -214,29 +187,19 @@ export default function ExamResultsPage() {
         {/* Floating tutor chat — same as the in-exam debrief */}
         <button
           onClick={() => setChatOpen(o => !o)}
-          className={!chatOpen ? 'tutor-fab tutor-fab--pulse' : 'tutor-fab'}
-          style={{
-            position: 'fixed', bottom: '24px', right: '24px', width: '56px', height: '56px',
-            borderRadius: '50%', background: '#1d4ed8', border: 'none', cursor: 'pointer',
-            fontSize: '24px', color: 'white', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          }}
+          className={(!chatOpen ? 'tutor-fab tutor-fab--pulse' : 'tutor-fab') + ' er-fab'}
           title="Ask the AI Tutor"
         >
           💬
         </button>
 
         {chatOpen && (
-          <div style={{
-            position: 'fixed', bottom: '90px', right: '24px', width: '700px',
-            maxWidth: 'calc(100vw - 48px)', height: '520px', maxHeight: 'calc(100vh - 120px)', background: '#1e293b',
-            border: '1px solid #334155', borderRadius: '12px', display: 'flex',
-            flexDirection: 'column', zIndex: 99, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-          }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: '#e2e8f0', fontWeight: 600 }}>Ask the AI Tutor</span>
-              <button onClick={() => setChatOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '18px' }}>✕</button>
+          <div className="er-chat-panel">
+            <div className="er-chat-head">
+              <span className="er-chat-title">Ask the AI Tutor</span>
+              <button onClick={() => setChatOpen(false)} className="er-chat-close">✕</button>
             </div>
-            <div style={{ flex: 1, overflow: 'hidden' }}>
+            <div className="er-chat-body">
               <QuizExamChatSection
                 messages={chatState.messages}
                 setMessages={updateMessages}
@@ -267,42 +230,42 @@ function SummaryView({ summary, navigate }) {
   const weakChapters = chapters.filter(ch => getGrade(ch.score) !== 'A');
 
   return (
-    <div style={{ height: '100vh', overflowY: 'auto', background: '#0D1117', color: '#F4F5F7', padding: '32px 24px', fontFamily: "'Barlow', -apple-system, sans-serif" }}>
-      <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', alignItems: 'start' }}>
+    <div className="er-summary">
+      <div className="er-summary-grid">
         <div>
-          <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: '28px', fontWeight: 700, marginBottom: '8px', color: '#F4F5F7', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+          <h1 className="er-summary-h1">
             Practice Exam Results
           </h1>
           {date && (
-            <p style={{ color: '#666', fontSize: '13px', marginBottom: '24px' }}>
+            <p className="er-summary-date">
               {new Date(date).toLocaleDateString(undefined, { dateStyle: 'medium' })}
             </p>
           )}
-          <div style={{ background: '#1C2333', borderRadius: '4px', padding: '24px', marginBottom: '24px', border: '1px solid #252F42' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
-              <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: '48px', fontWeight: 800, color: overallGrade === 'A' ? '#52A882' : overallGrade === 'B' ? '#F5A623' : '#f87171' }}>
+          <div className="er-summary-card">
+            <div className="er-summary-score-row">
+              <span className={`er-score ${overallGrade === 'A' ? 'er-score--a' : overallGrade === 'B' ? 'er-score--b' : 'er-score--c'}`}>
                 {score}%
               </span>
               <GradeBadge grade={overallGrade} />
             </div>
-            <p style={{ color: '#a8b4c0', margin: 0, fontSize: '15px' }}>{correct} / {total} questions correct</p>
+            <p className="er-summary-fraction">{correct} / {total} questions correct</p>
           </div>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <div className="er-summary-actions">
             <button
               onClick={() => navigate('/lobby')}
-              style={{ background: 'transparent', color: '#a8b4c0', border: '1px solid #252F42', padding: '12px 24px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit' }}
+              className="er-summary-back-btn"
             >
               ← Back to Lobby
             </button>
           </div>
         </div>
         <div>
-          <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: '22px', fontWeight: 700, marginBottom: '20px', color: '#F4F5F7', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+          <h2 className="er-summary-h2">
             Areas to Improve
           </h2>
           {weakChapters.length === 0 ? (
-            <div style={{ background: '#1C2333', borderRadius: '4px', padding: '24px', border: '1px solid #252F42', textAlign: 'center' }}>
-              <p style={{ color: '#52A882', fontWeight: 600, margin: 0 }}>All chapters are grade A — great work!</p>
+            <div className="er-summary-empty">
+              <p className="er-summary-empty-msg">All chapters are grade A — great work!</p>
             </div>
           ) : (
             weakChapters.map(ch => (
