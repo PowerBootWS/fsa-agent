@@ -24,12 +24,26 @@ function clientIp(req) {
   return req.headers['cf-connecting-ip'] || req.ip || null;
 }
 
-// Records a successful login with originating IP + user agent (both nullable).
-// Additive/best-effort — captured for account-sharing review (scripts/login_audit.js).
-async function recordLoginEvent(userId, req) {
+// Coarse device class from the user agent (mobile / tablet / desktop). Used to
+// measure mobile↔desktop switching — deliberately not a fingerprint.
+function deviceType(ua) {
+  if (!ua) return 'unknown';
+  if (/\biPad\b/i.test(ua) || /\bTablet\b/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua))) {
+    return 'tablet';
+  }
+  if (/Mobi|iPhone|iPod|Windows Phone|Android.*Mobile/i.test(ua)) return 'mobile';
+  return 'desktop';
+}
+
+// Records a successful login with IP, user agent, device class, and whether it
+// displaced a still-active session (another device got bumped — single-session).
+// Additive/best-effort — feeds scripts/login_audit.js + scripts/device_switch_report.js.
+async function recordLoginEvent(userId, req, { displaced = null } = {}) {
+  const ua = req.headers['user-agent'] || null;
   await pool.query(
-    `INSERT INTO login_events (user_id, ip_address, user_agent) VALUES ($1, $2, $3)`,
-    [userId, clientIp(req), req.headers['user-agent'] || null]
+    `INSERT INTO login_events (user_id, ip_address, user_agent, device_type, displaced_active_session)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [userId, clientIp(req), ua, deviceType(ua), displaced]
   );
 }
 
@@ -44,6 +58,7 @@ router.post('/login', async (req, res) => {
     // Find user with active subscription
     const userResult = await pool.query(
       `SELECT u.id, u.email, u.first_name, u.last_name, u.password_hash,
+              u.current_session_token AS prior_session_token,
               s.status AS subscription_status, s.active_paper, s.class_code
        FROM platform_users u
        LEFT JOIN subscriptions s ON s.user_id = u.id
@@ -70,11 +85,15 @@ router.post('/login', async (req, res) => {
     // Generate session token
     const sessionToken = crypto.randomUUID();
 
+    // A non-null prior token means a session was still active on another device
+    // and this login just bumped it — the mobile↔desktop friction we want to measure.
+    const displaced = !!user.prior_session_token;
+
     await pool.query(
       `UPDATE platform_users SET current_session_token = $1, last_login_at = now() WHERE id = $2`,
       [sessionToken, user.id]
     );
-    await recordLoginEvent(user.id, req);
+    await recordLoginEvent(user.id, req, { displaced });
 
     res.cookie(COOKIE_NAME, sessionToken, cookieOptions());
 
@@ -293,7 +312,8 @@ router.post('/setup', async (req, res) => {
        WHERE id = $3`,
       [passwordHash, sessionToken, row.user_id]
     );
-    await recordLoginEvent(row.user_id, req);
+    // Onboarding (first password set) — no prior active session to displace.
+    await recordLoginEvent(row.user_id, req, { displaced: false });
 
     await pool.query(
       `UPDATE auth_tokens SET used_at = now() WHERE id = $1`,
