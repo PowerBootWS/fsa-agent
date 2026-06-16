@@ -2,7 +2,7 @@
 
 Full Steam Ahead's self-hosted learning platform + AI tutoring agent for Power Engineering students. Live at **https://learn.fullsteamahead.ca**.
 
-> **Canonical docs:** `wiki/projects/fsa-agent.md` (the business wiki). Read it before non-trivial work — it has the current architecture, API reference, DB schema, and decisions. `README.md` here is a quick orientation. This file is agent working-guidance.
+> **Canonical docs:** `wiki/projects/fsa-agent.md` (the business wiki). Read it before non-trivial work — it has the current architecture, API reference, DB schema, and decisions. This file is agent working-guidance; `client-v2/README.md` covers the front end.
 
 ## Architecture
 

@@ -2,13 +2,13 @@
 
 React (Vite) front end for the Full Steam Ahead learning platform, served at **learn.fullsteamahead.ca** (and `/v2/*`). This is the **only active** client — `../client/` is retired v1 dead code.
 
-See `../README.md` and `wiki/projects/fsa-agent.md` for the full picture.
+See `../CLAUDE.md` and `wiki/projects/fsa-agent.md` for the full picture.
 
 ## Build & deploy
 
 ```bash
 npm run build          # outputs to build/ (Vite base: /v2/)
-# then rebuild the api image from the repo root — see ../README.md
+# then rebuild the api image from the repo root — see ../CLAUDE.md
 ```
 
 The Express API serves `build/` at the site root on `learn.*` (and at `/v2`). Build assets are referenced from `/v2/assets/`; files in `public/` (manifest, service worker, icons) land at `build/` root and are served at the **site root**.
