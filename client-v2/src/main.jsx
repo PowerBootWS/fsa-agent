@@ -11,3 +11,13 @@ createRoot(document.getElementById('root')).render(
     </BrowserRouter>
   </StrictMode>,
 )
+
+// Register the service worker (root scope) so the app is installable and the
+// shell loads fast. Served at /sw.js by express.static on learn.*.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {
+      /* SW registration is best-effort — never block the app */
+    });
+  });
+}
