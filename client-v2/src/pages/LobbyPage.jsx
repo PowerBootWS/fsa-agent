@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useInstall } from '../hooks/useInstall';
 import './LobbyPage.css';
 
 // Maps paper codes to human-readable names
@@ -40,6 +41,28 @@ export default function LobbyPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [billingLoading, setBillingLoading] = useState(false);
   const menuRef = useRef(null);
+
+  // PWA install affordance (one-tap on Android, instructions on iOS).
+  const { canPrompt, isIOS, isStandalone, promptInstall } = useInstall();
+  const [showIosInstall, setShowIosInstall] = useState(false);
+  const [installDismissed, setInstallDismissed] = useState(
+    () => localStorage.getItem('fsa_install_dismissed') === '1'
+  );
+  const showInstall = !isStandalone && (canPrompt || isIOS);
+
+  function handleInstallClick() {
+    setMenuOpen(false);
+    if (canPrompt) {
+      promptInstall();
+    } else {
+      setShowIosInstall(true);
+    }
+  }
+
+  function dismissInstallBanner() {
+    setInstallDismissed(true);
+    localStorage.setItem('fsa_install_dismissed', '1');
+  }
 
   const user = JSON.parse(localStorage.getItem('fsa_user') || '{}');
 
@@ -211,6 +234,11 @@ export default function LobbyPage() {
                     Switch Paper
                   </button>
                 )}
+                {showInstall && (
+                  <button className="lb-menu-item" onClick={handleInstallClick}>
+                    📲 Install app
+                  </button>
+                )}
                 <div className="lb-menu-divider" />
                 <button className="lb-menu-item--danger" onClick={handleLogout}>
                   Sign Out
@@ -222,6 +250,27 @@ export default function LobbyPage() {
       </header>
 
       <div className="lb-content">
+        {/* ── Install nudge (dismissible; hidden once installed/dismissed) ── */}
+        {showInstall && !installDismissed && (
+          <div className="lb-install-banner">
+            <span className="lb-install-banner-text">
+              📲 Add Full Steam Ahead to your home screen for quick, full-screen access.
+            </span>
+            <div className="lb-install-banner-actions">
+              <button className="lb-install-banner-btn" onClick={handleInstallClick}>
+                {canPrompt ? 'Install' : 'How?'}
+              </button>
+              <button
+                className="lb-install-banner-dismiss"
+                onClick={dismissInstallBanner}
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── Big Course Card ── */}
         <div className="lb-course-card">
           <div className="lb-course-card-top">
@@ -432,6 +481,26 @@ export default function LobbyPage() {
         </div>
 
       </div>
+
+      {/* iOS "Add to Home Screen" instructions (no programmatic install on iOS) */}
+      {showIosInstall && (
+        <div className="lb-install-modal-overlay" onClick={() => setShowIosInstall(false)}>
+          <div className="lb-install-modal" onClick={e => e.stopPropagation()}>
+            <div className="lb-install-modal-title">Install Full Steam Ahead</div>
+            <p className="lb-install-modal-text">
+              Add the app to your home screen for quick, full-screen access:
+            </p>
+            <ol className="lb-install-steps">
+              <li>Tap the <strong>Share</strong> button <span className="lb-ios-share" aria-hidden="true">⎋</span> in Safari's toolbar.</li>
+              <li>Scroll down and choose <strong>Add to Home Screen</strong>.</li>
+              <li>Tap <strong>Add</strong> — the FSA icon appears on your home screen.</li>
+            </ol>
+            <button className="lb-btn-primary lb-btn-block" onClick={() => setShowIosInstall(false)}>
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
