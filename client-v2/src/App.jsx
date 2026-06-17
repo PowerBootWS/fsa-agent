@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import SetupPage from './pages/SetupPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import SelectPaperPage from './pages/SelectPaperPage';
 import LobbyPage from './pages/LobbyPage';
 import AllChaptersPage from './pages/AllChaptersPage';
@@ -37,6 +38,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/setup" element={<SetupPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         path="/select-paper"
         element={
