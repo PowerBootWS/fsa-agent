@@ -9,6 +9,7 @@ const { sendMagicLink, sendDeactivationReview } = require('../services/email');
 const DEACTIVATION_REQUIRES_CONFIRMATION =
   (process.env.DEACTIVATION_REQUIRES_CONFIRMATION || 'true').toLowerCase() !== 'false';
 const requireAuth = require('../middleware/requireAuth');
+const ghl = require('../services/gohighlevel');
 
 const router = express.Router();
 
@@ -456,37 +457,28 @@ router.get('/course-structure/:paperCode', requireAuth, async (req, res) => {
       quizMap[row.chapter_id] = { score, passed: score >= PASSING_THRESHOLD };
     }
 
-    // Build gated structure
-    let previousChapterPassed = true; // chapter 1 is always unlocked
-    const chapters = outline.chapters.map((chapter, idx) => {
+    // Free navigation (2026-06-16): sequential gating disabled — every chapter
+    // and objective is unlocked. We still surface `completed` and quiz scores so
+    // the UI can show progress, but `locked` is always false.
+    const chapters = outline.chapters.map((chapter) => {
       const chapterId = `${paperCode}-${chapter.chapter_num}`;
       const quiz = quizMap[chapterId];
       const quizPassed = quiz?.passed || false;
-      const chapterLocked = !previousChapterPassed;
 
-      const objectives = chapter.objectives.map((obj, objIdx) => {
-        const previousComplete = objIdx === 0
-          ? !chapterLocked
-          : completedLessons.has(chapter.objectives[objIdx - 1].lesson_code);
-        const objLocked = chapterLocked || (objIdx > 0 && !previousComplete);
-        return {
-          ...obj,
-          completed: completedLessons.has(obj.lesson_code),
-          locked: objLocked,
-        };
-      });
+      const objectives = chapter.objectives.map((obj) => ({
+        ...obj,
+        completed: completedLessons.has(obj.lesson_code),
+        locked: false,
+      }));
 
-      const result = {
+      return {
         ...chapter,
         chapter_id: chapterId,
-        locked: chapterLocked,
+        locked: false,
         quiz_score: quiz?.score || null,
         quiz_passed: quizPassed,
         objectives,
       };
-
-      previousChapterPassed = quizPassed;
-      return result;
     });
 
     return res.json({ paper: paperCode, chapters });
@@ -520,6 +512,10 @@ router.get('/lesson-preview/:lessonCode', async (req, res) => {
 // Query params: type ('lesson'|'chapter_quiz'), lesson_code or chapter_id
 // Returns: { allowed: boolean, reason: string|null, required_lesson_code?: string, required_chapter_id?: string }
 router.get('/check-access', requireAuth, async (req, res) => {
+  // Free navigation (2026-06-16): sequential gating disabled — all access allowed.
+  return res.json({ allowed: true });
+
+  /* eslint-disable no-unreachable */
   const { type, lesson_code, chapter_id } = req.query;
   const { email } = req.user;
 
@@ -579,6 +575,7 @@ router.get('/check-access', requireAuth, async (req, res) => {
     console.error('GET /api/platform/check-access error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
+  /* eslint-enable no-unreachable */
 });
 
 // GET /api/platform/me
@@ -613,10 +610,28 @@ router.patch('/profile', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'First and last name are required' });
     }
 
+    const cleanFirst = first_name.trim();
+    const cleanLast = last_name.trim();
+    const cleanPhone = phone?.trim() || null;
+    const cleanAddress = address?.trim() || null;
+
     await pool.query(
       `UPDATE platform_users SET first_name = $1, last_name = $2, phone = $3, address = $4 WHERE id = $5`,
-      [first_name.trim(), last_name.trim(), phone?.trim() || null, address?.trim() || null, userId]
+      [cleanFirst, cleanLast, cleanPhone, cleanAddress, userId]
     );
+
+    // Keep the GoHighLevel contact current so marketing/onboarding/win-back
+    // workflows have the latest contact info. GHL is a secondary sink — Postgres
+    // is the system of record — so a GHL failure must not fail the save.
+    ghl.upsertContact({
+      email: req.user.email,
+      firstName: cleanFirst,
+      lastName: cleanLast,
+      phone: cleanPhone,
+      address: cleanAddress,
+    }).catch(err => {
+      console.error('GHL contact sync failed for', req.user.email, '-', err.message);
+    });
 
     return res.json({ ok: true });
   } catch (err) {

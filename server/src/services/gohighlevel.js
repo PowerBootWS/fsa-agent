@@ -1,6 +1,6 @@
 const GHL_API_BASE = 'https://services.leadconnectorhq.com';
 
-async function upsertContact({ email, firstName, tags }) {
+async function upsertContact({ email, firstName, lastName, phone, address, tags }) {
   const apiKey = process.env.GHL_API_KEY;
   const locationId = process.env.GHL_LOCATION_ID;
 
@@ -9,7 +9,15 @@ async function upsertContact({ email, firstName, tags }) {
     return;
   }
 
+  // /contacts/upsert keys on locationId + email, so this updates the existing
+  // contact in place (no duplicate). Only include fields that were provided so a
+  // partial upsert never blanks out data already on the contact.
   const body = { locationId, email, firstName };
+  if (lastName != null) body.lastName = lastName;
+  if (phone != null) body.phone = phone;
+  // The LMS stores a single free-text mailing address; GHL's address1 is a plain
+  // string field, so map the whole value there.
+  if (address != null) body.address1 = address;
   if (Array.isArray(tags) && tags.length > 0) {
     body.tags = tags;
   }

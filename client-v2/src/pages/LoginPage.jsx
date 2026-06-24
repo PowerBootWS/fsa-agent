@@ -89,6 +89,16 @@ const styles = {
     fontSize: '13px',
     textDecoration: 'none',
   },
+  enrollText: {
+    textAlign: 'center',
+    marginTop: '12px',
+    color: '#a8b4c0',
+    fontSize: '13px',
+  },
+  enrollLink: {
+    color: '#4da3ff',
+    textDecoration: 'none',
+  },
 };
 
 export default function LoginPage() {
@@ -171,6 +181,13 @@ export default function LoginPage() {
         <Link to="/forgot-password" style={styles.forgotLink}>
           Forgot password?
         </Link>
+
+        <div style={styles.enrollText}>
+          Not enrolled?{' '}
+          <a href="https://fullsteamahead.ca/enroll" style={styles.enrollLink}>
+            Sign up here.
+          </a>
+        </div>
       </div>
     </div>
   );

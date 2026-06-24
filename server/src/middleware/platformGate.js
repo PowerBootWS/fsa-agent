@@ -1,16 +1,25 @@
 /**
  * platformGate.js — Gated progression middleware for the self-hosted platform.
  *
- * Rules:
- *  - Only applies when req.isPlatformMode === true (learn.* host)
- *  - Objective gate: objective N requires objective N-1 completed
- *  - Objective 1 of Chapter 1: always unlocked
- *  - Objective 1 of Chapter N (N>1): requires Chapter N-1 quiz passed
- *  - Chapter quiz gate: requires ALL objectives in that chapter completed
- *  - Practice exams: always accessible, never gated
+ * FREE NAVIGATION (2026-06-16): sequential gating is DISABLED. Students may jump
+ * to any chapter/objective/quiz in any order. The gate middlewares below now pass
+ * through unconditionally; the helper functions (isChapterQuizPassed,
+ * areAllObjectivesComplete) are kept because they're still used elsewhere for
+ * completion/quiz reporting, not for blocking access. To re-enable gating, flip
+ * GATING_ENABLED to true.
+ *
+ * Original rules (kept for reference, now inert):
+ *  - Objective N requires objective N-1 completed
+ *  - Objective 1 of Chapter N (N>1) requires Chapter N-1 quiz passed
+ *  - Chapter quiz requires ALL objectives in that chapter completed
+ *  - Practice exams always accessible
  */
 
 const { pool } = require('../services/database');
+
+// Master switch for sequential progression gating. Disabled 2026-06-16 to allow
+// free navigation across all chapters/objectives.
+const GATING_ENABLED = false;
 
 const PASSING_THRESHOLD = () => parseInt(process.env.QUIZ_PASSING_THRESHOLD || '75', 10);
 
@@ -62,6 +71,9 @@ async function areAllObjectivesComplete(userEmail, courseId, chapterNum) {
  * Falls back to req.query.lesson or req.body.lessonId.
  */
 async function gateLessonAccess(req, res, next) {
+  // Free navigation: gating disabled — let any lesson load.
+  if (!GATING_ENABLED) return next();
+
   // Only gate on platform mode with an authenticated user
   if (!req.isPlatformMode || !req.user) return next();
 
@@ -124,6 +136,9 @@ async function gateLessonAccess(req, res, next) {
  * Expects req.params.chapterId or req.query.chapter_id (format: '{COURSE}-{CHAPTER_NUM}').
  */
 async function gateChapterQuizAccess(req, res, next) {
+  // Free navigation: gating disabled — let any chapter quiz load.
+  if (!GATING_ENABLED) return next();
+
   if (!req.isPlatformMode || !req.user) return next();
 
   const chapterId = req.params.chapterId || req.query.chapter_id;
