@@ -38,6 +38,8 @@ coverage/
 docs/source/lesson_content_aggregated.json
 # Large generated lesson-content source (131MB, over GitHub's 100MB limit; lives on disk only)
 docs/source/FSA_lesson_content.json
+# Per-paper generated exports (same pipeline as above, same reason to exclude)
+docs/source/lesson_content_*.json
 
 # Google OAuth credentials (never commit)
 credentials/.worktrees
