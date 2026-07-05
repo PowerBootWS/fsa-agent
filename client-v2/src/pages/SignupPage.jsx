@@ -59,9 +59,10 @@ export default function SignupPage() {
       }
       localStorage.setItem('fsa_user', JSON.stringify(data.user));
       const next = searchParams.get('next');
-      if (next) {
+      const isSafeNext = next && next.startsWith('/') && !next.startsWith('//');
+      if (isSafeNext) {
         navigate(next, { replace: true });
-      } else if (!data.user.class_code) {
+      } else if (!data.user.active_paper && !data.user.class_code) {
         navigate('/jobs', { replace: true });
       } else if (!data.user.active_paper) {
         navigate('/select-paper', { replace: true });
