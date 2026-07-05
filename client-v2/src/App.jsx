@@ -12,6 +12,8 @@ import ExamResultsPage from './pages/ExamResultsPage';
 import PracticeExamPage from './pages/PracticeExamPage';
 import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
+import AppShell from './components/AppShell';
+import JobsPage from './pages/JobsPage';
 import { LessonPlayer } from './LessonPlayer';
 import { ExamRouter } from './ExamRouter';
 
@@ -51,7 +53,19 @@ export default function App() {
         path="/lobby"
         element={
           <ProtectedRoute>
-            <LobbyPage />
+            <AppShell>
+              <LobbyPage />
+            </AppShell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/jobs"
+        element={
+          <ProtectedRoute requirePaper={false}>
+            <AppShell>
+              <JobsPage />
+            </AppShell>
           </ProtectedRoute>
         }
       />
@@ -90,8 +104,10 @@ export default function App() {
       <Route
         path="/profile"
         element={
-          <ProtectedRoute>
-            <ProfilePage />
+          <ProtectedRoute requirePaper={false}>
+            <AppShell>
+              <ProfilePage />
+            </AppShell>
           </ProtectedRoute>
         }
       />
