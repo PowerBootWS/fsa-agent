@@ -118,4 +118,21 @@ describe('saved jobs', () => {
     const listRes = await request(app).get('/api/jobs').set('Cookie', `fsa_session=${token}`);
     expect(listRes.body.jobs).toHaveLength(0);
   });
+
+  it('404s when patching a job deleted by concurrent request', async () => {
+    const { token } = await createUser('jobs7@example.com');
+    const app = buildTestApp();
+    const saveRes = await request(app).post('/api/jobs/save').set('Cookie', `fsa_session=${token}`).send({
+      title: 'Race Condition Job', url: 'https://example.com/job/7',
+    });
+    const jobId = saveRes.body.id;
+
+    // Simulate concurrent deletion by directly deleting from DB (bypassing the route)
+    await pool.query('DELETE FROM saved_jobs WHERE id = $1', [jobId]);
+
+    // Now attempt to PATCH the deleted job
+    const patchRes = await request(app).patch(`/api/jobs/${jobId}`).set('Cookie', `fsa_session=${token}`).send({ status: 'applied' });
+    expect(patchRes.status).toBe(404);
+    expect(patchRes.body.error).toBe('Job not found');
+  });
 });

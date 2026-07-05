@@ -90,9 +90,15 @@ router.patch('/:id', requireAuth, async (req, res) => {
     if (fields.length === 0) {
       return res.status(400).json({ error: 'Nothing to update' });
     }
-    values.push(req.params.id);
+    values.push(req.params.id, req.user.id);
 
-    await pool.query(`UPDATE saved_jobs SET ${fields.join(', ')} WHERE id = $${i}`, values);
+    const updateResult = await pool.query(
+      `UPDATE saved_jobs SET ${fields.join(', ')} WHERE id = $${i} AND user_id = $${i + 1}`,
+      values
+    );
+    if (updateResult.rowCount === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
 
     return res.json({ ok: true });
   } catch (err) {
