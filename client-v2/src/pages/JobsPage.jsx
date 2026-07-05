@@ -50,6 +50,7 @@ export default function JobsPage() {
       });
       if (!res.ok) throw new Error();
     } catch {
+      setError('Could not update that job\'s status. Please try again.');
       loadJobs();
     }
   }
@@ -76,8 +77,12 @@ export default function JobsPage() {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || 'Could not save this job.');
       }
+      const data = await res.json();
       setManualForm({ title: '', company: '', url: '' });
       setShowManualForm(false);
+      if (data.already_saved) {
+        setError('That job is already in your saved list.');
+      }
       loadJobs();
     } catch (err) {
       setManualError(err.message);
@@ -121,7 +126,7 @@ export default function JobsPage() {
               <div className="jb-card-company">{job.company}{job.location ? ` · ${job.location}` : ''}</div>
               <div className="jb-card-dates">
                 {formatDate(job.posted_at) && <span>Posted {formatDate(job.posted_at)} · </span>}
-                <span>Saved {formatDate(job.saved_at)}</span>
+                {formatDate(job.saved_at) && <span>Saved {formatDate(job.saved_at)}</span>}
               </div>
               <div className="jb-card-actions">
                 {STATUS_ORDER.filter(s => s !== job.status).map(s => (
