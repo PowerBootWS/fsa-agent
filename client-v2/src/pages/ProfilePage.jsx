@@ -291,7 +291,10 @@ export default function ProfilePage() {
                   type="file"
                   accept=".pdf,.docx"
                   style={{ display: 'none' }}
-                  onChange={e => handleDocUpload(type, e.target.files[0])}
+                  onChange={e => {
+                    handleDocUpload(type, e.target.files[0]);
+                    e.target.value = '';
+                  }}
                 />
               </label>
             </div>
