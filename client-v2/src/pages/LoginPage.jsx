@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 
 const styles = {
   page: {
@@ -107,6 +107,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [searchParams] = useSearchParams();
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -124,7 +125,12 @@ export default function LoginPage() {
         return;
       }
       localStorage.setItem('fsa_user', JSON.stringify(data.user));
-      if (!data.user.active_paper) {
+      const next = searchParams.get('next');
+      if (next) {
+        navigate(next, { replace: true });
+      } else if (!data.user.active_paper && !data.user.class_code) {
+        navigate('/jobs', { replace: true });
+      } else if (!data.user.active_paper) {
         navigate('/select-paper', { replace: true });
       } else {
         navigate('/lobby', { replace: true });
