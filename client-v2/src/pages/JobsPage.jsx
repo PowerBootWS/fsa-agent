@@ -50,8 +50,8 @@ export default function JobsPage() {
       });
       if (!res.ok) throw new Error();
     } catch {
+      await loadJobs();
       setError('Could not update that job\'s status. Please try again.');
-      loadJobs();
     }
   }
 
@@ -80,10 +80,10 @@ export default function JobsPage() {
       const data = await res.json();
       setManualForm({ title: '', company: '', url: '' });
       setShowManualForm(false);
+      await loadJobs();
       if (data.already_saved) {
         setError('That job is already in your saved list.');
       }
-      loadJobs();
     } catch (err) {
       setManualError(err.message);
     }
