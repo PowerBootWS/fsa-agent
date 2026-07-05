@@ -35,44 +35,54 @@ const upload = multer({
 
 // POST /documents
 router.post('/documents', requireAuth, upload.single('file'), async (req, res) => {
-  const client = await pool.connect();
+  const { doc_type } = req.body;
+  if (!VALID_DOC_TYPES.includes(doc_type)) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ error: 'doc_type must be resume or cover_letter' });
+  }
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
   try {
-    const { doc_type } = req.body;
-    if (!VALID_DOC_TYPES.includes(doc_type)) {
-      if (req.file) fs.unlink(req.file.path, () => {});
-      return res.status(400).json({ error: 'doc_type must be resume or cover_letter' });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Advisory lock keyed on (user_id, doc_type) — serializes concurrent uploads for the
+      // same slot even when no row exists yet (SELECT ... FOR UPDATE only locks existing rows,
+      // which left the user's very-first upload of a doc_type unprotected).
+      await client.query(
+        `SELECT pg_advisory_xact_lock(hashtext($1::text || ':' || $2)::bigint)`,
+        [req.user.id, doc_type]
+      );
+      const existing = await client.query(
+        `SELECT storage_path FROM user_documents WHERE user_id = $1 AND doc_type = $2`,
+        [req.user.id, doc_type]
+      );
+      await client.query(
+        `INSERT INTO user_documents (user_id, doc_type, original_filename, storage_path, mime_type, uploaded_at)
+         VALUES ($1, $2, $3, $4, $5, now())
+         ON CONFLICT (user_id, doc_type)
+         DO UPDATE SET original_filename = $3, storage_path = $4, mime_type = $5, uploaded_at = now()`,
+        [req.user.id, doc_type, req.file.originalname, req.file.path, req.file.mimetype]
+      );
+      await client.query('COMMIT');
+
+      if (existing.rows[0]?.storage_path && existing.rows[0].storage_path !== req.file.path) {
+        fs.unlink(existing.rows[0].storage_path, () => {});
+      }
+
+      return res.status(201).json({ ok: true });
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
     }
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    await client.query('BEGIN');
-    const existing = await client.query(
-      `SELECT storage_path FROM user_documents WHERE user_id = $1 AND doc_type = $2 FOR UPDATE`,
-      [req.user.id, doc_type]
-    );
-
-    await client.query(
-      `INSERT INTO user_documents (user_id, doc_type, original_filename, storage_path, mime_type, uploaded_at)
-       VALUES ($1, $2, $3, $4, $5, now())
-       ON CONFLICT (user_id, doc_type)
-       DO UPDATE SET original_filename = $3, storage_path = $4, mime_type = $5, uploaded_at = now()`,
-      [req.user.id, doc_type, req.file.originalname, req.file.path, req.file.mimetype]
-    );
-    await client.query('COMMIT');
-
-    if (existing.rows[0]?.storage_path && existing.rows[0].storage_path !== req.file.path) {
-      fs.unlink(existing.rows[0].storage_path, () => {});
-    }
-
-    return res.status(201).json({ ok: true });
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
     if (req.file) fs.unlink(req.file.path, () => {});
     console.error('POST /api/platform/documents error:', err);
     return res.status(500).json({ error: 'Internal server error' });
-  } finally {
-    client.release();
   }
 });
 

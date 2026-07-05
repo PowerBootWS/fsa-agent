@@ -11,6 +11,7 @@ process.env.USER_UPLOADS_DIR = TEST_UPLOAD_DIR;
 
 const documentsRouter = require('../src/routes/documents');
 const requireAuth = require('../src/middleware/requireAuth');
+const { pool: routerPool } = require('../src/services/database');
 
 function buildTestApp() {
   const app = express();
@@ -141,5 +142,32 @@ describe('document upload/download', () => {
     expect(res.status).toBe(404);
     expect(res.headers['content-type']).toMatch(/application\/json/);
     expect(res.body).toEqual({ error: 'File missing on disk' });
+  });
+
+  it('returns a clean 500 instead of crashing the process when pool.connect() rejects', async () => {
+    const { token } = await createUser('doc6@example.com');
+    const app = buildTestApp();
+
+    const connectSpy = jest
+      .spyOn(routerPool, 'connect')
+      .mockRejectedValueOnce(new Error('connection refused'));
+
+    try {
+      const res = await request(app)
+        .post('/api/platform/documents')
+        .set('Cookie', `fsa_session=${token}`)
+        .field('doc_type', 'resume')
+        .attach('file', Buffer.from('%PDF-1.4 pool exhausted'), { filename: 'resume.pdf', contentType: 'application/pdf' });
+
+      // The whole point of moving pool.connect() inside the try/catch is that a
+      // rejection here is handled like any other error — a normal 500 JSON
+      // response — rather than an unhandled promise rejection that would crash
+      // the Node process (there's no express-async-errors / unhandledRejection
+      // handler in this codebase).
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: 'Internal server error' });
+    } finally {
+      connectSpy.mockRestore();
+    }
   });
 });
