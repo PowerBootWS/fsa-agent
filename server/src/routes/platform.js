@@ -250,6 +250,10 @@ router.post('/switch-paper', requireAuth, async (req, res) => {
 
     const { subscription_id, last_paper_switch_at } = req.user;
 
+    if (!subscription_id) {
+      return res.status(403).json({ error: 'An active subscription is required to select a paper.' });
+    }
+
     if (last_paper_switch_at) {
       const switchedAt = new Date(last_paper_switch_at);
       const now = new Date();

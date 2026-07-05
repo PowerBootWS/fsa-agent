@@ -2,6 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './ProfilePage.css';
 
+// Job-only accounts (no active_paper, no class_code) have no lobby/course to go back
+// to — send them to /jobs instead. Mirrors the same check used in App.jsx's DefaultRedirect.
+function homeRoute() {
+  const user = JSON.parse(localStorage.getItem('fsa_user') || 'null');
+  if (user && !user.active_paper && !user.class_code) return '/jobs';
+  return '/lobby';
+}
+
 export default function ProfilePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -154,7 +162,7 @@ export default function ProfilePage() {
     <div className="pf-page">
       <header className="pf-header">
         <div className="pf-brand">Full Steam Ahead</div>
-        <button className="pf-back-btn" onClick={() => navigate('/lobby')}>← Back to Lobby</button>
+        <button className="pf-back-btn" onClick={() => navigate(homeRoute())}>← Back</button>
       </header>
 
       <div className="pf-content">
@@ -240,7 +248,7 @@ export default function ProfilePage() {
               <button type="submit" className="pf-btn-primary" disabled={saving}>
                 {saving ? 'Saving…' : 'Save Changes'}
               </button>
-              <button type="button" className="pf-btn-secondary" onClick={() => navigate('/lobby')}>
+              <button type="button" className="pf-btn-secondary" onClick={() => navigate(homeRoute())}>
                 Cancel
               </button>
             </div>

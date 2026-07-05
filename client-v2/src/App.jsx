@@ -115,8 +115,19 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route path="/" element={<Navigate to="/lobby" replace />} />
-      <Route path="*" element={<Navigate to="/lobby" replace />} />
+      <Route path="/" element={<DefaultRedirect />} />
+      <Route path="*" element={<DefaultRedirect />} />
     </Routes>
   );
+}
+
+// Job-only accounts (no active_paper, no class_code) have no course to land on —
+// send them to /jobs instead of /lobby, which would otherwise bounce them to
+// /select-paper. Everyone else keeps the existing default.
+function DefaultRedirect() {
+  const user = JSON.parse(localStorage.getItem('fsa_user') || 'null');
+  if (user && !user.active_paper && !user.class_code) {
+    return <Navigate to="/jobs" replace />;
+  }
+  return <Navigate to="/lobby" replace />;
 }
