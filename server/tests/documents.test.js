@@ -63,7 +63,7 @@ describe('document upload/download', () => {
   });
 
   it('replaces the existing resume on a second upload and deletes the old file', async () => {
-    const { token } = await createUser('doc2@example.com');
+    const { token, userId } = await createUser('doc2@example.com');
     const app = buildTestApp();
 
     await request(app)
@@ -75,6 +75,13 @@ describe('document upload/download', () => {
     const listAfterFirst = await request(app).get('/api/platform/documents').set('Cookie', `fsa_session=${token}`);
     const firstUploadedAt = listAfterFirst.body.documents[0].uploaded_at;
 
+    const firstRow = await pool.query(
+      `SELECT storage_path FROM user_documents WHERE user_id = $1 AND doc_type = 'resume'`,
+      [userId]
+    );
+    const firstStoragePath = firstRow.rows[0].storage_path;
+    expect(fs.existsSync(firstStoragePath)).toBe(true);
+
     await request(app)
       .post('/api/platform/documents')
       .set('Cookie', `fsa_session=${token}`)
@@ -85,6 +92,8 @@ describe('document upload/download', () => {
     expect(listAfterSecond.body.documents).toHaveLength(1);
     expect(listAfterSecond.body.documents[0].original_filename).toBe('v2.pdf');
     expect(listAfterSecond.body.documents[0].uploaded_at).not.toBe(firstUploadedAt);
+
+    expect(fs.existsSync(firstStoragePath)).toBe(false);
   });
 
   it('rejects a non-PDF/DOCX file with 400', async () => {
@@ -106,5 +115,31 @@ describe('document upload/download', () => {
       .get('/api/platform/documents/cover_letter/download')
       .set('Cookie', `fsa_session=${token}`);
     expect(res.status).toBe(404);
+  });
+
+  it('404s cleanly (not a 500 with mismatched headers) when the DB row outlives the file on disk', async () => {
+    const { token, userId } = await createUser('doc5@example.com');
+    const app = buildTestApp();
+
+    await request(app)
+      .post('/api/platform/documents')
+      .set('Cookie', `fsa_session=${token}`)
+      .field('doc_type', 'resume')
+      .attach('file', Buffer.from('%PDF-1.4 will vanish'), { filename: 'ghost.pdf', contentType: 'application/pdf' });
+
+    const row = await pool.query(
+      `SELECT storage_path FROM user_documents WHERE user_id = $1 AND doc_type = 'resume'`,
+      [userId]
+    );
+    const storagePath = row.rows[0].storage_path;
+    fs.unlinkSync(storagePath); // remove the file directly, leaving the DB row intact
+
+    const res = await request(app)
+      .get('/api/platform/documents/resume/download')
+      .set('Cookie', `fsa_session=${token}`);
+
+    expect(res.status).toBe(404);
+    expect(res.headers['content-type']).toMatch(/application\/json/);
+    expect(res.body).toEqual({ error: 'File missing on disk' });
   });
 });

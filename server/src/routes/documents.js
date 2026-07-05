@@ -35,6 +35,7 @@ const upload = multer({
 
 // POST /documents
 router.post('/documents', requireAuth, upload.single('file'), async (req, res) => {
+  const client = await pool.connect();
   try {
     const { doc_type } = req.body;
     if (!VALID_DOC_TYPES.includes(doc_type)) {
@@ -45,18 +46,20 @@ router.post('/documents', requireAuth, upload.single('file'), async (req, res) =
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const existing = await pool.query(
-      `SELECT storage_path FROM user_documents WHERE user_id = $1 AND doc_type = $2`,
+    await client.query('BEGIN');
+    const existing = await client.query(
+      `SELECT storage_path FROM user_documents WHERE user_id = $1 AND doc_type = $2 FOR UPDATE`,
       [req.user.id, doc_type]
     );
 
-    await pool.query(
+    await client.query(
       `INSERT INTO user_documents (user_id, doc_type, original_filename, storage_path, mime_type, uploaded_at)
        VALUES ($1, $2, $3, $4, $5, now())
        ON CONFLICT (user_id, doc_type)
        DO UPDATE SET original_filename = $3, storage_path = $4, mime_type = $5, uploaded_at = now()`,
       [req.user.id, doc_type, req.file.originalname, req.file.path, req.file.mimetype]
     );
+    await client.query('COMMIT');
 
     if (existing.rows[0]?.storage_path && existing.rows[0].storage_path !== req.file.path) {
       fs.unlink(existing.rows[0].storage_path, () => {});
@@ -64,9 +67,12 @@ router.post('/documents', requireAuth, upload.single('file'), async (req, res) =
 
     return res.status(201).json({ ok: true });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     if (req.file) fs.unlink(req.file.path, () => {});
     console.error('POST /api/platform/documents error:', err);
     return res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
   }
 });
 
@@ -104,9 +110,17 @@ router.get('/documents/:type/download', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'No document on file' });
     }
     const { storage_path, original_filename, mime_type } = result.rows[0];
+    const absolutePath = path.resolve(storage_path);
     res.setHeader('Content-Type', mime_type);
     res.setHeader('Content-Disposition', `attachment; filename="${original_filename.replace(/"/g, '')}"`);
-    return res.sendFile(path.resolve(storage_path));
+    return res.sendFile(absolutePath, (err) => {
+      if (err && !res.headersSent) {
+        console.error('GET /api/platform/documents/:type/download error:', err);
+        res.removeHeader('Content-Type');
+        res.removeHeader('Content-Disposition');
+        res.status(404).json({ error: 'File missing on disk' });
+      }
+    });
   } catch (err) {
     console.error('GET /api/platform/documents/:type/download error:', err);
     return res.status(500).json({ error: 'Internal server error' });
