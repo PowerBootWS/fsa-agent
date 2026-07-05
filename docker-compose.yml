@@ -46,9 +46,11 @@ services:
       - QUIZ_PASSING_THRESHOLD=${QUIZ_PASSING_THRESHOLD}
       - DEACTIVATION_REQUIRES_CONFIRMATION=${DEACTIVATION_REQUIRES_CONFIRMATION}
       - DEACTIVATION_REVIEW_EMAIL=${DEACTIVATION_REVIEW_EMAIL}
+      - USER_UPLOADS_DIR=/srv/fsa-user-uploads
       - TZ=America/Edmonton
     volumes:
       - ${FSA_MEDIA_DIR}:/srv/fsa-media:ro
+      - ${FSA_USER_UPLOADS_DIR}:/srv/fsa-user-uploads
     depends_on:
       - ai-service
     networks:

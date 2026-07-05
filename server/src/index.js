@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -132,10 +133,19 @@ app.use('/api/v2/progress', platformAuth, v2ProgressRouter);
 const authRouter = require('./routes/auth');
 const platformRouter = require('./routes/platform');
 const adminRouter = require('./routes/admin');
+const documentsRouter = require('./routes/documents');
+const jobsRouter = require('./routes/jobs');
 
 app.use('/api/auth', authRouter);
 app.use('/api/platform', platformRouter);
+app.use('/api/platform', documentsRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/jobs', jobsRouter);
+
+// Persistent storage for user-uploaded resumes/cover letters (distinct from MEDIA_DIR,
+// which is read-only lesson content, not user uploads).
+const USER_UPLOADS_DIR = process.env.USER_UPLOADS_DIR || '/srv/fsa-user-uploads';
+fs.mkdirSync(USER_UPLOADS_DIR, { recursive: true });
 
 // Serve lesson media files (bind-mounted from host)
 const MEDIA_DIR = process.env.MEDIA_DIR || '/srv/fsa-media';
