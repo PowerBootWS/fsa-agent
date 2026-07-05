@@ -73,7 +73,9 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    if (user.subscription_status !== 'active') {
+    // Block only users who HAD a subscription that is no longer active (lapsed/cancelled
+    // paid students) — allow through when there is no subscription row at all (job-only accounts).
+    if (user.subscription_status && user.subscription_status !== 'active') {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -335,6 +337,58 @@ router.post('/setup', async (req, res) => {
     });
   } catch (err) {
     console.error('POST /api/auth/setup error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/auth/signup
+// Free account creation for job-search-only users (no course purchase). Creates no
+// subscriptions row — ProtectedRoute routes such accounts with requirePaper={false}
+// instead of through /select-paper.
+router.post('/signup', async (req, res) => {
+  try {
+    const { email, password, first_name, last_name } = req.body;
+
+    if (!email || !password || !first_name?.trim() || !last_name?.trim()) {
+      return res.status(400).json({ error: 'Email, password, first name, and last name are required' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const sessionToken = crypto.randomUUID();
+
+    const insertResult = await pool.query(
+      `INSERT INTO platform_users (email, first_name, last_name, password_hash, current_session_token, last_login_at)
+       VALUES ($1, $2, $3, $4, $5, now())
+       RETURNING id, email, first_name, last_name`,
+      [normalizedEmail, first_name.trim(), last_name.trim(), passwordHash, sessionToken]
+    );
+    const user = insertResult.rows[0];
+
+    await recordLoginEvent(user.id, req, { displaced: false });
+
+    res.cookie(COOKIE_NAME, sessionToken, cookieOptions());
+
+    return res.status(201).json({
+      ok: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        active_paper: null,
+        class_code: null,
+      },
+    });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'An account with that email already exists. Try logging in instead.' });
+    }
+    console.error('POST /api/auth/signup error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
