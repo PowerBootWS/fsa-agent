@@ -1,0 +1,41 @@
+# fsa-agent/docker-compose.staging.yml
+# Overlay: docker compose -p fsa-agent-staging -f docker-compose.yml -f docker-compose.staging.yml <cmd>
+# Distinct project name (-p) keeps container/volume/network names from colliding with production.
+services:
+  postgres:
+    container_name: fsa-postgres-staging
+    # !override replaces (rather than appends to) the base file's port mapping —
+    # without it, Compose concatenates base (5434) + this (5435), and 5434 is
+    # already bound by the production postgres container, so the staging
+    # container fails to start ("port is already allocated"). Not in the
+    # original brief; added after hitting that error.
+    ports: !override
+      - "5435:5432"
+    volumes:
+      - fsa_postgres_staging_data:/var/lib/postgresql/data
+
+  api:
+    container_name: fsa-agent-api-staging
+    environment:
+      - LEARN_DOMAIN=learn-staging.fullsteamahead.ca
+    volumes:
+      - ${FSA_MEDIA_DIR}:/srv/fsa-media:ro
+      - ${FSA_USER_UPLOADS_STAGING_DIR}:/srv/fsa-user-uploads
+
+  ai-service:
+    container_name: fsa-agent-ai-staging
+
+networks:
+  # Explicit subnet added (not in the original brief): the host's default Docker
+  # address pools (172.16.0.0/12 and 192.168.0.0/16) are fully allocated across
+  # ~30 other projects on this box, so `docker network create` for a new bridge
+  # network fails with "all predefined address pools have been fully subnetted".
+  # 10.99.0.0/24 was confirmed free via `ip route`. This only affects the new
+  # staging-project network; production's fsa-network is untouched.
+  fsa-network:
+    ipam:
+      config:
+        - subnet: 10.99.0.0/24
+
+volumes:
+  fsa_postgres_staging_data:
