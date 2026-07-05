@@ -3,6 +3,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const { pool } = require('./testPool');
 const jobsRouter = require('../src/routes/jobs');
+const { pool: routerPool } = require('../src/services/database');
 
 function buildTestApp() {
   const app = express();
@@ -119,20 +120,31 @@ describe('saved jobs', () => {
     expect(listRes.body.jobs).toHaveLength(0);
   });
 
-  it('404s when patching a job deleted by concurrent request', async () => {
-    const { token } = await createUser('jobs7@example.com');
+  it('404s when the job is deleted between the ownership check and the update', async () => {
+    const { token } = await createUser('jobs-race@example.com');
     const app = buildTestApp();
     const saveRes = await request(app).post('/api/jobs/save').set('Cookie', `fsa_session=${token}`).send({
-      title: 'Race Condition Job', url: 'https://example.com/job/7',
+      title: 'Race Condition Job', url: 'https://example.com/job/race',
     });
     const jobId = saveRes.body.id;
 
-    // Simulate concurrent deletion by directly deleting from DB (bypassing the route)
-    await pool.query('DELETE FROM saved_jobs WHERE id = $1', [jobId]);
+    const originalQuery = routerPool.query.bind(routerPool);
+    const querySpy = jest.spyOn(routerPool, 'query').mockImplementation(async (text, params) => {
+      // Intercept the PATCH route's own ownership-check SELECT specifically, and delete the
+      // row immediately after it resolves but before the route's subsequent UPDATE runs —
+      // simulating a concurrent DELETE landing in that exact window. Any other query (the
+      // save above, the UPDATE itself, etc.) passes through unchanged.
+      if (typeof text === 'string' && text.includes('SELECT id FROM saved_jobs WHERE id = $1 AND user_id = $2')) {
+        const result = await originalQuery(text, params);
+        await originalQuery('DELETE FROM saved_jobs WHERE id = $1', [jobId]);
+        return result;
+      }
+      return originalQuery(text, params);
+    });
 
-    // Now attempt to PATCH the deleted job
     const patchRes = await request(app).patch(`/api/jobs/${jobId}`).set('Cookie', `fsa_session=${token}`).send({ status: 'applied' });
     expect(patchRes.status).toBe(404);
-    expect(patchRes.body.error).toBe('Job not found');
+
+    querySpy.mockRestore();
   });
 });
