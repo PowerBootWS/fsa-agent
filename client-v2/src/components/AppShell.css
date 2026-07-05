@@ -1,0 +1,79 @@
+/* fsa-agent/client-v2/src/components/AppShell.css */
+.as-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.as-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  background: #1C2333;
+  border-right: 1px solid #252F42;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0;
+}
+
+.as-brand {
+  color: #E8720C;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0 20px 24px;
+}
+
+.as-nav-item {
+  color: #a8b4c0;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 20px;
+  border-left: 3px solid transparent;
+}
+
+.as-nav-item--active {
+  color: #F4F5F7;
+  border-left-color: #E8720C;
+  background: rgba(232, 114, 12, 0.08);
+}
+
+.as-content {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .as-shell {
+    flex-direction: column;
+  }
+  .as-sidebar {
+    width: 100%;
+    flex-direction: row;
+    border-right: none;
+    border-top: 1px solid #252F42;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    padding: 8px 0;
+    justify-content: space-around;
+    z-index: 100;
+  }
+  .as-brand {
+    display: none;
+  }
+  .as-nav-item {
+    border-left: none;
+    border-top: 3px solid transparent;
+    padding: 6px 12px;
+    text-align: center;
+  }
+  .as-nav-item--active {
+    border-left-color: transparent;
+    border-top-color: #E8720C;
+  }
+  .as-content {
+    padding-bottom: 60px;
+  }
+}
