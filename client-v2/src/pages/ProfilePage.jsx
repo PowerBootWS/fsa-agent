@@ -10,6 +10,8 @@ export default function ProfilePage() {
   const [saveError, setSaveError] = useState('');
   const [pwStatus, setPwStatus] = useState(null); // 'sent' | 'error' | null
   const [pwSending, setPwSending] = useState(false);
+  const [documents, setDocuments] = useState({});
+  const [docUploadError, setDocUploadError] = useState('');
 
   const [form, setForm] = useState({
     first_name: '',
@@ -43,6 +45,42 @@ export default function ProfilePage() {
     }
     loadProfile();
   }, [navigate]);
+
+  useEffect(() => {
+    fetch('/api/platform/documents', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        const byType = {};
+        (data.documents || []).forEach(d => { byType[d.doc_type] = d; });
+        setDocuments(byType);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleDocUpload(docType, file) {
+    if (!file) return;
+    setDocUploadError('');
+    const formData = new FormData();
+    formData.append('doc_type', docType);
+    formData.append('file', file);
+    try {
+      const res = await fetch('/api/platform/documents', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Upload failed.');
+      }
+      const refreshed = await fetch('/api/platform/documents', { credentials: 'include' }).then(r => r.json());
+      const byType = {};
+      (refreshed.documents || []).forEach(d => { byType[d.doc_type] = d; });
+      setDocuments(byType);
+    } catch (err) {
+      setDocUploadError(err.message);
+    }
+  }
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -230,6 +268,34 @@ export default function ProfilePage() {
           >
             {pwSending ? 'Sending…' : pwStatus === 'sent' ? 'Email Sent' : 'Send Password Reset Email'}
           </button>
+        </div>
+
+        {/* Documents */}
+        <div className="pf-card">
+          <div className="pf-card-title">Documents</div>
+          {docUploadError && <div className="pf-error-banner">{docUploadError}</div>}
+          {['resume', 'cover_letter'].map(type => (
+            <div key={type} className="pf-doc-row">
+              <div className="pf-doc-label">{type === 'resume' ? 'Resume' : 'Cover Letter'}</div>
+              {documents[type] ? (
+                <div className="pf-doc-info">
+                  <span>{documents[type].original_filename}</span>
+                  <a href={`/api/platform/documents/${type}/download`} className="pf-doc-link">Download</a>
+                </div>
+              ) : (
+                <div className="pf-doc-info pf-doc-info--empty">No file on file</div>
+              )}
+              <label className="pf-btn-secondary pf-upload-label">
+                {documents[type] ? 'Replace' : 'Upload'}
+                <input
+                  type="file"
+                  accept=".pdf,.docx"
+                  style={{ display: 'none' }}
+                  onChange={e => handleDocUpload(type, e.target.files[0])}
+                />
+              </label>
+            </div>
+          ))}
         </div>
       </div>
     </div>

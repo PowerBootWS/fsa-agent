@@ -235,3 +235,44 @@
     padding: 24px 18px;
   }
 }
+
+.pf-doc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #252F42;
+}
+
+.pf-doc-row:last-child {
+  border-bottom: none;
+}
+
+.pf-doc-label {
+  font-weight: 600;
+  min-width: 100px;
+}
+
+.pf-doc-info {
+  flex: 1;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: #a8b4c0;
+  font-size: 13px;
+}
+
+.pf-doc-info--empty {
+  color: #616f80;
+  font-style: italic;
+}
+
+.pf-doc-link {
+  color: #4da3ff;
+  text-decoration: none;
+}
+
+.pf-upload-label {
+  display: inline-block;
+}
