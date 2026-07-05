@@ -15,6 +15,7 @@ import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppShell from './components/AppShell';
 import JobsPage from './pages/JobsPage';
+import JobsCapturePage from './pages/JobsCapturePage';
 import { LessonPlayer } from './LessonPlayer';
 import { ExamRouter } from './ExamRouter';
 
@@ -71,6 +72,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route path="/jobs/capture" element={<JobsCapturePage />} />
       <Route
         path="/chapters"
         element={
