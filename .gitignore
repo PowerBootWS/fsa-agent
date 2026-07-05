@@ -43,3 +43,5 @@ docs/source/lesson_content_*.json
 
 # Google OAuth credentials (never commit)
 credentials/.worktrees
+
+.superpowers/
