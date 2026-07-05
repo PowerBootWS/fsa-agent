@@ -1,0 +1,156 @@
+/* fsa-agent/client-v2/src/pages/JobsPage.css */
+.jb-page {
+  min-height: 100vh;
+  background: #0D1117;
+  color: #F4F5F7;
+  font-family: 'Barlow', -apple-system, sans-serif;
+  padding: 32px 24px;
+}
+
+.jb-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.jb-loading {
+  min-height: 100vh;
+  background: #0D1117;
+  color: #a8b4c0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.jb-error {
+  background: rgba(220, 38, 38, 0.12);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  color: #f87171;
+  border-radius: 4px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+}
+
+.jb-btn-primary, .jb-btn-secondary {
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-family: inherit;
+  margin-bottom: 16px;
+}
+
+.jb-btn-primary {
+  background: #E8720C;
+  color: #fff;
+  border: none;
+}
+
+.jb-btn-secondary {
+  background: transparent;
+  color: #a8b4c0;
+  border: 1px solid #252F42;
+}
+
+.jb-manual-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 420px;
+  margin-bottom: 24px;
+}
+
+.jb-input {
+  background: #1C2333;
+  border: 1px solid #252F42;
+  border-radius: 4px;
+  color: #F4F5F7;
+  font-size: 14px;
+  padding: 10px 12px;
+  font-family: inherit;
+}
+
+.jb-empty {
+  color: #a8b4c0;
+}
+
+.jb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.jb-card {
+  background: #1C2333;
+  border: 1px solid #252F42;
+  border-radius: 4px;
+  padding: 18px 20px;
+}
+
+.jb-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.jb-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.jb-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.jb-badge--saved { background: rgba(168, 180, 192, 0.15); color: #a8b4c0; }
+.jb-badge--applied { background: rgba(77, 163, 255, 0.15); color: #4da3ff; }
+.jb-badge--interviewing { background: rgba(232, 114, 12, 0.15); color: #E8720C; }
+.jb-badge--archived { background: rgba(74, 85, 104, 0.2); color: #4a5568; }
+
+.jb-card-company {
+  color: #a8b4c0;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.jb-card-dates {
+  color: #616f80;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.jb-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.jb-status-btn {
+  background: transparent;
+  border: 1px solid #252F42;
+  color: #a8b4c0;
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.jb-link {
+  color: #4da3ff;
+  font-size: 12px;
+  text-decoration: none;
+  align-self: center;
+  margin-left: auto;
+}
