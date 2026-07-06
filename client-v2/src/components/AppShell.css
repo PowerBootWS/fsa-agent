@@ -12,6 +12,16 @@
   display: flex;
   flex-direction: column;
   padding: 24px 0;
+  /* Pin the sidebar to the viewport regardless of how tall .as-content grows
+     (e.g. a fully-loaded course dashboard) — without this, the flex row's
+     default stretch behavior makes the sidebar as tall as the content, pushing
+     the bottom-anchored user menu below the fold and forcing a page scroll
+     just to reach it. */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  align-self: flex-start;
+  overflow-y: auto;
 }
 
 .as-brand {
@@ -206,6 +216,9 @@
     position: fixed;
     bottom: 0;
     left: 0;
+    top: auto;
+    height: auto;
+    overflow-y: visible;
     padding: 8px 0;
     justify-content: space-around;
     z-index: 100;
