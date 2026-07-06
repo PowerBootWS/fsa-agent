@@ -40,6 +40,10 @@ const corsOptions = {
       process.env.PARENT_DOMAIN || 'http://localhost:8080',
       `https://${LEARN_DOMAIN}`,
       `https://${LEGACY_DOMAIN}`,
+      // fsa-website's public jobs board (jobs.html) calls
+      // POST /api/jobs/capture-stash directly from the browser, before the
+      // user has any FSA session.
+      'https://fullsteamahead.ca',
     ];
     if (!origin || allowedOrigins.some(o => origin.includes(o.replace('https://', '')))) {
       callback(null, true);

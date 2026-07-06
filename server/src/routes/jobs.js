@@ -1,10 +1,65 @@
 const express = require('express');
 const { pool } = require('../services/database');
 const requireAuth = require('../middleware/requireAuth');
+const crypto = require('crypto');
 
 const router = express.Router();
 
 const VALID_STATUSES = ['saved', 'applied', 'interviewing', 'archived'];
+
+// In-memory stash for the save-from-jobs.html handoff: fsa-website's
+// jobs.html posts full job data here (title/description/ai_summary/etc.)
+// and gets back a short token, avoiding passing long description text
+// through URL query params (real postings aren't length-capped in storage
+// and can exceed proxy/CDN URL-length limits). Deliberately UNAUTHENTICATED
+// — the browser hasn't necessarily logged into FSA yet at this point.
+// Single-instance server (no dev/prod split, no clustering), so an
+// in-memory Map is sufficient for a short-lived handoff like this.
+const CAPTURE_STASH_TTL_MS = 10 * 60 * 1000;
+const captureStash = new Map(); // token -> { payload, expiresAt }
+
+function sweepExpiredCaptureStash() {
+  const now = Date.now();
+  for (const [token, entry] of captureStash) {
+    if (entry.expiresAt < now) captureStash.delete(token);
+  }
+}
+
+// POST /capture-stash — unauthenticated
+router.post('/capture-stash', (req, res) => {
+  const { job_id, title, company, url, posted_at, description, ai_summary, location, class_level, employer_logo_url } = req.body;
+  if (!title || !url) {
+    return res.status(400).json({ error: 'title and url are required' });
+  }
+  sweepExpiredCaptureStash();
+  const token = crypto.randomUUID();
+  captureStash.set(token, {
+    payload: {
+      job_id: job_id || null,
+      title,
+      company: company || null,
+      url,
+      posted_at: posted_at || null,
+      description: description || null,
+      ai_summary: ai_summary || null,
+      location: location || null,
+      class_level: class_level || null,
+      employer_logo_url: employer_logo_url || null,
+    },
+    expiresAt: Date.now() + CAPTURE_STASH_TTL_MS,
+  });
+  return res.status(201).json({ token });
+});
+
+// GET /capture-stash/:token — unauthenticated
+router.get('/capture-stash/:token', (req, res) => {
+  sweepExpiredCaptureStash();
+  const entry = captureStash.get(req.params.token);
+  if (!entry) {
+    return res.status(404).json({ error: 'This save link has expired. Please go back and try saving the job again.' });
+  }
+  return res.json(entry.payload);
+});
 
 // POST /save
 router.post('/save', requireAuth, async (req, res) => {
