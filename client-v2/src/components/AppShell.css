@@ -44,6 +44,156 @@
   min-width: 0;
 }
 
+/* User menu — anchored to the bottom of the sidebar; dropdown opens upward
+   since the trigger sits at the bottom of a tall column. */
+.as-user-menu-wrap {
+  position: relative;
+  margin-top: auto;
+  padding: 0 20px;
+}
+
+.as-user-menu-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px solid #252F42;
+  border-radius: 4px;
+  color: #F4F5F7;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.as-user-menu-dropdown {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 20px;
+  right: 20px;
+  background: #1C2333;
+  border: 1px solid #252F42;
+  border-radius: 4px;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.as-menu-item,
+.as-menu-item--disabled,
+.as-menu-item--danger {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  text-align: left;
+  font-size: 14px;
+  padding: 10px 16px;
+  font-family: inherit;
+}
+
+.as-menu-item {
+  color: #F4F5F7;
+  cursor: pointer;
+}
+
+.as-menu-item--disabled {
+  color: #4a5568;
+  cursor: not-allowed;
+}
+
+.as-menu-item--danger {
+  color: #f87171;
+  cursor: pointer;
+}
+
+.as-menu-divider {
+  height: 1px;
+  background: #252F42;
+  margin: 4px 0;
+}
+
+.as-menu-note {
+  color: #4a5568;
+  font-size: 11px;
+  padding: 2px 16px 8px;
+}
+
+/* iOS install instructions modal */
+.as-install-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 24px;
+}
+
+.as-install-modal {
+  background: #1C2333;
+  border: 1px solid #252F42;
+  border-top: 3px solid #E8720C;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 380px;
+  width: 100%;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.as-install-modal-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #F4F5F7;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 12px;
+}
+
+.as-install-modal-text {
+  color: #a8b4c0;
+  font-size: 14px;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.as-install-steps {
+  margin: 0 0 20px;
+  padding-left: 20px;
+  color: #F4F5F7;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.as-install-steps li {
+  margin-bottom: 8px;
+}
+
+.as-ios-share {
+  display: inline-block;
+  color: #4D88C2;
+  font-weight: 700;
+  transform: translateY(1px);
+}
+
+.as-btn-primary {
+  background: #E8720C;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+}
+
 @media (max-width: 768px) {
   .as-shell {
     flex-direction: column;
@@ -75,5 +225,21 @@
   }
   .as-content {
     padding-bottom: 60px;
+  }
+  .as-user-menu-wrap {
+    margin-top: 0;
+    padding: 0 8px;
+    flex: 0 0 auto;
+    align-self: center;
+  }
+  .as-user-menu-btn {
+    border: none;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  .as-user-menu-dropdown {
+    left: auto;
+    right: 8px;
+    min-width: 200px;
   }
 }

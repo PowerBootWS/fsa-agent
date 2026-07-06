@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInstall } from '../hooks/useInstall';
 import './LobbyPage.css';
@@ -38,9 +38,6 @@ export default function LobbyPage() {
   const [error, setError] = useState(null);
   const [examCount, setExamCount] = useState(50);
   const [timedMode, setTimedMode] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [billingLoading, setBillingLoading] = useState(false);
-  const menuRef = useRef(null);
 
   // PWA install affordance (one-tap on Android, instructions on iOS).
   const { canPrompt, isIOS, isStandalone, promptInstall } = useInstall();
@@ -51,7 +48,6 @@ export default function LobbyPage() {
   const showInstall = !isStandalone && (canPrompt || isIOS);
 
   function handleInstallClick() {
-    setMenuOpen(false);
     if (canPrompt) {
       promptInstall();
     } else {
@@ -70,23 +66,6 @@ export default function LobbyPage() {
     fetchLobbyData();
   }, []);
 
-  useEffect(() => {
-    function handleClick(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setMenuOpen(false);
-      }
-    }
-    function handleKey(e) {
-      if (e.key === 'Escape') setMenuOpen(false);
-    }
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, []);
-
   async function fetchLobbyData() {
     setLoading(true);
     setError(null);
@@ -103,16 +82,6 @@ export default function LobbyPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  async function handleLogout() {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-    } catch {
-      // ignore
-    }
-    localStorage.removeItem('fsa_user');
-    navigate('/login', { replace: true });
   }
 
   function handleContinue() {
@@ -136,34 +105,6 @@ export default function LobbyPage() {
   function handleStartExam() {
     if (!data) return;
     navigate(`/practice-exam?paper=${data.paper}&count=${examCount}&timed=${timedMode}`);
-  }
-
-  async function handleOpenBillingPortal() {
-    setMenuOpen(false);
-    setBillingLoading(true);
-    try {
-      const res = await fetch('/api/platform/billing-portal', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error || 'Could not open billing portal');
-      window.open(d.url, '_blank', 'noopener');
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setBillingLoading(false);
-    }
-  }
-
-  // Calculate paper switch cooldown from server data (not localStorage, which lacks this field)
-  const lastSwitchAt = data?.last_paper_switch_at;
-  const COOLDOWN_DAYS = 7;
-  let daysUntilSwitch = 0;
-  if (lastSwitchAt) {
-    const diffMs = Date.now() - new Date(lastSwitchAt).getTime();
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    daysUntilSwitch = Math.max(0, Math.ceil(COOLDOWN_DAYS - diffDays));
   }
 
   if (loading) {
@@ -192,61 +133,6 @@ export default function LobbyPage() {
       {/* ── Header ── */}
       <header className="lb-header">
         <div className="lb-brand">Full Steam Ahead</div>
-        <div className="lb-header-right">
-          <div className="lb-user-menu-wrap" ref={menuRef}>
-            <button
-              className="lb-user-menu-btn"
-              onClick={() => setMenuOpen(o => !o)}
-              aria-expanded={menuOpen}
-            >
-              {user.first_name && user.last_name
-                ? `${user.first_name} ${user.last_name}`
-                : user.first_name || user.email}
-              {' '}▾
-            </button>
-            {menuOpen && (
-              <div className="lb-user-menu-dropdown">
-                <button
-                  className="lb-menu-item"
-                  onClick={() => { setMenuOpen(false); navigate('/profile'); }}
-                >
-                  Profile
-                </button>
-                <button
-                  className="lb-menu-item"
-                  onClick={handleOpenBillingPortal}
-                  disabled={billingLoading}
-                >
-                  {billingLoading ? 'Opening…' : 'Subscription'}
-                </button>
-                {daysUntilSwitch > 0 ? (
-                  <>
-                    <button className="lb-menu-item--disabled" disabled>
-                      Switch Paper
-                    </button>
-                    <div className="lb-menu-note">Available in {daysUntilSwitch} day{daysUntilSwitch !== 1 ? 's' : ''}</div>
-                  </>
-                ) : (
-                  <button
-                    className="lb-menu-item"
-                    onClick={() => { setMenuOpen(false); navigate('/select-paper'); }}
-                  >
-                    Switch Paper
-                  </button>
-                )}
-                {showInstall && (
-                  <button className="lb-menu-item" onClick={handleInstallClick}>
-                    📲 Install app
-                  </button>
-                )}
-                <div className="lb-menu-divider" />
-                <button className="lb-menu-item--danger" onClick={handleLogout}>
-                  Sign Out
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
       </header>
 
       <div className="lb-content">
