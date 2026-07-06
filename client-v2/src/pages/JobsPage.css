@@ -148,9 +148,46 @@
 }
 
 .jb-link {
+  background: none;
+  border: none;
+  padding: 0;
   color: #4da3ff;
   font-size: 12px;
   text-decoration: none;
   align-self: center;
   margin-left: auto;
+  cursor: pointer;
+  font-family: inherit;
 }
+
+.jb-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.jb-tab {
+  background: transparent;
+  border: 1px solid #252F42;
+  color: #a8b4c0;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.jb-tab--active {
+  background: #E8720C;
+  border-color: #E8720C;
+  color: #fff;
+}
+
+.jb-card-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.jb-badge--closed { background: rgba(220, 38, 38, 0.15); color: #f87171; }

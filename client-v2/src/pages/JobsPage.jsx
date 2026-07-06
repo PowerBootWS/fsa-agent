@@ -1,15 +1,21 @@
 // fsa-agent/client-v2/src/pages/JobsPage.jsx
 import { useEffect, useState } from 'react';
+import JobDetailModal from './JobDetailModal';
 import './JobsPage.css';
 
 const STATUS_LABELS = { saved: 'Saved', applied: 'Applied', interviewing: 'Interviewing', archived: 'Archived' };
 const STATUS_ORDER = ['saved', 'applied', 'interviewing', 'archived'];
+const ACTIVE_STATUSES = ['saved', 'applied', 'interviewing'];
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '';
   return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+}
+
+function isJobClosed(job) {
+  return job.status === 'saved' && job.source_status && job.source_status !== 'active';
 }
 
 export default function JobsPage() {
@@ -19,6 +25,8 @@ export default function JobsPage() {
   const [showManualForm, setShowManualForm] = useState(false);
   const [manualForm, setManualForm] = useState({ title: '', company: '', url: '' });
   const [manualError, setManualError] = useState('');
+  const [tab, setTab] = useState('active'); // 'active' | 'archived'
+  const [detailJobId, setDetailJobId] = useState(null);
 
   useEffect(() => {
     loadJobs();
@@ -91,10 +99,29 @@ export default function JobsPage() {
 
   if (loading) return <div className="jb-loading">Loading your saved jobs…</div>;
 
+  const visibleJobs = jobs.filter(job =>
+    tab === 'archived' ? job.status === 'archived' : ACTIVE_STATUSES.includes(job.status)
+  );
+
   return (
     <div className="jb-page">
       <h1 className="jb-title">Your Saved Jobs</h1>
       {error && <div className="jb-error">{error}</div>}
+
+      <div className="jb-tabs">
+        <button
+          className={`jb-tab${tab === 'active' ? ' jb-tab--active' : ''}`}
+          onClick={() => setTab('active')}
+        >
+          Active
+        </button>
+        <button
+          className={`jb-tab${tab === 'archived' ? ' jb-tab--active' : ''}`}
+          onClick={() => setTab('archived')}
+        >
+          Archived
+        </button>
+      </div>
 
       <button className="jb-btn-secondary" onClick={() => setShowManualForm(s => !s)}>
         {showManualForm ? 'Cancel' : '+ Add a Job Manually'}
@@ -113,15 +140,20 @@ export default function JobsPage() {
         </form>
       )}
 
-      {jobs.length === 0 ? (
-        <p className="jb-empty">No saved jobs yet. Save one from the jobs board, or add one manually above.</p>
+      {visibleJobs.length === 0 ? (
+        <p className="jb-empty">
+          {tab === 'archived' ? 'No archived jobs.' : 'No saved jobs yet. Save one from the jobs board, or add one manually above.'}
+        </p>
       ) : (
         <div className="jb-list">
-          {jobs.map(job => (
+          {visibleJobs.map(job => (
             <div key={job.id} className="jb-card">
               <div className="jb-card-top">
                 <h3 className="jb-card-title">{job.title}</h3>
-                <span className={`jb-badge jb-badge--${job.status}`}>{STATUS_LABELS[job.status]}</span>
+                <div className="jb-card-badges">
+                  {isJobClosed(job) && <span className="jb-badge jb-badge--closed">Closed</span>}
+                  <span className={`jb-badge jb-badge--${job.status}`}>{STATUS_LABELS[job.status]}</span>
+                </div>
               </div>
               <div className="jb-card-company">{job.company}{job.location ? ` · ${job.location}` : ''}</div>
               <div className="jb-card-dates">
@@ -134,11 +166,15 @@ export default function JobsPage() {
                     Mark {STATUS_LABELS[s]}
                   </button>
                 ))}
-                <a href={job.url} target="_blank" rel="noopener noreferrer" className="jb-link">View posting →</a>
+                <button className="jb-link" onClick={() => setDetailJobId(job.id)}>View Details</button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {detailJobId && (
+        <JobDetailModal jobId={detailJobId} onClose={() => setDetailJobId(null)} />
       )}
     </div>
   );
