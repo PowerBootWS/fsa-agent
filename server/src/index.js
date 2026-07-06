@@ -45,7 +45,7 @@ const corsOptions = {
       // user has any FSA session.
       'https://fullsteamahead.ca',
     ];
-    if (!origin || allowedOrigins.some(o => origin.includes(o.replace('https://', '')))) {
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
