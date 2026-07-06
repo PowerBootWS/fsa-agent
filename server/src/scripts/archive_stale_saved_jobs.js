@@ -31,7 +31,8 @@ async function archiveStaleSavedJobs(days) {
 }
 
 async function main() {
-  const days = parseInt(process.env.SAVED_JOB_ARCHIVE_DAYS, 10) || 90;
+  const parsed = parseInt(process.env.SAVED_JOB_ARCHIVE_DAYS, 10);
+  const days = Number.isInteger(parsed) && parsed > 0 ? parsed : 90;
   const count = await archiveStaleSavedJobs(days);
   console.log(`Archived ${count} saved job(s) older than ${days} days.`);
   await pool.end();
