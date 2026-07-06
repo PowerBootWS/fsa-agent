@@ -8,21 +8,38 @@ export default function JobsCapturePage() {
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState('checking'); // 'checking' | 'need-auth' | 'error'
   const [error, setError] = useState('');
+  const [job, setJob] = useState(null);
 
-  const jobId = searchParams.get('job_id') || '';
-  const title = searchParams.get('title') || '';
-  const company = searchParams.get('company') || '';
-  const url = searchParams.get('url') || '';
-  const postedAt = searchParams.get('posted_at') || '';
+  const token = searchParams.get('token') || '';
 
   useEffect(() => {
-    async function attemptSave() {
+    async function resolveAndSave() {
+      if (!token) {
+        setStatus('error');
+        setError('This save link is missing information. Please go back and try again from the listing.');
+        return;
+      }
+
+      let stashed;
+      try {
+        const stashRes = await fetch(`/api/jobs/capture-stash/${encodeURIComponent(token)}`);
+        if (!stashRes.ok) {
+          throw new Error('This save link has expired. Please go back and try saving the job again.');
+        }
+        stashed = await stashRes.json();
+      } catch (err) {
+        setStatus('error');
+        setError(err.message || 'Something went wrong. Please try again.');
+        return;
+      }
+      setJob(stashed);
+
       const storedUser = localStorage.getItem('fsa_user');
       if (!storedUser) {
         setStatus('need-auth');
         return;
       }
-      if (!title || !url) {
+      if (!stashed.title || !stashed.url) {
         setStatus('error');
         setError('This job link is missing required information. Please go back and try again from the listing.');
         return;
@@ -32,7 +49,18 @@ export default function JobsCapturePage() {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source_job_id: jobId || null, title, company, url, posted_at: postedAt || null }),
+          body: JSON.stringify({
+            source_job_id: stashed.job_id || null,
+            title: stashed.title,
+            company: stashed.company,
+            url: stashed.url,
+            posted_at: stashed.posted_at || null,
+            description_snapshot: stashed.description || null,
+            ai_summary_snapshot: stashed.ai_summary || null,
+            location: stashed.location || null,
+            job_class_label: stashed.class_level || null,
+            employer_logo_url_snapshot: stashed.employer_logo_url || null,
+          }),
         });
         if (res.status === 401) {
           localStorage.removeItem('fsa_user');
@@ -49,7 +77,7 @@ export default function JobsCapturePage() {
         setError(err.message || 'Something went wrong. Please try again.');
       }
     }
-    attemptSave();
+    resolveAndSave();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -66,7 +94,7 @@ export default function JobsCapturePage() {
   return (
     <div className="jc-wrap">
       <h2>Save this job to your FSA account</h2>
-      {title && <p>{title}{company ? ` at ${company}` : ''}</p>}
+      {job && job.title && <p>{job.title}{job.company ? ` at ${job.company}` : ''}</p>}
       <div className="jc-actions">
         <Link to={`/login?next=${nextParam}`} className="jc-btn-primary">Log In</Link>
         <Link to={`/signup?next=${nextParam}`} className="jc-btn-secondary">Create a Free Account</Link>
