@@ -33,6 +33,7 @@ function formatDate(dateStr) {
 
 export default function LobbyPage() {
   const navigate = useNavigate();
+  const [account, setAccount] = useState(null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -63,20 +64,36 @@ export default function LobbyPage() {
   const user = JSON.parse(localStorage.getItem('fsa_user') || '{}');
 
   useEffect(() => {
-    fetchLobbyData();
+    fetchAccountAndData();
   }, []);
 
-  async function fetchLobbyData() {
+  // Branch on account state before ever touching lobby-data, which 400s without
+  // an active_paper: no course at all → enroll prompt (rendered below, no
+  // redirect); has a course but no paper picked yet → the picker. Only a course
+  // with a paper already active loads the dashboard itself.
+  async function fetchAccountAndData() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/platform/lobby-data', { credentials: 'include' });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.error || 'Failed to load lobby data');
+      const meRes = await fetch('/api/platform/me', { credentials: 'include' });
+      if (!meRes.ok) throw new Error('Failed to load your account');
+      const me = await meRes.json();
+      setAccount(me);
+
+      if (me.class_code && !me.active_paper) {
+        navigate('/select-paper', { replace: true });
+        return;
       }
-      const d = await res.json();
-      setData(d);
+
+      if (me.class_code && me.active_paper) {
+        const res = await fetch('/api/platform/lobby-data', { credentials: 'include' });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.error || 'Failed to load lobby data');
+        }
+        const d = await res.json();
+        setData(d);
+      }
     } catch (err) {
       setError(err.message || 'Something went wrong. Please refresh.');
     } finally {
@@ -115,6 +132,36 @@ export default function LobbyPage() {
     return (
       <div className="lb-page">
         <div className="lb-error-wrap">{error}</div>
+      </div>
+    );
+  }
+
+  if (account && !account.class_code) {
+    return (
+      <div className="lb-page">
+        <header className="lb-header">
+          <div className="lb-brand">Full Steam Ahead</div>
+        </header>
+        <div className="lb-content">
+          <div className="lb-enroll-wrap">
+            <h2 className="lb-enroll-title">You're not enrolled in a course yet</h2>
+            <p className="lb-enroll-subtitle">
+              Pick your certification level to get instant access to every paper, lesson, and practice exam.
+            </p>
+            <div className="lb-enroll-options">
+              <a className="lb-enroll-card" href="https://fullsteamahead.ca/enroll.html?class=second">
+                <span className="lb-enroll-card-title">2nd Class</span>
+                <span className="lb-enroll-card-sub">All six papers — 2A1 to 2B3</span>
+                <span className="lb-btn-primary lb-enroll-card-btn">Enroll in 2nd Class →</span>
+              </a>
+              <a className="lb-enroll-card" href="https://fullsteamahead.ca/enroll.html?class=third">
+                <span className="lb-enroll-card-title">3rd Class</span>
+                <span className="lb-enroll-card-sub">All four papers — 3A1 to 3B2</span>
+                <span className="lb-btn-primary lb-enroll-card-btn">Enroll in 3rd Class →</span>
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

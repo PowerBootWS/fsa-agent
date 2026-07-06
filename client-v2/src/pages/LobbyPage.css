@@ -249,6 +249,65 @@
   font-weight: 600;
 }
 
+/* Not-enrolled prompt (job-only accounts landing on Courses) */
+.lb-enroll-wrap {
+  max-width: 640px;
+  margin: 40px auto 0;
+  text-align: center;
+}
+.lb-enroll-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: #F4F5F7;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 0 0 8px;
+}
+.lb-enroll-subtitle {
+  color: #a8b4c0;
+  font-size: 15px;
+  margin: 0 0 32px;
+}
+.lb-enroll-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+@media (max-width: 600px) {
+  .lb-enroll-options { grid-template-columns: 1fr; }
+}
+.lb-enroll-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: #1C2333;
+  border: 1px solid #252F42;
+  border-radius: 4px;
+  padding: 28px 20px;
+  text-decoration: none;
+  transition: border-color 0.2s;
+}
+.lb-enroll-card:hover {
+  border-color: #E8720C;
+}
+.lb-enroll-card-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #F4F5F7;
+  text-transform: uppercase;
+}
+.lb-enroll-card-sub {
+  color: #a8b4c0;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+.lb-enroll-card-btn {
+  display: inline-block;
+}
+
 /* 4-tile grid (moved from index.css). 2-up on desktop,
    single column on phones so the right column can't clip off-screen. */
 .lobby-tile-grid {

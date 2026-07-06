@@ -9,13 +9,10 @@ export default function SelectPaperPage() {
   const [switching, setSwitching] = useState(null); // paper code being switched to
   const [error, setError] = useState(null);
 
-  // If user already has an active paper, send them to lobby
+  // Reached either as first-time paper selection (no active_paper yet) or as an
+  // explicit "Switch Paper" action (already has one) — both need the picker, so
+  // this must NOT redirect away just because active_paper is already set.
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem('fsa_user') || '{}');
-    if (stored.active_paper) {
-      navigate('/lobby', { replace: true });
-      return;
-    }
     fetchPapers();
   }, []);
 
