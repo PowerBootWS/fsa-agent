@@ -147,4 +147,47 @@ describe('saved jobs', () => {
 
     querySpy.mockRestore();
   });
+
+  it('captures ai_summary_snapshot and employer_logo_url_snapshot, and exposes them via GET /:id but not in the list', async () => {
+    const { token } = await createUser('jobs7@example.com');
+    const app = buildTestApp();
+
+    const saveRes = await request(app).post('/api/jobs/save').set('Cookie', `fsa_session=${token}`).send({
+      title: 'Boiler Technician',
+      url: 'https://example.com/job/7',
+      description_snapshot: 'Full description text.',
+      ai_summary_snapshot: 'AI-written summary.',
+      employer_logo_url_snapshot: 'https://example.com/logo.png',
+    });
+    expect(saveRes.status).toBe(201);
+    const jobId = saveRes.body.id;
+
+    const listRes = await request(app).get('/api/jobs').set('Cookie', `fsa_session=${token}`);
+    expect(listRes.body.jobs[0]).not.toHaveProperty('description_snapshot');
+    expect(listRes.body.jobs[0]).not.toHaveProperty('ai_summary_snapshot');
+    expect(listRes.body.jobs[0].source_status).toBeNull();
+
+    const detailRes = await request(app).get(`/api/jobs/${jobId}`).set('Cookie', `fsa_session=${token}`);
+    expect(detailRes.status).toBe(200);
+    expect(detailRes.body.job.description_snapshot).toBe('Full description text.');
+    expect(detailRes.body.job.ai_summary_snapshot).toBe('AI-written summary.');
+    expect(detailRes.body.job.employer_logo_url_snapshot).toBe('https://example.com/logo.png');
+  });
+
+  it('404s GET /:id for a job that does not exist or belongs to another user', async () => {
+    const userA = await createUser('jobs8a@example.com');
+    const userB = await createUser('jobs8b@example.com');
+    const app = buildTestApp();
+
+    const saveRes = await request(app).post('/api/jobs/save').set('Cookie', `fsa_session=${userA.token}`).send({
+      title: 'Refrigeration Operator', url: 'https://example.com/job/8',
+    });
+    const jobId = saveRes.body.id;
+
+    const otherUserRes = await request(app).get(`/api/jobs/${jobId}`).set('Cookie', `fsa_session=${userB.token}`);
+    expect(otherUserRes.status).toBe(404);
+
+    const missingRes = await request(app).get('/api/jobs/999999').set('Cookie', `fsa_session=${userA.token}`);
+    expect(missingRes.status).toBe(404);
+  });
 });

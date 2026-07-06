@@ -64,7 +64,10 @@ router.get('/capture-stash/:token', (req, res) => {
 // POST /save
 router.post('/save', requireAuth, async (req, res) => {
   try {
-    const { source_job_id, title, company, location, url, job_class_label, description_snapshot, posted_at } = req.body;
+    const {
+      source_job_id, title, company, location, url, job_class_label,
+      description_snapshot, ai_summary_snapshot, employer_logo_url_snapshot, posted_at,
+    } = req.body;
 
     if (!title || !url) {
       return res.status(400).json({ error: 'title and url are required' });
@@ -82,10 +85,14 @@ router.post('/save', requireAuth, async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO saved_jobs
-         (user_id, source_job_id, title, company, location, job_class_label, url, description_snapshot, posted_at, status, saved_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'saved', now())
+         (user_id, source_job_id, title, company, location, job_class_label, url,
+          description_snapshot, ai_summary_snapshot, employer_logo_url_snapshot, posted_at, status, saved_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'saved', now())
        RETURNING id`,
-      [req.user.id, source_job_id || null, title, company || null, location || null, job_class_label || null, url, description_snapshot || null, posted_at || null]
+      [
+        req.user.id, source_job_id || null, title, company || null, location || null, job_class_label || null, url,
+        description_snapshot || null, ai_summary_snapshot || null, employer_logo_url_snapshot || null, posted_at || null,
+      ]
     );
 
     return res.status(201).json({ ok: true, id: result.rows[0].id });
@@ -100,7 +107,7 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, source_job_id, title, company, location, job_class_label, url,
-              status, notes, posted_at, saved_at, applied_at, interview_flagged_at
+              status, notes, posted_at, saved_at, applied_at, interview_flagged_at, source_status
        FROM saved_jobs
        WHERE user_id = $1
        ORDER BY saved_at DESC`,
@@ -109,6 +116,28 @@ router.get('/', requireAuth, async (req, res) => {
     return res.json({ jobs: result.rows });
   } catch (err) {
     console.error('GET /api/jobs error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /:id — full record for one saved job (used by the detail modal)
+router.get('/:id', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, source_job_id, title, company, location, job_class_label, url,
+              description_snapshot, ai_summary_snapshot, employer_logo_url_snapshot,
+              status, notes, posted_at, saved_at, applied_at, interview_flagged_at,
+              source_status, source_status_checked_at
+       FROM saved_jobs
+       WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    return res.json({ job: result.rows[0] });
+  } catch (err) {
+    console.error('GET /api/jobs/:id error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
