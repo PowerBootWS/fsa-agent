@@ -120,4 +120,72 @@ router.post('/jobs/:savedJobId/tailor', requireAuth, async (req, res) => {
   }
 });
 
+router.get('/jobs/:savedJobId/generated-documents', requireAuth, async (req, res) => {
+  try {
+    const jobResult = await pool.query(
+      `SELECT id FROM saved_jobs WHERE id = $1 AND user_id = $2`,
+      [req.params.savedJobId, req.user.id]
+    );
+    if (jobResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    const result = await pool.query(
+      `SELECT id, doc_type, changes_summary, placeholder_count, generated_at
+       FROM generated_documents WHERE saved_job_id = $1 AND user_id = $2
+       ORDER BY generated_at DESC`,
+      [req.params.savedJobId, req.user.id]
+    );
+    return res.json({
+      documents: result.rows.map((d) => ({
+        id: d.id,
+        docType: d.doc_type,
+        changesSummary: d.changes_summary,
+        placeholderCount: d.placeholder_count,
+        generatedAt: d.generated_at,
+        downloadUrls: {
+          docx: `/api/platform/generated-documents/${d.id}/download?format=docx`,
+          pdf: `/api/platform/generated-documents/${d.id}/download?format=pdf`,
+        },
+      })),
+    });
+  } catch (err) {
+    console.error('GET /api/platform/jobs/:savedJobId/generated-documents error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/generated-documents/:id/download', requireAuth, async (req, res) => {
+  const format = req.query.format === 'pdf' ? 'pdf' : req.query.format === 'docx' ? 'docx' : null;
+  if (!format) {
+    return res.status(400).json({ error: 'format must be docx or pdf' });
+  }
+  try {
+    const result = await pool.query(
+      `SELECT doc_type, docx_path, pdf_path FROM generated_documents WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    const row = result.rows[0];
+    const storagePath = format === 'pdf' ? row.pdf_path : row.docx_path;
+    const mimeType = format === 'pdf' ? 'application/pdf'
+      : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const absolutePath = path.resolve(storagePath);
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${row.doc_type}.${format}"`);
+    return res.sendFile(absolutePath, (err) => {
+      if (err && !res.headersSent) {
+        console.error('GET /api/platform/generated-documents/:id/download error:', err);
+        res.removeHeader('Content-Type');
+        res.removeHeader('Content-Disposition');
+        res.status(404).json({ error: 'File missing on disk' });
+      }
+    });
+  } catch (err) {
+    console.error('GET /api/platform/generated-documents/:id/download error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
