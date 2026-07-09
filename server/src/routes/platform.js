@@ -678,7 +678,7 @@ router.post('/credits/checkout', requireAuth, async (req, res) => {
       const customer = await stripe.customers.create({
         email: req.user.email,
         name: `${req.user.first_name} ${req.user.last_name}`.trim(),
-        metadata: { userId: req.user.id },
+        metadata: { userId: String(req.user.id) },
       });
       customerId = customer.id;
       await pool.query(
