@@ -21,9 +21,21 @@ services:
     volumes:
       - ${FSA_MEDIA_DIR}:/srv/fsa-media:ro
       - ${FSA_USER_UPLOADS_STAGING_DIR}:/srv/fsa-user-uploads
+      # Same target path as the base file's fsa-generated-documents mount — this entry
+      # replaces it so staging reads/downloads from an isolated directory instead of
+      # production's real generated documents.
+      - ${FSA_GENERATED_DOCS_STAGING_DIR}:/srv/fsa-generated-documents:ro
 
   ai-service:
     container_name: fsa-agent-ai-staging
+    # The base file has no ai-service volumes prior to this feature's staging rollout
+    # discovering the gap: without an override here, staging's ai-service would read
+    # real production resumes from /srv/fsa-user-uploads and write generated documents
+    # into production's /srv/fsa-generated-documents — both isolated to staging-only
+    # directories below.
+    volumes:
+      - ${FSA_USER_UPLOADS_STAGING_DIR}:/srv/fsa-user-uploads:ro
+      - ${FSA_GENERATED_DOCS_STAGING_DIR}:/srv/fsa-generated-documents
 
 networks:
   # Explicit subnet added (not in the original brief): the host's default Docker
