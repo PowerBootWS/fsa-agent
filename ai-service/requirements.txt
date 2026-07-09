@@ -5,4 +5,8 @@ python-dotenv==1.0.0
 requests==2.31.0
 pdfplumber==0.11.4
 python-docx==1.1.2
-weasyprint==62.3
+# 62.3 (original pin) is incompatible with pydyf>=0.11 (pip resolves the latest pydyf
+# automatically since it's not pinned here) — AttributeError: 'super' object has no
+# attribute 'transform' in weasyprint/pdf/stream.py during write_pdf. 68.1 is confirmed
+# working against the pydyf version pip currently resolves.
+weasyprint==68.1
