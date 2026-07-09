@@ -1,3 +1,5 @@
+# Pinned to the Debian codename (not floating `slim`) — `slim` silently rolled onto
+# trixie and renamed libgdk-pixbuf2.0-0, breaking the apt-get step below.
 FROM python:3.11-slim-bookworm
 
 WORKDIR /app
