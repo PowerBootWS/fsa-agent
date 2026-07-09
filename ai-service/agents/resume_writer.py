@@ -11,8 +11,38 @@ generation failures here propagate to the caller — this produces a paid delive
 candidate downloads, so silently returning placeholder content on an API error would be
 worse than a visible failure.
 """
+import json
+import os
+import re
+
 import pdfplumber
+import requests
 from docx import Document as DocxDocument
+
+_OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
+
+_SYSTEM = (
+    "You are an expert resume and cover letter writer for Power Engineering job "
+    "candidates. You tailor a candidate's existing resume/cover letter to a specific "
+    "job posting. Follow these rules strictly:\n"
+    "1. Never invent facts, dates, employers, certifications, or numbers that are not "
+    "already present in the candidate's source material. If a strong bullet point needs "
+    "information the candidate hasn't provided, insert a bracketed placeholder instead "
+    "(e.g. '[specific boiler type/manufacturer]', '[reason you want to work here]') — "
+    "target 3 to 6 placeholders total across the requested documents.\n"
+    "2. Mirror the job posting's own terminology and reorder/re-emphasize the candidate's "
+    "existing experience to match what the posting stresses — do not add experience that "
+    "isn't there.\n"
+    "3. If the posting has a hard requirement the candidate's background doesn't clearly "
+    "meet (e.g. a certification level), note it in changes_summary or flagged_gaps — "
+    "never paper over it in the document itself.\n"
+    "4. changes_summary must be first-person, plain-language coaching directly to the "
+    "candidate (e.g. \"I moved your certificate to the top...\") — never phrased as "
+    "compliance against a reference document.\n"
+    "Respond with ONLY a JSON object matching this shape, no other text:\n"
+    '{"resume_content": "...or null", "cover_letter_content": "...or null", '
+    '"changes_summary": "...", "placeholder_count": 0, "flagged_gaps": ["..."]}'
+)
 
 
 def extract_text(file_path: str, mime_type: str) -> str:
@@ -32,3 +62,56 @@ def extract_text(file_path: str, mime_type: str) -> str:
     if not text:
         raise ValueError('NO_EXTRACTABLE_TEXT')
     return text
+
+
+def _build_prompt(job: dict, resume_text: str, cover_letter_text: str | None, doc_types: list[str]) -> str:
+    wants = ' and '.join(
+        {'resume': 'a tailored resume', 'cover_letter': 'a tailored cover letter'}[t] for t in doc_types
+    )
+    parts = [
+        f"Generate {wants} for this candidate, tailored to the job posting below.",
+        f"\nJob title: {job.get('title', '')}",
+        f"Company: {job.get('company', '')}",
+        f"Job posting description:\n{job.get('description_snapshot', '')}",
+        f"\nCandidate's current resume:\n{resume_text}",
+    ]
+    if cover_letter_text:
+        parts.append(f"\nCandidate's current cover letter (for tone/history context only):\n{cover_letter_text}")
+    if 'resume' not in doc_types:
+        parts.append('\nSet resume_content to null — a tailored resume was not requested.')
+    if 'cover_letter' not in doc_types:
+        parts.append('\nSet cover_letter_content to null — a tailored cover letter was not requested.')
+    return '\n'.join(parts)
+
+
+def _call_openrouter(prompt: str) -> tuple[dict, str]:
+    api_key = os.getenv('OPENROUTER_API_KEY')
+    # Confirm this exact slug against OpenRouter's current model list before deploy
+    # (spec open question #1, docs/superpowers/specs/2026-07-08-resume-cover-letter-tailoring-design.md).
+    model = os.getenv('OPENROUTER_RESUME_MODEL', 'anthropic/claude-sonnet-5')
+
+    response = requests.post(
+        _OPENROUTER_URL,
+        headers={
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json',
+        },
+        json={
+            'model': model,
+            'max_tokens': 4000,
+            'messages': [
+                {'role': 'system', 'content': _SYSTEM},
+                {'role': 'user', 'content': prompt},
+            ],
+        },
+        timeout=60,
+    )
+    response.raise_for_status()
+    raw_content = response.json()['choices'][0]['message']['content'].strip()
+
+    # Some models wrap JSON in ```json fences despite instructions — strip if present.
+    match = re.search(r'\{.*\}', raw_content, re.DOTALL)
+    if not match:
+        raise ValueError('MODEL_RESPONSE_NOT_JSON')
+    parsed = json.loads(match.group(0))
+    return parsed, model
