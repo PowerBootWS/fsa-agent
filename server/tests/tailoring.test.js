@@ -7,6 +7,7 @@ jest.mock('../src/services/aiServiceClient');
 const { requestTailoredDocuments } = require('../src/services/aiServiceClient');
 
 const tailoringRouter = require('../src/routes/tailoring');
+const credits = require('../src/services/credits');
 
 function buildTestApp() {
   const app = express();
@@ -141,6 +142,73 @@ describe('POST /api/platform/jobs/:savedJobId/tailor', () => {
     expect(res.status).toBe(502);
     const balanceRow = await pool.query(`SELECT balance FROM credit_balances WHERE user_id = $1`, [userId]);
     expect(balanceRow.rows[0].balance).toBe(1);
+  });
+
+  it('de-duplicates docTypes so a duplicate resume request only charges one credit', async () => {
+    const { token, userId } = await createUser('t5@example.com', 1);
+    const savedJobId = await createSavedJob(userId);
+    await uploadResumeRow(userId);
+    requestTailoredDocuments.mockResolvedValue({
+      documents: [{ doc_type: 'resume', docx_path: '/srv/fsa-generated-documents/x/resume.docx', pdf_path: '/srv/fsa-generated-documents/x/resume.pdf' }],
+      changes_summary: 'Moved certification to the top.',
+      placeholder_count: 4,
+      flagged_gaps: [],
+      model_used: 'anthropic/claude-sonnet-5',
+    });
+    const app = buildTestApp();
+
+    const res = await request(app)
+      .post(`/api/platform/jobs/${savedJobId}/tailor`)
+      .set('Cookie', `fsa_session=${token}`)
+      .send({ docTypes: ['resume', 'resume'] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.balanceRemaining).toBe(0);
+
+    const balanceRow = await pool.query(`SELECT balance FROM credit_balances WHERE user_id = $1`, [userId]);
+    expect(balanceRow.rows[0].balance).toBe(0);
+
+    const generatedRow = await pool.query(`SELECT * FROM generated_documents WHERE user_id = $1`, [userId]);
+    expect(generatedRow.rows).toHaveLength(1);
+
+    const txRow = await pool.query(
+      `SELECT * FROM credit_transactions WHERE user_id = $1 AND reason = 'generation_debit'`,
+      [userId]
+    );
+    expect(txRow.rows).toHaveLength(1);
+  });
+
+  it('returns 402 (not 500) and rolls back the DB insert when a credit-race loses to debitCredits', async () => {
+    const { token, userId } = await createUser('t6@example.com', 1);
+    const savedJobId = await createSavedJob(userId);
+    await uploadResumeRow(userId);
+    requestTailoredDocuments.mockResolvedValue({
+      documents: [{ doc_type: 'resume', docx_path: '/srv/fsa-generated-documents/x/resume.docx', pdf_path: '/srv/fsa-generated-documents/x/resume.pdf' }],
+      changes_summary: 'Moved certification to the top.',
+      placeholder_count: 4,
+      flagged_gaps: [],
+      model_used: 'anthropic/claude-sonnet-5',
+    });
+    const debitSpy = jest.spyOn(credits, 'debitCredits').mockRejectedValueOnce(new Error('INSUFFICIENT_CREDITS'));
+    const app = buildTestApp();
+
+    try {
+      const res = await request(app)
+        .post(`/api/platform/jobs/${savedJobId}/tailor`)
+        .set('Cookie', `fsa_session=${token}`)
+        .send({ docTypes: ['resume'] });
+
+      expect(res.status).toBe(402);
+      expect(res.body.error).toBe('Not enough credits');
+
+      const generatedRow = await pool.query(`SELECT * FROM generated_documents WHERE user_id = $1`, [userId]);
+      expect(generatedRow.rows).toHaveLength(0);
+
+      const balanceRow = await pool.query(`SELECT balance FROM credit_balances WHERE user_id = $1`, [userId]);
+      expect(balanceRow.rows[0].balance).toBe(1);
+    } finally {
+      debitSpy.mockRestore();
+    }
   });
 
   it('404s tailoring a job that belongs to another user', async () => {

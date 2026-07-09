@@ -21,7 +21,7 @@ const VALID_DOC_TYPES = ['resume', 'cover_letter'];
 
 router.post('/jobs/:savedJobId/tailor', requireAuth, async (req, res) => {
   const { savedJobId } = req.params;
-  const docTypes = Array.isArray(req.body.docTypes) ? req.body.docTypes : [];
+  const docTypes = [...new Set(Array.isArray(req.body.docTypes) ? req.body.docTypes : [])];
 
   if (docTypes.length === 0 || !docTypes.every((t) => VALID_DOC_TYPES.includes(t))) {
     return res.status(400).json({ error: 'docTypes must be a non-empty array of resume/cover_letter' });
@@ -94,6 +94,13 @@ router.post('/jobs/:savedJobId/tailor', requireAuth, async (req, res) => {
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});
+      if (err.message === 'INSUFFICIENT_CREDITS') {
+        // Rare race: two concurrent tailor requests exhausted the balance between the
+        // earlier pre-check (line 51) and this debit. The DB insert is rolled back, but
+        // the already-rendered DOCX/PDF files on disk for this request are orphaned and
+        // the OpenRouter spend for it is lost — an accepted v1 trade-off, not fixed here.
+        return res.status(402).json({ error: 'Not enough credits', balance: await credits.getBalance(req.user.id) });
+      }
       throw err;
     } finally {
       client.release();
