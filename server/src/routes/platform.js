@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { pool, getCourseOutline } = require('../services/database');
 const { sendMagicLink, sendDeactivationReview } = require('../services/email');
 const { CREDIT_PACKS, PACK_ORDER } = require('../config/creditPacks');
+const credits = require('../services/credits');
 
 // While the LMS transition stabilizes, automated deactivations are held for operator
 // confirmation instead of pulling access immediately. Default ON; set to 'false' to resume
@@ -730,6 +731,34 @@ router.post('/billing-portal', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('POST /api/platform/billing-portal error:', err);
     return res.status(500).json({ error: 'Failed to open billing portal. Please contact support@fullsteamahead.ca.' });
+  }
+});
+
+// POST /api/platform/credits/grant-purchase
+router.post('/credits/grant-purchase', requireInternalSecret, async (req, res) => {
+  const { userId, packId, stripeSessionId } = req.body;
+  const pack = CREDIT_PACKS[packId];
+  if (!userId || !pack || !stripeSessionId) {
+    return res.status(400).json({ error: 'userId, a valid packId, and stripeSessionId are required' });
+  }
+
+  try {
+    const client = await pool.connect();
+    let result;
+    try {
+      await client.query('BEGIN');
+      result = await credits.addCredits(client, userId, pack.credits, 'stripe_purchase', stripeSessionId);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+    return res.status(result.alreadyProcessed ? 200 : 201).json({ ok: true, alreadyProcessed: result.alreadyProcessed });
+  } catch (err) {
+    console.error('POST /api/platform/credits/grant-purchase error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
