@@ -112,7 +112,10 @@ describe('generated-documents history + download', () => {
       .get(`/api/platform/generated-documents/${docId}/download?format=pdf`)
       .set('Cookie', `fsa_session=${token}`);
     expect(pdfRes.status).toBe(200);
-    expect(pdfRes.text).toBe('fake pdf bytes');
+    // supertest/superagent treats application/pdf as binary and buffers it into
+    // .body (a Buffer), not .text (unlike the docx mime type above, which it treats
+    // as text) — compare the buffer instead.
+    expect(Buffer.isBuffer(pdfRes.body) ? pdfRes.body.toString() : pdfRes.text).toBe('fake pdf bytes');
   });
 
   it('404s downloading a document that belongs to another user', async () => {
