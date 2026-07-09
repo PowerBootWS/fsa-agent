@@ -357,17 +357,41 @@ router.post('/signup', async (req, res) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-
     const passwordHash = await bcrypt.hash(password, 12);
     const sessionToken = crypto.randomUUID();
 
-    const insertResult = await pool.query(
-      `INSERT INTO platform_users (email, first_name, last_name, password_hash, current_session_token, last_login_at)
-       VALUES ($1, $2, $3, $4, $5, now())
-       RETURNING id, email, first_name, last_name`,
-      [normalizedEmail, first_name.trim(), last_name.trim(), passwordHash, sessionToken]
-    );
-    const user = insertResult.rows[0];
+    const client = await pool.connect();
+    let user;
+    try {
+      await client.query('BEGIN');
+      const insertResult = await client.query(
+        `INSERT INTO platform_users (email, first_name, last_name, password_hash, current_session_token, last_login_at)
+         VALUES ($1, $2, $3, $4, $5, now())
+         RETURNING id, email, first_name, last_name`,
+        [normalizedEmail, first_name.trim(), last_name.trim(), passwordHash, sessionToken]
+      );
+      user = insertResult.rows[0];
+
+      // Sub-project 3 (AI resume/cover-letter tailoring): every new account gets a small
+      // free credit grant so the feature is usable ahead of the Stripe purchase flow
+      // (sub-project 2). See server/migrations/011_resume_tailoring.sql for the matching
+      // one-time backfill on pre-existing accounts.
+      await client.query(
+        `INSERT INTO credit_balances (user_id, balance) VALUES ($1, 1)`,
+        [user.id]
+      );
+      await client.query(
+        `INSERT INTO credit_transactions (user_id, delta, reason) VALUES ($1, 1, 'signup_grant')`,
+        [user.id]
+      );
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
 
     await recordLoginEvent(user.id, req, { displaced: false });
 
