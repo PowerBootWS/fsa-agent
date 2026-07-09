@@ -655,6 +655,54 @@ router.get('/credits/packs', requireAuth, async (req, res) => {
   return res.json({ packs });
 });
 
+// POST /api/platform/credits/checkout
+router.post('/credits/checkout', requireAuth, async (req, res) => {
+  const { packId } = req.body;
+  const pack = CREDIT_PACKS[packId];
+  if (!pack) {
+    return res.status(400).json({ error: 'Unknown packId' });
+  }
+  const priceId = process.env[pack.priceIdEnvVar];
+  if (!priceId) {
+    console.error(`POST /api/platform/credits/checkout: ${pack.priceIdEnvVar} not set`);
+    return res.status(502).json({ error: 'This pack is not available right now. Please try again later.' });
+  }
+
+  try {
+    const Stripe = require('stripe');
+    const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+
+    let customerId = req.user.stripe_customer_id;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: req.user.email,
+        name: `${req.user.first_name} ${req.user.last_name}`.trim(),
+        metadata: { userId: req.user.id },
+      });
+      customerId = customer.id;
+      await pool.query(
+        `UPDATE platform_users SET stripe_customer_id = $1 WHERE id = $2 AND stripe_customer_id IS NULL`,
+        [customerId, req.user.id]
+      );
+    }
+
+    const baseUrl = process.env.PLATFORM_BASE_URL || 'https://learn.fullsteamahead.ca';
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      customer: customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      metadata: { userId: String(req.user.id), packId, purpose: 'credit_pack' },
+      success_url: `${baseUrl}/credits?purchase=success`,
+      cancel_url: `${baseUrl}/credits?purchase=cancelled`,
+    });
+
+    return res.status(201).json({ url: session.url });
+  } catch (err) {
+    console.error('POST /api/platform/credits/checkout error:', err);
+    return res.status(502).json({ error: "Couldn't start checkout. Please try again." });
+  }
+});
+
 // POST /api/platform/billing-portal
 // Creates a Stripe Customer Portal session and returns the URL.
 router.post('/billing-portal', requireAuth, async (req, res) => {
