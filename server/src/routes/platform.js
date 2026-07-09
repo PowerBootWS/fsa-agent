@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool, getCourseOutline } = require('../services/database');
 const { sendMagicLink, sendDeactivationReview } = require('../services/email');
+const { CREDIT_PACKS, PACK_ORDER } = require('../config/creditPacks');
 
 // While the LMS transition stabilizes, automated deactivations are held for operator
 // confirmation instead of pulling access immediately. Default ON; set to 'false' to resume
@@ -642,6 +643,16 @@ router.patch('/profile', requireAuth, async (req, res) => {
     console.error('PATCH /api/platform/profile error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// GET /api/platform/credits/packs
+// Lists all purchasable credit packs in fixed order (Spark, Full Steam, Locomotive).
+router.get('/credits/packs', requireAuth, async (req, res) => {
+  const packs = PACK_ORDER.map((id) => {
+    const pack = CREDIT_PACKS[id];
+    return { id, displayName: pack.displayName, priceLabel: pack.priceLabel, credits: pack.credits };
+  });
+  return res.json({ packs });
 });
 
 // POST /api/platform/billing-portal
