@@ -52,6 +52,7 @@ services:
     volumes:
       - ${FSA_MEDIA_DIR}:/srv/fsa-media:ro
       - ${FSA_USER_UPLOADS_DIR}:/srv/fsa-user-uploads
+      - ${FSA_GENERATED_DOCS_DIR}:/srv/fsa-generated-documents:ro
     depends_on:
       - ai-service
     networks:
@@ -74,7 +75,13 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OPENROUTER_MODEL=google/gemini-3-flash-preview
+      - OPENROUTER_RESUME_MODEL=anthropic/claude-sonnet-5
+      - USER_UPLOADS_DIR=/srv/fsa-user-uploads
+      - GENERATED_DOCS_DIR=/srv/fsa-generated-documents
       - TZ=America/Edmonton
+    volumes:
+      - ${FSA_USER_UPLOADS_DIR}:/srv/fsa-user-uploads:ro
+      - ${FSA_GENERATED_DOCS_DIR}:/srv/fsa-generated-documents
     networks:
       - fsa-network
     restart: unless-stopped
