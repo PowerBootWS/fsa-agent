@@ -18,6 +18,7 @@ import re
 import pdfplumber
 import requests
 from docx import Document as DocxDocument
+from weasyprint import HTML
 
 _OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
@@ -115,3 +116,81 @@ def _call_openrouter(prompt: str) -> tuple[dict, str]:
         raise ValueError('MODEL_RESPONSE_NOT_JSON')
     parsed = json.loads(match.group(0))
     return parsed, model
+
+
+def _render_docx(title: str, content: str, output_path: str) -> None:
+    doc = DocxDocument()
+    doc.add_heading(title, level=1)
+    for line in content.split('\n'):
+        if not line.strip():
+            continue
+        paragraph = doc.add_paragraph()
+        # Bracketed placeholders are bolded so they stand out for the candidate to find
+        # and fill in before sending the document anywhere.
+        segments = re.split(r'(\[[^\]]+\])', line)
+        for segment in segments:
+            run = paragraph.add_run(segment)
+            if segment.startswith('[') and segment.endswith(']'):
+                run.bold = True
+    doc.save(output_path)
+
+
+def _render_pdf(title: str, content: str, output_path: str) -> None:
+    def _escape(text):
+        return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+    escaped_lines = [
+        re.sub(r'\[[^\]]+\]', lambda m: f'<strong>{m.group(0)}</strong>', _escape(line))
+        for line in content.split('\n')
+        if line.strip()
+    ]
+    html = f"""
+    <html><head><style>
+      body {{ font-family: sans-serif; font-size: 11pt; line-height: 1.5; margin: 2cm; }}
+      h1 {{ font-size: 16pt; }}
+      strong {{ background: #fff3b0; }}
+    </style></head>
+    <body><h1>{_escape(title)}</h1>{''.join(f'<p>{line}</p>' for line in escaped_lines)}</body>
+    </html>
+    """
+    HTML(string=html).write_pdf(output_path)
+
+
+def generate_tailored_documents(job: dict, resume_path: str, resume_mime: str,
+                                 cover_letter_path: str | None, cover_letter_mime: str | None,
+                                 doc_types: list[str], output_dir: str) -> dict:
+    """
+    Orchestrates extraction -> OpenRouter call -> rendering for one tailoring request.
+    Raises ValueError('NO_EXTRACTABLE_TEXT') if the source resume/cover letter can't be
+    read, or ValueError('MODEL_DID_NOT_RETURN_<TYPE>') if the model didn't produce a
+    requested document type.
+    """
+    resume_text = extract_text(resume_path, resume_mime)
+    cover_letter_text = extract_text(cover_letter_path, cover_letter_mime) if cover_letter_path else None
+
+    prompt = _build_prompt(job, resume_text, cover_letter_text, doc_types)
+    parsed, model_used = _call_openrouter(prompt)
+
+    os.makedirs(output_dir, exist_ok=True)
+    content_by_type = {
+        'resume': (f"Resume — {job.get('title', '')}", parsed.get('resume_content')),
+        'cover_letter': (f"Cover Letter — {job.get('title', '')}", parsed.get('cover_letter_content')),
+    }
+    documents = []
+    for doc_type in doc_types:
+        title, content = content_by_type[doc_type]
+        if not content:
+            raise ValueError(f'MODEL_DID_NOT_RETURN_{doc_type.upper()}')
+        docx_path = os.path.join(output_dir, f'{doc_type}.docx')
+        pdf_path = os.path.join(output_dir, f'{doc_type}.pdf')
+        _render_docx(title, content, docx_path)
+        _render_pdf(title, content, pdf_path)
+        documents.append({'doc_type': doc_type, 'docx_path': docx_path, 'pdf_path': pdf_path})
+
+    return {
+        'documents': documents,
+        'changes_summary': parsed.get('changes_summary', ''),
+        'placeholder_count': int(parsed.get('placeholder_count', 0)),
+        'flagged_gaps': parsed.get('flagged_gaps', []),
+        'model_used': model_used,
+    }
