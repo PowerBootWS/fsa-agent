@@ -30,15 +30,15 @@ describe('GET /api/platform/credits/packs', () => {
     await pool.end();
   });
 
-  it('lists all three packs in Spark, Full Steam, Locomotive order', async () => {
+  it('lists all three packs in Single Shot, In the Game, All In order', async () => {
     const { token } = await createUser('packs1@example.com');
     const app = buildTestApp();
     const res = await request(app).get('/api/platform/credits/packs').set('Cookie', `fsa_session=${token}`);
     expect(res.status).toBe(200);
     expect(res.body.packs).toEqual([
-      { id: 'spark', displayName: 'Spark', priceLabel: '$19', credits: 1 },
-      { id: 'full_steam', displayName: 'Full Steam', priceLabel: '$39', credits: 5 },
-      { id: 'locomotive', displayName: 'Locomotive', priceLabel: '$69', credits: 10 },
+      { id: 'spark', displayName: 'Single Shot', priceLabel: '$19', credits: 1 },
+      { id: 'full_steam', displayName: 'In the Game', priceLabel: '$39', credits: 5 },
+      { id: 'locomotive', displayName: 'All In', priceLabel: '$69', credits: 10 },
     ]);
   });
 });
