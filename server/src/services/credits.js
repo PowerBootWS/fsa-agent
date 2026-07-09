@@ -33,4 +33,28 @@ async function debitCredits(client, userId, generatedDocumentIds) {
   return result.rows[0].balance;
 }
 
-module.exports = { getBalance, debitCredits };
+// Grants `delta` credits to userId for a Stripe purchase, idempotently keyed on
+// stripeSessionId — a retried webhook delivery for the same Checkout Session is a safe
+// no-op (returns alreadyProcessed: true) rather than double-crediting. The transaction
+// insert happens FIRST and gates the balance update: if the insert is skipped (conflict),
+// the balance is never touched for that call.
+async function addCredits(client, userId, delta, reason, stripeSessionId) {
+  const txResult = await client.query(
+    `INSERT INTO credit_transactions (user_id, delta, reason, stripe_session_id)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (stripe_session_id) WHERE stripe_session_id IS NOT NULL DO NOTHING
+     RETURNING id`,
+    [userId, delta, reason, stripeSessionId]
+  );
+  if (txResult.rows.length === 0) {
+    return { alreadyProcessed: true };
+  }
+  await client.query(
+    `INSERT INTO credit_balances (user_id, balance) VALUES ($1, $2)
+     ON CONFLICT (user_id) DO UPDATE SET balance = credit_balances.balance + $2, updated_at = now()`,
+    [userId, delta]
+  );
+  return { alreadyProcessed: false };
+}
+
+module.exports = { getBalance, debitCredits, addCredits };

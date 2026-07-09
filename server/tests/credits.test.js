@@ -4,6 +4,7 @@ const cookieParser = require('cookie-parser');
 const { pool } = require('./testPool');
 
 const credits = require('../src/services/credits');
+const { addCredits } = require('../src/services/credits');
 const tailoringRouter = require('../src/routes/tailoring');
 
 function buildTestApp() {
@@ -38,7 +39,7 @@ async function createDummyDocument(userId, documentId) {
   );
 }
 
-describe('credits service + GET /credits', () => {
+describe('credits service', () => {
   afterEach(async () => {
     await pool.query(`DELETE FROM credit_transactions`);
     await pool.query(`DELETE FROM generated_documents`);
@@ -51,60 +52,116 @@ describe('credits service + GET /credits', () => {
     await pool.end();
   });
 
-  it('getBalance returns 0 for a user with no row', async () => {
-    const { userId } = await createUser('nobal@example.com', 0);
-    await pool.query(`DELETE FROM credit_balances WHERE user_id = $1`, [userId]);
-    const balance = await credits.getBalance(userId);
-    expect(balance).toBe(0);
+  describe('getBalance', () => {
+    it('returns 0 for a user with no row', async () => {
+      const { userId } = await createUser('nobal@example.com', 0);
+      await pool.query(`DELETE FROM credit_balances WHERE user_id = $1`, [userId]);
+      const balance = await credits.getBalance(userId);
+      expect(balance).toBe(0);
+    });
   });
 
-  it('GET /api/platform/credits returns the balance for the logged-in user', async () => {
-    const { token } = await createUser('bal1@example.com', 3);
-    const app = buildTestApp();
-    const res = await request(app).get('/api/platform/credits').set('Cookie', `fsa_session=${token}`);
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ balance: 3 });
+  describe('GET /api/platform/credits', () => {
+    it('returns the balance for the logged-in user', async () => {
+      const { token } = await createUser('bal1@example.com', 3);
+      const app = buildTestApp();
+      const res = await request(app).get('/api/platform/credits').set('Cookie', `fsa_session=${token}`);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ balance: 3 });
+    });
   });
 
-  it('debitCredits decrements balance and records one transaction per document', async () => {
-    const { userId } = await createUser('bal2@example.com', 2);
-    await createDummyDocument(userId, 101);
-    await createDummyDocument(userId, 102);
-    const generatedDocs = await pool.query(
-      `SELECT id FROM generated_documents WHERE user_id = $1 ORDER BY id LIMIT 2`,
-      [userId]
-    );
-    const docIds = generatedDocs.rows.map((r) => r.id);
-    const client = await pool.connect();
-    try {
-      const newBalance = await credits.debitCredits(client, userId, docIds);
-      expect(newBalance).toBe(0);
-    } finally {
-      client.release();
-    }
-    const txRows = await pool.query(
-      `SELECT generated_document_id FROM credit_transactions WHERE user_id = $1 ORDER BY generated_document_id`,
-      [userId]
-    );
-    expect(txRows.rows.map((r) => r.generated_document_id)).toEqual(docIds);
+  describe('debitCredits', () => {
+    it('decrements balance and records one transaction per document', async () => {
+      const { userId } = await createUser('bal2@example.com', 2);
+      await createDummyDocument(userId, 101);
+      await createDummyDocument(userId, 102);
+      const generatedDocs = await pool.query(
+        `SELECT id FROM generated_documents WHERE user_id = $1 ORDER BY id LIMIT 2`,
+        [userId]
+      );
+      const docIds = generatedDocs.rows.map((r) => r.id);
+      const client = await pool.connect();
+      try {
+        const newBalance = await credits.debitCredits(client, userId, docIds);
+        expect(newBalance).toBe(0);
+      } finally {
+        client.release();
+      }
+      const txRows = await pool.query(
+        `SELECT generated_document_id FROM credit_transactions WHERE user_id = $1 ORDER BY generated_document_id`,
+        [userId]
+      );
+      expect(txRows.rows.map((r) => r.generated_document_id)).toEqual(docIds);
+    });
+
+    it('throws INSUFFICIENT_CREDITS and changes nothing when balance is too low', async () => {
+      const { userId } = await createUser('bal3@example.com', 1);
+      await createDummyDocument(userId, 201);
+      await createDummyDocument(userId, 202);
+      const generatedDocs = await pool.query(
+        `SELECT id FROM generated_documents WHERE user_id = $1 ORDER BY id LIMIT 2`,
+        [userId]
+      );
+      const docIds = generatedDocs.rows.map((r) => r.id);
+      const client = await pool.connect();
+      try {
+        await expect(credits.debitCredits(client, userId, docIds)).rejects.toThrow('INSUFFICIENT_CREDITS');
+      } finally {
+        client.release();
+      }
+      const balanceRow = await pool.query(`SELECT balance FROM credit_balances WHERE user_id = $1`, [userId]);
+      expect(balanceRow.rows[0].balance).toBe(1);
+    });
   });
 
-  it('debitCredits throws INSUFFICIENT_CREDITS and changes nothing when balance is too low', async () => {
-    const { userId } = await createUser('bal3@example.com', 1);
-    await createDummyDocument(userId, 201);
-    await createDummyDocument(userId, 202);
-    const generatedDocs = await pool.query(
-      `SELECT id FROM generated_documents WHERE user_id = $1 ORDER BY id LIMIT 2`,
-      [userId]
-    );
-    const docIds = generatedDocs.rows.map((r) => r.id);
-    const client = await pool.connect();
-    try {
-      await expect(credits.debitCredits(client, userId, docIds)).rejects.toThrow('INSUFFICIENT_CREDITS');
-    } finally {
-      client.release();
-    }
-    const balanceRow = await pool.query(`SELECT balance FROM credit_balances WHERE user_id = $1`, [userId]);
-    expect(balanceRow.rows[0].balance).toBe(1);
+  describe('addCredits', () => {
+    it('increments balance and records a stripe_purchase transaction', async () => {
+      const { userId } = await createUser('purchase1@example.com', 0);
+      const client = await pool.connect();
+      try {
+        const result = await addCredits(client, userId, 5, 'stripe_purchase', 'cs_test_abc');
+        expect(result).toEqual({ alreadyProcessed: false });
+      } finally {
+        client.release();
+      }
+      const balanceRow = await pool.query(`SELECT balance FROM credit_balances WHERE user_id = $1`, [userId]);
+      expect(balanceRow.rows[0].balance).toBe(5);
+      const txRow = await pool.query(
+        `SELECT delta, reason, stripe_session_id FROM credit_transactions WHERE user_id = $1`,
+        [userId]
+      );
+      expect(txRow.rows).toEqual([{ delta: 5, reason: 'stripe_purchase', stripe_session_id: 'cs_test_abc' }]);
+    });
+
+    it('creates a credit_balances row if none exists yet', async () => {
+      const { userId } = await createUser('purchase2@example.com', 0);
+      await pool.query(`DELETE FROM credit_balances WHERE user_id = $1`, [userId]);
+      const client = await pool.connect();
+      try {
+        await addCredits(client, userId, 10, 'stripe_purchase', 'cs_test_def');
+      } finally {
+        client.release();
+      }
+      const balanceRow = await pool.query(`SELECT balance FROM credit_balances WHERE user_id = $1`, [userId]);
+      expect(balanceRow.rows[0].balance).toBe(10);
+    });
+
+    it('is idempotent — the same stripe_session_id never double-credits', async () => {
+      const { userId } = await createUser('purchase3@example.com', 0);
+      const client = await pool.connect();
+      try {
+        const first = await addCredits(client, userId, 5, 'stripe_purchase', 'cs_test_dup');
+        expect(first).toEqual({ alreadyProcessed: false });
+        const second = await addCredits(client, userId, 5, 'stripe_purchase', 'cs_test_dup');
+        expect(second).toEqual({ alreadyProcessed: true });
+      } finally {
+        client.release();
+      }
+      const balanceRow = await pool.query(`SELECT balance FROM credit_balances WHERE user_id = $1`, [userId]);
+      expect(balanceRow.rows[0].balance).toBe(5); // not 10 — the second call was a no-op
+      const txRows = await pool.query(`SELECT id FROM credit_transactions WHERE user_id = $1`, [userId]);
+      expect(txRows.rows).toHaveLength(1);
+    });
   });
 });
