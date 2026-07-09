@@ -140,7 +140,9 @@ export default function JobDetailModal({ jobId, onClose }) {
                   Upload a resume on your <a href="/profile">Profile</a> page before generating tailored documents.
                 </p>
               ) : balance === 0 ? (
-                <p className="jd-tailoring-gate">You're out of credits — more ways to get credits are coming soon.</p>
+                <p className="jd-tailoring-gate">
+                  You're out of credits — <a href="/credits">buy more here</a>.
+                </p>
               ) : (
                 <>
                   <p className="jd-credit-balance">Credits available: {balance}</p>

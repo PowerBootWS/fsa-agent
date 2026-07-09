@@ -16,6 +16,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AppShell from './components/AppShell';
 import JobsPage from './pages/JobsPage';
 import JobsCapturePage from './pages/JobsCapturePage';
+import CreditsPage from './pages/CreditsPage';
 import { LessonPlayer } from './LessonPlayer';
 import { ExamRouter } from './ExamRouter';
 
@@ -111,6 +112,16 @@ export default function App() {
           <ProtectedRoute requirePaper={false}>
             <AppShell>
               <ProfilePage />
+            </AppShell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/credits"
+        element={
+          <ProtectedRoute requirePaper={false}>
+            <AppShell>
+              <CreditsPage />
             </AppShell>
           </ProtectedRoute>
         }
