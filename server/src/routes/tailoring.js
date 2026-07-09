@@ -96,7 +96,7 @@ router.post('/jobs/:savedJobId/tailor', requireAuth, async (req, res) => {
       await client.query('ROLLBACK').catch(() => {});
       if (err.message === 'INSUFFICIENT_CREDITS') {
         // Rare race: two concurrent tailor requests exhausted the balance between the
-        // earlier pre-check (line 51) and this debit. The DB insert is rolled back, but
+        // earlier balance pre-check above and this debit. The DB insert is rolled back, but
         // the already-rendered DOCX/PDF files on disk for this request are orphaned and
         // the OpenRouter spend for it is lost — an accepted v1 trade-off, not fixed here.
         return res.status(402).json({ error: 'Not enough credits', balance: await credits.getBalance(req.user.id) });
