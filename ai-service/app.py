@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from datetime import datetime
 
 load_dotenv("../../.env")
 
@@ -14,6 +15,7 @@ from agents.tutor import TutorAgent
 from agents.researcher import Researcher
 from agents.display import DisplayAgent
 from agents.checkpoint import generate_checkin
+from agents.resume_writer import generate_tailored_documents
 
 # Initialize agents
 orchestrator = Orchestrator()
@@ -123,6 +125,55 @@ def checkpoint():
 
     message = generate_checkin(sections_covered, correct_pct, question_count)
     return jsonify({'message': message})
+
+
+GENERATED_DOCS_DIR = os.getenv('GENERATED_DOCS_DIR', '/srv/fsa-generated-documents')
+
+
+@app.route('/agent/resume-tailor', methods=['POST'])
+def resume_tailor():
+    """
+    Tailor a resume and/or cover letter to a specific saved job.
+    Body: {
+      job: {title, company, description_snapshot},
+      user_id: int, saved_job_id: int,
+      resume: {path, mime_type},
+      cover_letter: {path, mime_type} | null,
+      doc_types: ["resume"] | ["cover_letter"] | ["resume", "cover_letter"]
+    }
+    """
+    data = request.json or {}
+    job = data.get('job')
+    user_id = data.get('user_id')
+    saved_job_id = data.get('saved_job_id')
+    resume = data.get('resume')
+    cover_letter = data.get('cover_letter')
+    doc_types = data.get('doc_types')
+
+    if not job or not user_id or not saved_job_id or not resume or not doc_types:
+        return jsonify({'error': 'Missing required parameters'}), 400
+
+    output_dir = os.path.join(
+        GENERATED_DOCS_DIR, str(user_id), str(saved_job_id),
+        datetime.utcnow().strftime('%Y%m%dT%H%M%S%f')
+    )
+
+    try:
+        result = generate_tailored_documents(
+            job=job,
+            resume_path=resume['path'],
+            resume_mime=resume['mime_type'],
+            cover_letter_path=cover_letter['path'] if cover_letter else None,
+            cover_letter_mime=cover_letter['mime_type'] if cover_letter else None,
+            doc_types=doc_types,
+            output_dir=output_dir,
+        )
+    except ValueError as err:
+        if str(err) == 'NO_EXTRACTABLE_TEXT':
+            return jsonify({'error': 'UNREADABLE_SOURCE_DOCUMENT'}), 422
+        return jsonify({'error': str(err)}), 502
+
+    return jsonify(result)
 
 
 if __name__ == '__main__':
