@@ -150,9 +150,14 @@ router.post('/deactivate-user', requireInternalSecret, async (req, res) => {
     }
 
     // Immediate deactivation path.
-    // force_immediate bypasses the confirmation gate. It is used only for trial cancellations
-    // (caller: fsa-webhook-listener), where no payment was taken and there is no paying
-    // customer to protect — so the gate that guards paying customers does not apply.
+    // force_immediate bypasses the confirmation gate. Two callers today:
+    // (1) fsa-webhook-listener, for trial cancellations — no payment was taken and there is
+    //     no paying customer to protect, so the gate that guards paying customers does not apply.
+    // (2) fsa-dashboard's reconcile_subscriptions.py, a daily cron job that revokes access for
+    //     paying customers with no matching active Stripe subscription — a deliberate, narrower,
+    //     owner-authorized bypass (2026-07-11) with its own independent safeguards (safety cap,
+    //     stripe_customer_id-or-email matching, fail-closed on any fetch error). See that repo's
+    //     reconcile_subscriptions.py docstring and wiki/log.md for the authorization record.
     if (DEACTIVATION_REQUIRES_CONFIRMATION && !force_immediate) {
       // Gate on: do NOT pull access. Notify the operator and keep the customer active.
       const name = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
