@@ -139,7 +139,7 @@ describe('POST /api/platform/jobs/:savedJobId/tailor', () => {
       .set('Cookie', `fsa_session=${token}`)
       .send({ docTypes: ['resume'] });
 
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(500);
     const balanceRow = await pool.query(`SELECT balance FROM credit_balances WHERE user_id = $1`, [userId]);
     expect(balanceRow.rows[0].balance).toBe(1);
   });

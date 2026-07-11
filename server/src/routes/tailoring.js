@@ -69,7 +69,11 @@ router.post('/jobs/:savedJobId/tailor', requireAuth, async (req, res) => {
         return res.status(422).json({ error: "We couldn't read your resume — try re-uploading a text-based PDF or DOCX." });
       }
       console.error('POST /api/platform/jobs/:savedJobId/tailor ai-service error:', err.message);
-      return res.status(502).json({ error: 'Document generation failed — no credits were charged. Please try again.' });
+      // Deliberately 500, not 502/504/52x — Cloudflare's edge replaces the response body
+      // of those gateway-error status codes with its own branded HTML error page even when
+      // the origin (this app) sends a well-formed JSON payload, which broke the frontend's
+      // res.json() parse (see wiki/projects/fsa-agent.md). 500 passes through untouched.
+      return res.status(500).json({ error: 'Document generation failed — no credits were charged. Please try again.' });
     }
 
     const client = await pool.connect();

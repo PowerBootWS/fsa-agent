@@ -98,7 +98,9 @@ router.post('/credits/test-checkout', requireAdminKey, async (req, res) => {
   }
   const priceId = process.env.STRIPE_TEST_PRICE_SPARK_ID;
   if (!priceId) {
-    return res.status(502).json({ error: 'STRIPE_TEST_PRICE_SPARK_ID is not set' });
+    // 500, not 502 — Cloudflare's edge overrides 502/504/52x bodies with its own HTML
+    // error page even for a well-formed origin JSON response (see wiki/projects/fsa-agent.md).
+    return res.status(500).json({ error: 'STRIPE_TEST_PRICE_SPARK_ID is not set' });
   }
 
   try {

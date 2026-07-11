@@ -666,7 +666,9 @@ router.post('/credits/checkout', requireAuth, async (req, res) => {
   const priceId = process.env[pack.priceIdEnvVar];
   if (!priceId) {
     console.error(`POST /api/platform/credits/checkout: ${pack.priceIdEnvVar} not set`);
-    return res.status(502).json({ error: 'This pack is not available right now. Please try again later.' });
+    // 500, not 502 — Cloudflare's edge overrides 502/504/52x response bodies with its own
+    // HTML error page even for a well-formed origin JSON response (see wiki/projects/fsa-agent.md).
+    return res.status(500).json({ error: 'This pack is not available right now. Please try again later.' });
   }
 
   try {
@@ -700,7 +702,7 @@ router.post('/credits/checkout', requireAuth, async (req, res) => {
     return res.status(201).json({ url: session.url });
   } catch (err) {
     console.error('POST /api/platform/credits/checkout error:', err);
-    return res.status(502).json({ error: "Couldn't start checkout. Please try again." });
+    return res.status(500).json({ error: "Couldn't start checkout. Please try again." });
   }
 });
 
