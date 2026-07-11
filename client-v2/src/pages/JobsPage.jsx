@@ -27,6 +27,7 @@ export default function JobsPage() {
   const [manualError, setManualError] = useState('');
   const [tab, setTab] = useState('active'); // 'active' | 'archived'
   const [detailJobId, setDetailJobId] = useState(null);
+  const [focusTailoringModal, setFocusTailoringModal] = useState(false);
 
   useEffect(() => {
     loadJobs();
@@ -160,13 +161,24 @@ export default function JobsPage() {
                 {formatDate(job.posted_at) && <span>Posted {formatDate(job.posted_at)} · </span>}
                 {formatDate(job.saved_at) && <span>Saved {formatDate(job.saved_at)}</span>}
               </div>
+              <button
+                className="jb-btn-tailor"
+                onClick={() => { setDetailJobId(job.id); setFocusTailoringModal(true); }}
+              >
+                Customize Your Resume and Cover Letter for This Job
+              </button>
               <div className="jb-card-actions">
                 {STATUS_ORDER.filter(s => s !== job.status).map(s => (
                   <button key={s} className="jb-status-btn" onClick={() => updateStatus(job.id, s)}>
                     Mark {STATUS_LABELS[s]}
                   </button>
                 ))}
-                <button className="jb-link" onClick={() => setDetailJobId(job.id)}>View Details</button>
+                <button
+                  className="jb-link"
+                  onClick={() => { setDetailJobId(job.id); setFocusTailoringModal(false); }}
+                >
+                  View Details
+                </button>
               </div>
             </div>
           ))}
@@ -174,7 +186,11 @@ export default function JobsPage() {
       )}
 
       {detailJobId && (
-        <JobDetailModal jobId={detailJobId} onClose={() => setDetailJobId(null)} />
+        <JobDetailModal
+          jobId={detailJobId}
+          focusTailoring={focusTailoringModal}
+          onClose={() => { setDetailJobId(null); setFocusTailoringModal(false); }}
+        />
       )}
     </div>
   );

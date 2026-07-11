@@ -1,8 +1,8 @@
 // fsa-agent/client-v2/src/pages/JobDetailModal.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './JobDetailModal.css';
 
-export default function JobDetailModal({ jobId, onClose }) {
+export default function JobDetailModal({ jobId, onClose, focusTailoring = false }) {
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -13,6 +13,11 @@ export default function JobDetailModal({ jobId, onClose }) {
   const [tailorError, setTailorError] = useState('');
   const [tailorResult, setTailorResult] = useState(null);
   const [history, setHistory] = useState([]);
+  const tailoringRef = useRef(null);
+
+  function scrollToTailoring() {
+    tailoringRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +62,13 @@ export default function JobDetailModal({ jobId, onClose }) {
     loadTailoringContext();
     return () => { cancelled = true; };
   }, [jobId]);
+
+  useEffect(() => {
+    if (focusTailoring && job) {
+      scrollToTailoring();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTailoring, job]);
 
   const selectedCount = Object.values(selectedTypes).filter(Boolean).length;
 
@@ -117,6 +129,10 @@ export default function JobDetailModal({ jobId, onClose }) {
               </div>
             </div>
 
+            <button className="jd-tailor-cta-top" onClick={scrollToTailoring}>
+              Customize Your Resume and Cover Letter for This Job
+            </button>
+
             {job.ai_summary_snapshot && (
               <div className="jd-summary-panel">
                 <div className="jd-summary-label">AI Summary</div>
@@ -131,8 +147,8 @@ export default function JobDetailModal({ jobId, onClose }) {
               </div>
             )}
 
-            <div className="jd-section jd-tailoring">
-              <h3>Tailor my resume & cover letter</h3>
+            <div className="jd-section jd-tailoring" ref={tailoringRef}>
+              <h3>Customize Your Resume and Cover Letter for This Job</h3>
               {balance === null ? (
                 <p className="jd-loading">Loading…</p>
               ) : !hasResume ? (

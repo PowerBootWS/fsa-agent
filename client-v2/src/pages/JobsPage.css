@@ -129,6 +129,25 @@
   margin-top: 6px;
 }
 
+.jb-btn-tailor {
+  display: block;
+  width: 100%;
+  background: rgba(232, 114, 12, 0.12);
+  border: 1px solid #E8720C;
+  color: #E8720C;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 14px;
+  margin-top: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.jb-btn-tailor:hover {
+  background: rgba(232, 114, 12, 0.2);
+}
+
 .jb-card-actions {
   display: flex;
   flex-wrap: wrap;

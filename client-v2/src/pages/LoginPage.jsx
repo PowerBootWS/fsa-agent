@@ -109,6 +109,10 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [searchParams] = useSearchParams();
 
+  const signupHref = searchParams.get('next')
+    ? `/signup?next=${encodeURIComponent(searchParams.get('next'))}`
+    : '/signup';
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
@@ -190,7 +194,13 @@ export default function LoginPage() {
         </Link>
 
         <div style={styles.enrollText}>
-          Not enrolled?{' '}
+          New here?{' '}
+          <Link to={signupHref} style={styles.enrollLink}>
+            Create a free account.
+          </Link>
+        </div>
+        <div style={styles.enrollText}>
+          Enrolling in a course?{' '}
           <a href="https://fullsteamahead.ca/enroll" style={styles.enrollLink}>
             Sign up here.
           </a>
