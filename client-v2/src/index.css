@@ -63,6 +63,13 @@ body {
   background: var(--carbon);
 }
 
+/* 4th Class defense-in-depth: no tutor panel means content should take the
+   full width instead of leaving 40% blank. */
+.lesson-player--tutor-hidden .content-panel {
+  flex: 1 1 100%;
+  border-right: none;
+}
+
 .content-scroll {
   flex: 1;
   overflow-y: auto;

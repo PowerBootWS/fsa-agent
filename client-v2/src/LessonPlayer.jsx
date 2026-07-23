@@ -14,8 +14,13 @@ function isCourseCode(lessonCode) {
   return lessonCode ? lessonCode.split('-').length === 1 : false;
 }
 
-export function LessonPlayer({ lessonCode: initialLessonCode, learnerId }) {
+export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCode }) {
   const courseId = parseCourseId(initialLessonCode);
+
+  // 4th Class has no AI tutor chat (defense-in-depth — this route is never actually
+  // reached by 4th Class students; see
+  // docs/superpowers/specs/2026-07-13-fourth-class-platform-integration-design.md §5).
+  const hideTutor = classCode === 'fourth';
 
   // Mobile-only view toggle: the content + tutor panels sit side-by-side on
   // desktop, but stack to a single full-width panel on phones (CSS hides the
@@ -261,7 +266,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId }) {
   const isComplete = sectionIndex === sections.length;
 
   return (
-    <div className={`lesson-player lesson-player--show-${mobileTab}`}>
+    <div className={`lesson-player lesson-player--show-${mobileTab}${hideTutor ? ' lesson-player--tutor-hidden' : ''}`}>
       <div className="lesson-mobile-tabs" role="tablist">
         <button
           role="tab"
@@ -271,14 +276,16 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId }) {
         >
           📖 Lesson
         </button>
-        <button
-          role="tab"
-          aria-selected={mobileTab === 'tutor'}
-          className={mobileTab === 'tutor' ? 'active' : ''}
-          onClick={() => setMobileTab('tutor')}
-        >
-          💬 AI Tutor
-        </button>
+        {!hideTutor && (
+          <button
+            role="tab"
+            aria-selected={mobileTab === 'tutor'}
+            className={mobileTab === 'tutor' ? 'active' : ''}
+            onClick={() => setMobileTab('tutor')}
+          >
+            💬 AI Tutor
+          </button>
+        )}
       </div>
       <ContentPanel
         section={sections[sectionIndex] || null}
@@ -295,14 +302,16 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId }) {
         nextLessonCode={nextLessonCode}
         isComplete={isComplete}
       />
-      <TutorPanel
-        lessonCode={activeLessonCode}
-        learnerId={learnerId || 'anonymous'}
-        sectionIndex={sectionIndex}
-        checkpoint={checkpoint}
-        completionTrigger={completionTrigger}
-        onAnswered={handleAnswered}
-      />
+      {!hideTutor && (
+        <TutorPanel
+          lessonCode={activeLessonCode}
+          learnerId={learnerId || 'anonymous'}
+          sectionIndex={sectionIndex}
+          checkpoint={checkpoint}
+          completionTrigger={completionTrigger}
+          onAnswered={handleAnswered}
+        />
+      )}
     </div>
   );
 }

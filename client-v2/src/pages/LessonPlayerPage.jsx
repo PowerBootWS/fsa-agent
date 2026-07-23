@@ -16,7 +16,7 @@ export default function LessonPlayerPage() {
           ← Back to Chapters
         </button>
       </div>
-      <LessonPlayer lessonCode={lessonCode} learnerId={user.email || ''} />
+      <LessonPlayer lessonCode={lessonCode} learnerId={user.email || ''} classCode={user.class_code || null} />
     </div>
   );
 }
