@@ -471,7 +471,7 @@ router.get('/quiz-lobby-data', requireAuth, async (req, res) => {
           total: parseInt(row.total_questions),
           correct: parseInt(row.correct_count),
           last_attempt: row.last_attempt,
-          passed: score > passingThreshold,
+          passed: score >= passingThreshold,
         };
       });
 

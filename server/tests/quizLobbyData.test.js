@@ -81,9 +81,9 @@ describe('GET /api/platform/quiz-lobby-data', () => {
     expect(Object.keys(res.body.papers)).toEqual(['4A', '4B']);
     expect(res.body.papers['4A'].total_chapters).toBe(2);
     expect(res.body.papers['4A'].chapter_quizzes).toEqual([
-      { chapter_id: '4A-1', score: 75, total: 4, correct: 3, last_attempt: expect.anything(), passed: false },
+      { chapter_id: '4A-1', score: 75, total: 4, correct: 3, last_attempt: expect.anything(), passed: true },
     ]);
-    expect(res.body.papers['4A'].next_quiz_chapter_id).toBe('4A-1');
+    expect(res.body.papers['4A'].next_quiz_chapter_id).toBe('4A-2');
     expect(res.body.papers['4A'].last_exam).toBeNull();
     expect(res.body.papers['4B'].total_chapters).toBe(1);
     expect(res.body.papers['4B'].chapter_quizzes).toEqual([]);
