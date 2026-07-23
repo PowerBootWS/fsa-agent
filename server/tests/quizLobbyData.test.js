@@ -12,7 +12,7 @@ function buildTestApp() {
   return app;
 }
 
-async function createUser({ email, classCode }) {
+async function createUser({ email, classCodes }) {
   const token = `test-token-${email}`;
   const userResult = await pool.query(
     `INSERT INTO platform_users (email, first_name, last_name, current_session_token)
@@ -20,11 +20,13 @@ async function createUser({ email, classCode }) {
     [email, token]
   );
   const userId = userResult.rows[0].id;
-  await pool.query(
-    `INSERT INTO subscriptions (user_id, class_code, status, active_paper)
-     VALUES ($1, $2, 'active', NULL)`,
-    [userId, classCode]
-  );
+  for (const classCode of classCodes) {
+    await pool.query(
+      `INSERT INTO subscriptions (user_id, class_code, status, active_paper)
+       VALUES ($1, $2, 'active', NULL)`,
+      [userId, classCode]
+    );
+  }
   return { userId, token };
 }
 
@@ -41,7 +43,7 @@ describe('GET /api/platform/quiz-lobby-data', () => {
   });
 
   it('rejects a non-fourth-class subscriber with 400', async () => {
-    const { token } = await createUser({ email: 'not-fourth@example.com', classCode: 'second' });
+    const { token } = await createUser({ email: 'not-fourth@example.com', classCodes: ['second'] });
     const res = await request(buildTestApp())
       .get('/api/platform/quiz-lobby-data')
       .set('Cookie', `fsa_session=${token}`);
@@ -49,7 +51,7 @@ describe('GET /api/platform/quiz-lobby-data', () => {
   });
 
   it('returns both 4A and 4B with chapter-quiz and practice-exam stats, no lesson data', async () => {
-    const { token } = await createUser({ email: 'fourth-lobby@example.com', classCode: 'fourth' });
+    const { token } = await createUser({ email: 'fourth-lobby@example.com', classCodes: ['fourth_a', 'fourth_b'] });
 
     await pool.query(
       `INSERT INTO chapters (course_id, chapter_num, title) VALUES
@@ -77,7 +79,7 @@ describe('GET /api/platform/quiz-lobby-data', () => {
       .set('Cookie', `fsa_session=${token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.class_code).toBe('fourth');
+    expect(['fourth_a', 'fourth_b']).toContain(res.body.class_code);
     expect(Object.keys(res.body.papers)).toEqual(['4A', '4B']);
     expect(res.body.papers['4A'].total_chapters).toBe(2);
     expect(res.body.papers['4A'].chapter_quizzes).toEqual([

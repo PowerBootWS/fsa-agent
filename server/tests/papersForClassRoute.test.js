@@ -38,14 +38,24 @@ describe('GET /api/platform/papers-for-class', () => {
     await pool.end();
   });
 
-  it('returns 4A and 4B for a fourth-class subscriber', async () => {
-    const { token } = await createUser({ email: 'fourth-papers@example.com', classCode: 'fourth' });
+  it('returns 4A for a fourth_a subscriber', async () => {
+    const { token } = await createUser({ email: 'fourth-a-papers@example.com', classCode: 'fourth_a' });
     const res = await request(buildTestApp())
       .get('/api/platform/papers-for-class')
       .set('Cookie', `fsa_session=${token}`);
     expect(res.status).toBe(200);
-    expect(res.body.papers).toEqual(['4A', '4B']);
-    expect(res.body.class_code).toBe('fourth');
+    expect(res.body.papers).toEqual(['4A']);
+    expect(res.body.class_code).toBe('fourth_a');
+  });
+
+  it('returns 4B for a fourth_b subscriber', async () => {
+    const { token } = await createUser({ email: 'fourth-b-papers@example.com', classCode: 'fourth_b' });
+    const res = await request(buildTestApp())
+      .get('/api/platform/papers-for-class')
+      .set('Cookie', `fsa_session=${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.papers).toEqual(['4B']);
+    expect(res.body.class_code).toBe('fourth_b');
   });
 
   it('still returns the six second-class papers for a second-class subscriber (unchanged)', async () => {

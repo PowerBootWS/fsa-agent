@@ -456,12 +456,24 @@ router.get('/lobby-data', requireAuth, async (req, res) => {
 // paper-switch/cooldown concept (both papers are accessible at once).
 router.get('/quiz-lobby-data', requireAuth, async (req, res) => {
   try {
-    const { email, class_code } = req.user;
-    if (class_code !== 'fourth') {
+    const { id: userId, email, class_code } = req.user;
+    if (!FOURTH_CLASS_CODES.includes(class_code)) {
       return res.status(400).json({ error: 'This endpoint is for 4th Class subscribers only' });
     }
+
+    // A student may own just one paper or both, purchased separately —
+    // requireAuth only surfaces ONE of the user's possibly-two active rows as
+    // req.user.class_code (via its existing LEFT JOIN, unmodified), so this
+    // endpoint queries subscriptions directly to find every paper actually owned,
+    // rather than assuming both the way the original combined 'fourth' did.
+    const ownedResult = await pool.query(
+      `SELECT class_code FROM subscriptions
+       WHERE user_id = $1 AND status = 'active' AND class_code = ANY($2::text[])`,
+      [userId, FOURTH_CLASS_CODES]
+    );
+    const papers = ownedResult.rows.flatMap(r => PAPERS_BY_CLASS[r.class_code] || []);
+
     const passingThreshold = parseInt(process.env.QUIZ_PASSING_THRESHOLD || '75', 10);
-    const papers = PAPERS_BY_CLASS.fourth;
     const result = {};
 
     for (const paper of papers) {
