@@ -55,6 +55,12 @@ export default function ExamResultsPage() {
   const [params] = useSearchParams();
   const location = useLocation();
   const user = JSON.parse(localStorage.getItem('fsa_user') || '{}');
+  // 4th Class has no AI tutor chat (see ExamRouter.jsx's QuizExamView for the
+  // same guard on the in-flow debrief screen — found via live testing that
+  // this standalone results page, reached immediately on exam completion via
+  // PracticeExamPage's onComplete navigation, is a separate, unguarded copy
+  // of the tutor-fab/chat and needs the same fix).
+  const isFourthClass = user.class_code === 'fourth';
 
   const [debrief, setDebrief] = useState(null);   // { courseId, display_update, tutor_response, date }
   const [summary, setSummary] = useState(null);   // fsa_last_exam fallback
@@ -184,16 +190,19 @@ export default function ExamResultsPage() {
           />
         </div>
 
-        {/* Floating tutor chat — same as the in-exam debrief */}
-        <button
-          onClick={() => setChatOpen(o => !o)}
-          className={(!chatOpen ? 'tutor-fab tutor-fab--pulse' : 'tutor-fab') + ' er-fab'}
-          title="Ask the AI Tutor"
-        >
-          💬
-        </button>
+        {/* Floating tutor chat — same as the in-exam debrief. Hidden for 4th
+            Class (see isFourthClass above). */}
+        {!isFourthClass && (
+          <button
+            onClick={() => setChatOpen(o => !o)}
+            className={(!chatOpen ? 'tutor-fab tutor-fab--pulse' : 'tutor-fab') + ' er-fab'}
+            title="Ask the AI Tutor"
+          >
+            💬
+          </button>
+        )}
 
-        {chatOpen && (
+        {!isFourthClass && chatOpen && (
           <div className="er-chat-panel">
             <div className="er-chat-head">
               <span className="er-chat-title">Ask the AI Tutor</span>
