@@ -5,6 +5,7 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { PracticeExamLobby } from './components/PracticeExamLobby.jsx';
 import { TeachingNotes, NextAttemptPreview } from './components/TeachingNotes.jsx';
+import { QuestionReview, QuestionReviewModal } from './components/QuestionReview.jsx';
 import { MathContent } from './components/MathContent.jsx';
 import { CountdownTimer } from './components/CountdownTimer.jsx';
 
@@ -117,9 +118,10 @@ function ExamProgressBar({ current, total, correct }) {
 
 export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, user }) {
   const { score, total, score_pct, chapter_stats,
-          objective_breakdowns, next_attempt_allocation } = displayContent;
+          objective_breakdowns, next_attempt_allocation, question_review } = displayContent;
   const scoreColor = score_pct >= 75 ? '#16a34a' : score_pct >= 55 ? '#d97706' : '#dc2626';
   const [retrying, setRetrying] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
 
   const handleRetry = () => {
     setRetrying(true);
@@ -127,6 +129,7 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
   };
 
   const hasFocus = objective_breakdowns && objective_breakdowns.length > 0;
+  const hasReview = question_review && question_review.length > 0;
 
   // Left column — the score overview, always visible (sticky) while the
   // right-hand lesson accordion scrolls independently.
@@ -160,6 +163,24 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
         />
       )}
 
+      {/* Chapter quiz (short, ~15 questions max): show the review inline,
+          directly on the results screen. */}
+      {hasReview && !isExam && <QuestionReview questions={question_review} />}
+
+      {/* Practice exam (25-100 questions): a button opens a modal instead —
+          additive, sits below the existing chapter-stats table and
+          weighting chart without disturbing them. */}
+      {hasReview && isExam && (
+        <div className="results-view-all-block">
+          <button
+            className="results-view-all-btn"
+            onClick={() => setReviewModalOpen(true)}
+          >
+            View All Questions
+          </button>
+        </div>
+      )}
+
       {onRetry && (
         <div className="results-retry-block">
           <button
@@ -167,10 +188,14 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
             onClick={handleRetry}
             disabled={retrying}
           >
-            {retrying ? 'Loading next exam…' : 'Retake Exam (Adaptive)'}
+            {retrying
+              ? 'Loading…'
+              : isExam ? 'Retake Exam (Adaptive)' : 'Retry Quiz'}
           </button>
           <p className="results-retry-hint">
-            Your next exam will pull more questions from chapters you struggled with.
+            {isExam
+              ? 'Your next exam will pull more questions from chapters you struggled with.'
+              : 'Get a fresh, randomly selected set of questions for this chapter.'}
           </p>
         </div>
       )}
@@ -188,6 +213,12 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
             onSelectChapter={onSelectChapter}
           />
         </div>
+      )}
+      {hasReview && isExam && reviewModalOpen && (
+        <QuestionReviewModal
+          questions={question_review}
+          onClose={() => setReviewModalOpen(false)}
+        />
       )}
     </div>
   );
@@ -213,7 +244,7 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSele
       <ResultsPanel
         displayContent={displayContent}
         isExam={isExam}
-        onRetry={isExam ? () => onAnswer('yes') : null}
+        onRetry={(isExam || mode === 'chapter_quiz') ? () => onAnswer('yes') : null}
         onSelectChapter={onSelectChapter}
         user={user}
       />
@@ -729,7 +760,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
       <div className="quizexam-with-back">
         <div className="quizexam-back-bar">
           <button className="quizexam-back-btn" onClick={handleBack}>
-            ← Back to Exam
+            ← Back to Lobby
           </button>
         </div>
         <QuizExamView
