@@ -1,0 +1,145 @@
+/* QuizOnlyLobbyPage styles — parallels LobbyPage.css's palette/prefix convention
+   (qo- instead of lb-) but with no progress-bar/lesson-deeplink UI. */
+
+.qo-page {
+  min-height: 100vh;
+  background: #0D1117;
+  color: #F4F5F7;
+  font-family: 'Barlow', -apple-system, sans-serif;
+}
+
+.qo-header {
+  background: #1C2333;
+  border-bottom: 2px solid #E8720C;
+  padding: 12px 24px;
+}
+.qo-brand {
+  color: #E8720C;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.qo-header-sub {
+  margin: 2px 0 0;
+  color: #a8b4c0;
+  font-size: 13px;
+}
+
+.qo-content {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.qo-loading-wrap,
+.qo-error-wrap {
+  padding: 48px 24px;
+  text-align: center;
+  color: #a8b4c0;
+}
+
+.qo-paper-card {
+  background: #1C2333;
+  border: 1px solid #252F42;
+  border-radius: 8px;
+  padding: 20px 24px;
+}
+.qo-paper-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.qo-paper-title {
+  margin: 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.qo-btn-primary {
+  background: #E8720C;
+  color: #0D1117;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.qo-btn-primary:hover { background: #f5821c; }
+
+.qo-chip-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.qo-chip {
+  font-size: 13px;
+  color: #a8b4c0;
+}
+.qo-chip-value {
+  color: #F4F5F7;
+  font-weight: 700;
+}
+
+.qo-tile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 640px) {
+  .qo-tile-grid { grid-template-columns: 1fr; }
+}
+
+.qo-tile {
+  background: #151b28;
+  border: 1px solid #252F42;
+  border-radius: 6px;
+  padding: 16px;
+}
+.qo-tile-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.qo-muted { color: #6b7686; font-size: 13px; }
+
+.qo-quiz-list { list-style: none; margin: 0 0 10px; padding: 0; }
+.qo-quiz-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid #252F42;
+  font-size: 13px;
+}
+.qo-quiz-row:last-child { border-bottom: none; }
+.qo-quiz-row-right { display: flex; align-items: center; gap: 8px; }
+.qo-score-text { color: #a8b4c0; }
+.qo-badge-pass, .qo-badge-fail {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+.qo-badge-pass { background: #163a1f; color: #4ade80; }
+.qo-badge-fail { background: #3a1616; color: #f87171; }
+
+.qo-next-quiz-id { font-size: 12px; color: #E8720C; }
+
+.qo-big-score {
+  font-size: 32px;
+  font-weight: 700;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+.qo-exam-date { font-size: 12px; color: #6b7686; }

@@ -7,6 +7,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import SelectPaperPage from './pages/SelectPaperPage';
 import LobbyPage from './pages/LobbyPage';
+import QuizOnlyLobbyPage from './pages/QuizOnlyLobbyPage';
 import AllChaptersPage from './pages/AllChaptersPage';
 import LessonPlayerPage from './pages/LessonPlayerPage';
 import ExamResultsPage from './pages/ExamResultsPage';
@@ -19,6 +20,13 @@ import JobsCapturePage from './pages/JobsCapturePage';
 import CreditsPage from './pages/CreditsPage';
 import { LessonPlayer } from './LessonPlayer';
 import { ExamRouter } from './ExamRouter';
+
+// 4th Class has no lesson content — it gets a dedicated quiz-only lobby at the
+// same /lobby route path instead of a class_code branch inside LobbyPage itself.
+function LobbyRoute() {
+  const user = JSON.parse(localStorage.getItem('fsa_user') || 'null');
+  return user?.class_code === 'fourth' ? <QuizOnlyLobbyPage /> : <LobbyPage />;
+}
 
 export default function App() {
   // Legacy iframe mode — fsachat.fullsteamahead.ca or localhost dev with lessonId param
@@ -58,7 +66,7 @@ export default function App() {
         element={
           <ProtectedRoute requirePaper={false}>
             <AppShell>
-              <LobbyPage />
+              <LobbyRoute />
             </AppShell>
           </ProtectedRoute>
         }
