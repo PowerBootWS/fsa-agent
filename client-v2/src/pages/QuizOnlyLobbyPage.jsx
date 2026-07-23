@@ -22,7 +22,7 @@ function PaperCard({ paperCode, data, onStartExam }) {
       <div className="qo-paper-card-top">
         <h2 className="qo-paper-title">{paperCode} — {PAPER_NAMES[paperCode] || paperCode}</h2>
         <button className="qo-btn-primary" onClick={() => onStartExam(paperCode)}>
-          Start Practice Exam
+          Practice This Paper
         </button>
       </div>
 
@@ -97,7 +97,9 @@ export default function QuizOnlyLobbyPage() {
   }, []);
 
   function handleStartExam(paper) {
-    navigate(`/practice-exam?paper=${paper}&count=50`);
+    // No count param → lands on the combined practice-exam/chapter-quiz
+    // picker (PracticeExamLobby) instead of auto-starting a 50-question exam.
+    navigate(`/practice-exam?paper=${paper}`);
   }
 
   if (loading) return <div className="qo-loading-wrap">Loading your dashboard…</div>;

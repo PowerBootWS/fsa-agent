@@ -375,9 +375,16 @@ export function QuizExamChatSection({ messages, setMessages, user, lessonId, set
 
 function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter, onComplete }) {
   const isExam = mode === 'practice_exam';
-  // 4th Class has no AI tutor chat (see
-  // docs/superpowers/specs/2026-07-13-fourth-class-platform-integration-design.md §5).
-  const isFourthClass = user?.class_code === 'fourth';
+  // 4th Class has no AI tutor CHAT — but chapter-quiz mode's per-question
+  // feedback ("Correct!" / "Not quite — the correct answer was...") is
+  // delivered ONLY via this same tutor_response channel (see
+  // _process_chapter_quiz in ai-service/agents/orchestrator.py — it's plain
+  // templated text, not an LLM call, and there's no other display surface
+  // for it). Hiding it there would silently break chapter quizzes for 4th
+  // Class, not just remove optional tutoring. Only practice_exam mode's
+  // chat is truly optional/supplementary (it shows a full stats debrief
+  // instead), so only that mode gets hidden.
+  const isFourthClass = user?.class_code === 'fourth' && mode !== 'chapter_quiz';
   const examProgress = chatState.examProgress;
   const [chatOpen, setChatOpen] = useState(false);
   // True between answering the final exam question and the debrief arriving —
