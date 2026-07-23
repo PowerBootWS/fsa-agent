@@ -375,6 +375,9 @@ export function QuizExamChatSection({ messages, setMessages, user, lessonId, set
 
 function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter, onComplete }) {
   const isExam = mode === 'practice_exam';
+  // 4th Class has no AI tutor chat (see
+  // docs/superpowers/specs/2026-07-13-fourth-class-platform-integration-design.md §5).
+  const isFourthClass = user?.class_code === 'fourth';
   const examProgress = chatState.examProgress;
   const [chatOpen, setChatOpen] = useState(false);
   // True between answering the final exam question and the debrief arriving —
@@ -560,24 +563,27 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
       </div>
 
       {/* Floating chat button — pulses to draw attention once the exam
-          review is on screen and the tutor's debrief is waiting. */}
-      <button
-        onClick={() => setChatOpen(o => !o)}
-        className={isExam && isDone && !chatOpen ? 'tutor-fab tutor-fab--pulse' : 'tutor-fab'}
-        style={{
-          position: 'fixed', bottom: '24px', right: '24px',
-          width: '56px', height: '56px', borderRadius: '50%',
-          background: '#1d4ed8', border: 'none', cursor: 'pointer',
-          fontSize: '24px', color: 'white', zIndex: 100,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-        }}
-        title="Ask the AI Tutor"
-      >
-        💬
-      </button>
+          review is on screen and the tutor's debrief is waiting. Hidden
+          entirely for 4th Class (no AI tutor chat for that offering). */}
+      {!isFourthClass && (
+        <button
+          onClick={() => setChatOpen(o => !o)}
+          className={isExam && isDone && !chatOpen ? 'tutor-fab tutor-fab--pulse' : 'tutor-fab'}
+          style={{
+            position: 'fixed', bottom: '24px', right: '24px',
+            width: '56px', height: '56px', borderRadius: '50%',
+            background: '#1d4ed8', border: 'none', cursor: 'pointer',
+            fontSize: '24px', color: 'white', zIndex: 100,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          }}
+          title="Ask the AI Tutor"
+        >
+          💬
+        </button>
+      )}
 
       {/* Chat overlay */}
-      {chatOpen && (
+      {!isFourthClass && chatOpen && (
         <div style={{
           position: 'fixed', bottom: '90px', right: '24px',
           width: '700px', maxWidth: 'calc(100vw - 48px)', height: '520px', maxHeight: 'calc(100vh - 120px)',
