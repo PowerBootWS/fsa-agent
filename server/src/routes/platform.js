@@ -73,7 +73,7 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
        SELECT $1, $2, 'active', NULL, $3
        WHERE NOT EXISTS (
          SELECT 1 FROM subscriptions
-         WHERE user_id = $1 AND class_code = $2 AND status = 'active'
+         WHERE user_id = $1 AND status = 'active'
        )
        RETURNING id`,
       [user.id, class_code, stripe_subscription_id || null]
