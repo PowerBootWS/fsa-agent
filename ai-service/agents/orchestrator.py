@@ -943,25 +943,7 @@ class Orchestrator:
 
         # ---- Record answer for previous question ----
         if idx > 0 and not state.get('exam_init_hello'):
-            prev_q = questions[idx - 1]
-            correct = self._evaluate_mc_answer(message, prev_q['correct_answer'])
-            state['exam_results'].append({
-                'chapter_id': prev_q['chapter_id'],
-                'question_id': prev_q['id'],
-                'correct': correct,
-                # Objective enrichment — already in memory, needed for debrief
-                'lesson_code': prev_q.get('lesson_code', ''),
-                'topic': prev_q.get('topic', ''),
-                'explanation': prev_q.get('explanation', ''),
-            })
-            researcher.record_response(
-                user_email=user,
-                question_id=prev_q['id'],
-                session_type='practice_exam',
-                course_id=course_id,
-                chapter_id=prev_q['chapter_id'],
-                correct=correct,
-            )
+            self._record_exam_answer(state, user, course_id, message, researcher)
 
         state['exam_init_hello'] = False
 
@@ -1342,6 +1324,18 @@ class Orchestrator:
             )
             tutor_response = tutor_result.get('response', '') if isinstance(tutor_result, dict) else str(tutor_result)
 
+        question_review = [
+            {
+                'question_text': r.get('question_text', ''),
+                'options': r.get('options', []),
+                'correct_index': r.get('correct_index'),
+                'selected_index': r.get('selected_index'),
+                'correct': r['correct'],
+                'explanation': r.get('explanation', ''),
+            }
+            for r in results
+        ]
+
         display_update = {
             'type': 'exam_done',
             'title': f'{course_id} Exam Results',
@@ -1351,6 +1345,7 @@ class Orchestrator:
             'chapter_stats': chapter_lines,
             'objective_breakdowns': objective_breakdowns,
             'next_attempt_allocation': next_allocation,
+            'question_review': question_review,
         }
         # Cache so page refreshes can return results without re-running the LLM.
         state['last_debrief'] = {
@@ -1629,6 +1624,36 @@ class Orchestrator:
             return int(num_match.group(1)) - 1
 
         return None
+
+    def _record_exam_answer(self, state, user, course_id, message, researcher):
+        """Scores and persists the previous exam question's answer, and
+        captures enough detail (question text, options, both indices) for
+        the debrief's question_review."""
+        idx = state['exam_index']
+        prev_q = state['exam_questions'][idx - 1]
+        correct = self._evaluate_mc_answer(message, prev_q['correct_answer'])
+        selected_index = self._parse_mc_selected_index(message)
+        state['exam_results'].append({
+            'chapter_id': prev_q['chapter_id'],
+            'question_id': prev_q['id'],
+            'correct': correct,
+            # Objective enrichment — already in memory, needed for debrief
+            'lesson_code': prev_q.get('lesson_code', ''),
+            'topic': prev_q.get('topic', ''),
+            'explanation': prev_q.get('explanation', ''),
+            'question_text': prev_q.get('question_text', ''),
+            'options': prev_q.get('options', []),
+            'correct_index': prev_q['correct_answer'],
+            'selected_index': selected_index,
+        })
+        researcher.record_response(
+            user_email=user,
+            question_id=prev_q['id'],
+            session_type='practice_exam',
+            course_id=course_id,
+            chapter_id=prev_q['chapter_id'],
+            correct=correct,
+        )
 
     # ------------------------------------------------------------------
     # Intent classification
