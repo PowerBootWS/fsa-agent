@@ -731,7 +731,14 @@ class Researcher:
             total_weight = 1.0
 
         # Ensure each chapter gets at least 1 question, proportionally distribute rest
-        min_per_chapter = 1
+        # -- but only when there are enough requested questions to cover every
+        # chapter. 4th Class papers have 55-56 chapters, more than the smallest
+        # exam-count option (25); forcing 1-per-chapter regardless of `total`
+        # meant a 25/50-question exam always silently returned 55/56 questions
+        # instead once any chapter-accuracy weighting existed (i.e. for any
+        # returning student, not just their very first exam). 2nd/3rd Class
+        # papers all have fewer chapters than 25, so this never triggered there.
+        min_per_chapter = 1 if total >= len(chapters) else 0
         reserved = min_per_chapter * len(chapters)
         distributable = max(0, total - reserved)
 
@@ -752,7 +759,7 @@ class Researcher:
                 if diff > 0:
                     alloc[c] += 1
                     diff -= 1
-                elif diff < 0 and alloc[c] > 1:
+                elif diff < 0 and alloc[c] > min_per_chapter:
                     alloc[c] -= 1
                     diff += 1
 
