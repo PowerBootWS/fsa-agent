@@ -760,7 +760,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
       <div className="quizexam-with-back">
         <div className="quizexam-back-bar">
           <button className="quizexam-back-btn" onClick={handleBack}>
-            ← Back to Lobby
+            {returnPhase === 'lobby' ? '← Back to Lobby' : '← Back to Exam Results'}
           </button>
         </div>
         <QuizExamView
