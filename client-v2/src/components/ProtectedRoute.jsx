@@ -13,7 +13,10 @@ export default function ProtectedRoute({ children, requirePaper = true, requireC
   if (!user) return <Navigate to="/login" replace />;
 
   // Logged in but no paper selected → paper picker (only when this route requires one)
-  if (requirePaper && !user.active_paper) return <Navigate to="/select-paper" replace />;
+  // 4th Class never has an active_paper (no paper-switching concept — both 4A and 4B
+  // are reachable at once via QuizOnlyLobbyPage), so the paper-picker requirement
+  // doesn't apply to it. See client-v2/src/pages/QuizOnlyLobbyPage.jsx.
+  if (requirePaper && !user.active_paper && user.class_code !== 'fourth') return <Navigate to="/select-paper" replace />;
 
   // No active subscription at all → nothing to pick a paper for, back to /lobby
   // (used only by /select-paper — reached both for first-time selection and for

@@ -62,6 +62,11 @@ export default function SignupPage() {
       const isSafeNext = next && next.startsWith('/') && !next.startsWith('//');
       if (isSafeNext) {
         navigate(next, { replace: true });
+      } else if (data.user.class_code === 'fourth') {
+        // 4th Class has no paper-switching concept (both 4A and 4B are accessible
+        // at once via QuizOnlyLobbyPage) and active_paper is always null — route
+        // straight to /lobby instead of falling into the !active_paper checks below.
+        navigate('/lobby', { replace: true });
       } else if (!data.user.active_paper && !data.user.class_code) {
         navigate('/jobs', { replace: true });
       } else if (!data.user.active_paper) {

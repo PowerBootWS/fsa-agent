@@ -150,7 +150,12 @@ export default function SetupPage() {
         return;
       }
       localStorage.setItem('fsa_user', JSON.stringify(data.user));
-      if (!data.user.active_paper) {
+      if (data.user.class_code === 'fourth') {
+        // 4th Class has no paper-switching concept (both 4A and 4B are accessible
+        // at once via QuizOnlyLobbyPage) and active_paper is always null — route
+        // straight to /lobby instead of falling into the !active_paper check below.
+        navigate('/lobby', { replace: true });
+      } else if (!data.user.active_paper) {
         navigate('/select-paper', { replace: true });
       } else {
         navigate('/lobby', { replace: true });
