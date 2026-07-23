@@ -628,31 +628,9 @@ class Orchestrator:
 
         # ---- Handle debrief phase ----
         if state.get('quiz_done'):
-            correct = state['quiz_correct']
-            score_pct = int(correct / total * 100) if total else 0
-            topics_missed = state.get('quiz_topics_missed', [])
-            missed_str = ', '.join(topics_missed) if topics_missed else 'none in particular'
-            summary = (
-                f"Quiz complete, {first_name}! You got **{correct} out of {total}** "
-                f"({score_pct}%).\n\n"
-            )
-            if score_pct >= 80:
-                summary += f"Great work — you're clearly solid on this chapter. {missed_str != 'none in particular' and f'A quick look at **{missed_str}** would round things out nicely.' or ''}"
-            elif score_pct >= 60:
-                summary += f"Decent foundation. Worth revisiting **{missed_str}** before the practice exam — those topics came up in your wrong answers."
-            else:
-                summary += f"There's room to strengthen this chapter. I'd recommend going back through **{missed_str}** — those are the areas where you dropped marks. The practice exam will also help reinforce them."
-
-            return {
-                'tutor_response': summary,
-                'display_update': {'type': 'quiz_done', 'title': 'Chapter Quiz Complete',
-                                   'score': correct, 'total': total, 'score_pct': score_pct},
-                'progress_update': {},
-                'complexity_level': state['complexity_level'],
-                'first_name': first_name,
-                'action': None,
-                'mode': 'chapter_quiz',
-            }
+            if self._is_exam_retry(message):
+                return self._reset_and_start_quiz(state, researcher, chapter_id, first_name)
+            return self._build_chapter_quiz_debrief(state, first_name)
 
         # ---- No questions available ----
         if not questions:
@@ -680,6 +658,15 @@ class Orchestrator:
 
             # Parse what the student selected
             student_correct = self._evaluate_mc_answer(message, correct_index)
+            selected_index = self._parse_mc_selected_index(message)
+            state.setdefault('quiz_review', []).append({
+                'question_text': current_q.get('question_text', ''),
+                'options': options,
+                'correct_index': correct_index,
+                'selected_index': selected_index,
+                'correct': student_correct,
+                'explanation': explanation,
+            })
 
             # Record response silently
             researcher.record_response(
@@ -709,20 +696,11 @@ class Orchestrator:
 
             state['quiz_awaiting_feedback'] = False
 
-            # If this was the last question, move to debrief
+            # If this was the last question, return the full debrief now —
+            # no second round-trip required to see the result.
             if idx >= total:
                 state['quiz_done'] = True
-                feedback += f"\n\nThat's all {total} questions! Let me tally up your results…"
-                # Return without a new question — next message triggers debrief
-                return {
-                    'tutor_response': feedback,
-                    'display_update': self._build_quiz_progress_display(idx, total, state['quiz_correct'], chapter_id),
-                    'progress_update': {},
-                    'complexity_level': state['complexity_level'],
-                    'first_name': first_name,
-                    'action': None,
-                    'mode': 'chapter_quiz',
-                }
+                return self._build_chapter_quiz_debrief(state, first_name)
 
             # Load next question
             next_q = questions[idx]
@@ -768,6 +746,84 @@ class Orchestrator:
             'mode': 'chapter_quiz',
         }
 
+    def _build_chapter_quiz_debrief(self, state, first_name):
+        """
+        Score + full question review for a finished chapter quiz. Called both
+        immediately after the last question is answered and on resume (a
+        follow-up message after quiz_done that isn't a retry trigger) — same
+        content either way, no second round-trip needed to see it.
+        """
+        correct = state['quiz_correct']
+        total = len(state['quiz_questions'])
+        score_pct = int(correct / total * 100) if total else 0
+        topics_missed = state.get('quiz_topics_missed', [])
+        missed_str = ', '.join(topics_missed) if topics_missed else 'none in particular'
+        summary = (
+            f"Quiz complete, {first_name}! You got **{correct} out of {total}** "
+            f"({score_pct}%).\n\n"
+        )
+        if score_pct >= 80:
+            summary += f"Great work — you're clearly solid on this chapter. {missed_str != 'none in particular' and f'A quick look at **{missed_str}** would round things out nicely.' or ''}"
+        elif score_pct >= 60:
+            summary += f"Decent foundation. Worth revisiting **{missed_str}** before the practice exam — those topics came up in your wrong answers."
+        else:
+            summary += f"There's room to strengthen this chapter. I'd recommend going back through **{missed_str}** — those are the areas where you dropped marks. The practice exam will also help reinforce them."
+
+        return {
+            'tutor_response': summary,
+            'display_update': {
+                'type': 'quiz_done', 'title': 'Chapter Quiz Complete',
+                'score': correct, 'total': total, 'score_pct': score_pct,
+                'question_review': state.get('quiz_review', []),
+            },
+            'progress_update': {},
+            'complexity_level': state['complexity_level'],
+            'first_name': first_name,
+            'action': None,
+            'mode': 'chapter_quiz',
+        }
+
+    def _reset_and_start_quiz(self, state, researcher, chapter_id, first_name):
+        """Chapter-quiz retry — mirrors _reset_and_start_exam's pattern exactly
+        (chat-message-triggered, not a remount: QuizExamView's init effect
+        only fires once per mount, so a fresh question set has to arrive via
+        the same in-place state-update path every other answer uses)."""
+        qs = researcher.get_chapter_quiz_questions(chapter_id, limit=CHAPTER_QUIZ_QUESTION_COUNT)
+        if not qs:
+            return {
+                'tutor_response': f"Sorry {first_name}, I couldn't load new quiz questions for this chapter right now. Please try again in a moment.",
+                'display_update': None,
+                'progress_update': {},
+                'complexity_level': state.get('complexity_level', 3),
+                'first_name': first_name,
+                'action': None,
+                'mode': 'chapter_quiz',
+            }
+
+        state['quiz_questions'] = qs
+        state['quiz_correct'] = 0
+        state['quiz_done'] = False
+        state['quiz_topics_missed'] = []
+        state['quiz_review'] = []
+        state['quiz_awaiting_feedback'] = True
+        state['quiz_current_correct_answer'] = qs[0]['correct_answer']
+        state['quiz_index'] = 1
+
+        display_update = self._build_quiz_question_display(qs[0], 0, len(qs))
+        intro = (
+            f"Fresh chapter quiz, {first_name}! **{len(qs)} questions**, one at a time, "
+            f"randomly selected — here's question 1."
+        )
+        return {
+            'tutor_response': intro,
+            'display_update': display_update,
+            'progress_update': {},
+            'complexity_level': state['complexity_level'],
+            'first_name': first_name,
+            'action': None,
+            'mode': 'chapter_quiz',
+        }
+
     def _build_quiz_question_display(self, q, idx, total):
         options = q.get('options', [])
         formatted = [{'label': chr(65 + i), 'text': opt} for i, opt in enumerate(options)]
@@ -778,15 +834,6 @@ class Orchestrator:
             'options': formatted,
             'topic': q.get('topic', ''),
             'question_id': q['id'],
-        }
-
-    def _build_quiz_progress_display(self, questions_done, total, correct, chapter_id):
-        return {
-            'type': 'quiz_progress',
-            'title': f'Chapter Quiz — {chapter_id}',
-            'questions_done': questions_done,
-            'total': total,
-            'correct': correct,
         }
 
     # ------------------------------------------------------------------
@@ -1560,6 +1607,28 @@ class Orchestrator:
             return (int(num_match.group(1)) - 1) == correct_index
 
         return False
+
+    def _parse_mc_selected_index(self, message):
+        """
+        Returns the 0-based option index the student's message selected, or
+        None if unparseable. Sibling to _evaluate_mc_answer (which only
+        returns whether the answer was correct) — this returns WHICH option
+        was picked, needed to build a full question-review list.
+        """
+        msg = message.strip().lower()
+        letter_map = {'a': 0, 'b': 1, 'c': 2, 'd': 3}
+        if msg in letter_map:
+            return letter_map[msg]
+
+        letter_match = re.search(r'\b([abcd])\b', msg)
+        if letter_match:
+            return letter_map.get(letter_match.group(1))
+
+        num_match = re.search(r'\b([1234])\b', msg)
+        if num_match:
+            return int(num_match.group(1)) - 1
+
+        return None
 
     # ------------------------------------------------------------------
     # Intent classification
