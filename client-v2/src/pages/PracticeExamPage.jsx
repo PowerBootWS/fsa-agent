@@ -21,6 +21,7 @@ export default function PracticeExamPage() {
     <ExamRouter
       courseId={paper}
       learnerId={user.email}
+      classCode={user.class_code}
       initialConfig={initialConfig}
       onExit={() => navigate('/lobby')}
       onComplete={(debrief) =>

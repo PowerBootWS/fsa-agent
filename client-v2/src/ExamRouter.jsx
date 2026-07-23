@@ -373,7 +373,7 @@ export function QuizExamChatSection({ messages, setMessages, user, lessonId, set
 // QuizExamView — full exam/quiz page
 // ---------------------------------------------------------------------------
 
-function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter, onComplete }) {
+function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter, onComplete }) {
   const isExam = mode === 'practice_exam';
   // 4th Class has no AI tutor CHAT — but chapter-quiz mode's per-question
   // feedback ("Correct!" / "Not quite — the correct answer was...") is
@@ -384,7 +384,15 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
   // Class, not just remove optional tutoring. Only practice_exam mode's
   // chat is truly optional/supplementary (it shows a full stats debrief
   // instead), so only that mode gets hidden.
-  const isFourthClass = user?.class_code === 'fourth' && mode !== 'chapter_quiz';
+  //
+  // NOTE: `user` here is a plain email string (passed through as the
+  // `/api/chat` request identifier, not a user object) — it was never
+  // going to carry `.class_code`. Use the dedicated `classCode` prop
+  // instead, threaded from PracticeExamPage.jsx down through ExamRouter
+  // and PracticeExamRouter. (Found via live testing: this condition had
+  // silently always evaluated to `isFourthClass = false` because
+  // `user?.class_code` was checked on a string.)
+  const isFourthClass = classCode === 'fourth' && mode !== 'chapter_quiz';
   const examProgress = chatState.examProgress;
   const [chatOpen, setChatOpen] = useState(false);
   // True between answering the final exam question and the debrief arriving —
@@ -628,7 +636,7 @@ function QuizExamView({ lesson, user, lessonId, mode, chatState, setChatState, e
 // PracticeExamRouter — orchestrates lobby → exam → results flow
 // ---------------------------------------------------------------------------
 
-function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState, startPhase, initialConfig, onExit, onComplete }) {
+function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setChatState, startPhase, initialConfig, onExit, onComplete }) {
   const [phase, setPhase] = useState(startPhase || 'lobby');
   const [examConfig, setExamConfig] = useState(initialConfig || null);
   const [activeChapterId, setActiveChapterId] = useState(null);
@@ -727,6 +735,7 @@ function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState, s
         <QuizExamView
           lesson={lesson}
           user={user}
+          classCode={classCode}
           lessonId={activeChapterId}
           mode="chapter_quiz"
           chatState={chatState}
@@ -749,6 +758,7 @@ function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState, s
       <QuizExamView
         lesson={lesson}
         user={user}
+        classCode={classCode}
         lessonId={lessonId}
         mode="practice_exam"
         chatState={chatState}
@@ -765,7 +775,7 @@ function PracticeExamRouter({ lesson, user, lessonId, chatState, setChatState, s
 // ExamRouter — top-level export, receives courseId + learnerId from App.jsx
 // ---------------------------------------------------------------------------
 
-export function ExamRouter({ courseId, learnerId, initialConfig, onExit, onComplete }) {
+export function ExamRouter({ courseId, learnerId, classCode, initialConfig, onExit, onComplete }) {
   const [chatState, setChatState] = useState({
     messages: [],
     displayContent: null,
@@ -778,6 +788,7 @@ export function ExamRouter({ courseId, learnerId, initialConfig, onExit, onCompl
       <PracticeExamRouter
         lesson={{ title: courseId }}
         user={learnerId}
+        classCode={classCode}
         lessonId={courseId}
         chatState={chatState}
         setChatState={setChatState}

@@ -1076,7 +1076,17 @@ class Orchestrator:
         if total_weight == 0:
             total_weight = 1.0
 
-        min_per_chapter = 1
+        # Guaranteeing 1 question per chapter only makes sense when there are
+        # enough requested questions to cover every chapter — 2nd/3rd Class
+        # papers always had fewer chapters than the smallest exam-count
+        # option (25), so this was never exercised. 4th Class papers have
+        # 55-56 chapters: with the floor forced to 1 regardless of `total`,
+        # a 25- or 50-question exam always came out as 55/56 questions
+        # instead, silently ignoring the student's chosen count. When there
+        # are more chapters than requested questions, drop the floor to 0 so
+        # the weighted distribution (favoring low-accuracy chapters) can
+        # actually add up to `total`.
+        min_per_chapter = 1 if total >= len(chapters) else 0
         reserved = min_per_chapter * len(chapters)
         distributable = max(0, total - reserved)
 
@@ -1095,7 +1105,7 @@ class Orchestrator:
                 if diff > 0:
                     alloc[c] += 1
                     diff -= 1
-                elif diff < 0 and alloc[c] > 1:
+                elif diff < 0 and alloc[c] > min_per_chapter:
                     alloc[c] -= 1
                     diff += 1
 
