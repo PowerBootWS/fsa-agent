@@ -759,6 +759,12 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
     return (
       <div className="quizexam-with-back">
         <div className="quizexam-back-bar">
+          {/* returnPhase has three possible values ('lobby', 'exam', 'results') —
+              chapter quizzes are also reachable from TeachingNotes' chapter links
+              on both the live exam debrief and the standalone "Most Recent
+              Results" review screen. This label intentionally buckets 'exam'
+              and 'results' together since handleBack() returns to either one
+              correctly and "Back to Exam Results" reads fine for both. */}
           <button className="quizexam-back-btn" onClick={handleBack}>
             {returnPhase === 'lobby' ? '← Back to Lobby' : '← Back to Exam Results'}
           </button>
