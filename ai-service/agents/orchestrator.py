@@ -24,6 +24,12 @@ PROGRESS_SAVE_INTERVAL = 3  # save progress every N exchanges as a heartbeat
 CHAPTER_QUIZ_QUESTION_COUNT = 8
 PRACTICE_EXAM_QUESTION_COUNT = 50
 
+# Courses with no lesson content and a reduced-AI (stats-only) debrief — see
+# docs/superpowers/specs/2026-07-13-fourth-class-platform-integration-design.md.
+# The AI service only ever sees course_id (never class_code), so membership in
+# this fixed set is the simplest correct "is this 4th Class" signal.
+FOURTH_CLASS_COURSES = {'4A', '4B'}
+
 def _detect_mode(lesson_id):
     """
     Detect session mode from the lesson_id string.
@@ -1121,12 +1127,18 @@ class Orchestrator:
                 if not r['correct'] and not r.get('lesson_code') and r['question_id'] in enrichment:
                     r.update(enrichment[r['question_id']])
 
+        is_fourth_class = course_id in FOURTH_CLASS_COURSES
+
         # --- Group wrong answers by objective ---
         by_objective = self._group_wrong_by_objective(results)
 
         # --- Generate teaching tips via single batched LLM call ---
+        # Skipped for 4th Class: no generated or templated prose of any kind (see
+        # docs/superpowers/specs/2026-07-13-fourth-class-platform-integration-design.md §6) —
+        # those students are already in a real accredited program elsewhere and are
+        # understood to want the score breakdown, not FSA-authored explanations.
         objective_breakdowns = []
-        if by_objective:
+        if by_objective and not is_fourth_class:
             objectives_list = list(by_objective.values())
             numbered_lines = []
             for i, obj in enumerate(objectives_list, 1):
@@ -1161,7 +1173,7 @@ class Orchestrator:
                     'wrong_count': obj['count'],
                 })
 
-        # --- Aggregate chapter stats ---
+        # --- Aggregate chapter stats (unchanged for 4th Class — pure SQL, not an LLM feature) ---
         chapter_stats = {}
         for r in results:
             cid = r['chapter_id'] or 'Unknown'
@@ -1188,7 +1200,7 @@ class Orchestrator:
             elif pct >= 75:
                 strong_chapters.append(cid)
 
-        # --- Compute next-attempt allocation ---
+        # --- Compute next-attempt allocation (unchanged for 4th Class) ---
         fresh_weights = {
             cid: {'accuracy': s['correct'] / s['total'] if s['total'] else 0.5, 'total': s['total']}
             for cid, s in chapter_stats.items()
@@ -1198,76 +1210,80 @@ class Orchestrator:
         next_allocation = self._compute_chapter_allocations(all_chapters, exam_count, fresh_weights)
 
         # --- Build tutor debrief message ---
-        missed_obj_mentions = []
-        for obj in objective_breakdowns[:3]:
-            missed_obj_mentions.append(
-                f"Chapter {obj['chapter_num']} Objective {obj['objective_num']} ({obj['topic']})"
-            )
-        weak_str = ', '.join(weak_chapters) if weak_chapters else 'none'
-        strong_str = ', '.join(strong_chapters) if strong_chapters else 'none'
-        missed_str = ', '.join(missed_obj_mentions) if missed_obj_mentions else ''
-
-        if state.get('exam_lead_magnet'):
-            debrief_prompt = (
-                f"A prospective student named {first_name} just completed a {total_q}-question "
-                f"practice exam for the {course_id} exam paper.\n"
-                f"Overall: {total_correct}/{total_q} ({score_pct}%)\n"
-                f"Strong chapters: {strong_str}\n"
-                f"Chapters needing review: {weak_str}\n"
-                + (f"Missed objectives: {missed_str}\n" if missed_str else "")
-                + f"\nWrite a warm, encouraging 5-7 sentence response. "
-                f"Address them as {first_name}. "
-                f"Start by acknowledging their score. "
-                f"Highlight their strong chapters if any exist. "
-                f"If they have weak chapters, explain that Full Steam Ahead's practice exams "
-                f"automatically adapt — giving more questions on chapters they struggle with — "
-                f"so they improve faster. "
-                f"End with a genuine, warm invitation: a Full Steam Ahead subscription gives them "
-                f"unlimited adaptive practice exams for all 6 papers, full course content with "
-                f"step-by-step lessons, and AI tutoring for $149/month. "
-                f"Invite them to enroll at https://enrollment.fullsteamahead.ca . "
-                f"Be encouraging and genuine, not pushy."
-            )
+        # Skipped entirely for 4th Class: no LLM call, no generated or templated prose.
+        if is_fourth_class:
+            tutor_response = ''
         else:
-            debrief_prompt = (
-                f"The student {first_name} just completed a {total_q}-question practice exam for {course_id}, "
-                f"scoring {total_correct}/{total_q} ({score_pct}%).\n"
-                f"The full score breakdown, per-chapter results, and per-objective teaching notes are ALREADY "
-                f"displayed on screen next to this chat, so do NOT repeat or list them.\n"
-                f"\nKeep your reply very brief — 2 to 3 short sentences total, no more. Do this in order:\n"
-                f"1. Summarize their performance in one short sentence at a high level "
-                f"(e.g. strong work / solid progress / room to grow) WITHOUT naming specific chapters, "
-                f"objectives, scores, or percentages.\n"
-                f"2. Encourage them to review the lessons in the \"Where to focus\" section shown on this page.\n"
-                f"3. Ask if there's anything they'd like explained in more detail.\n"
-                f"Address them as {first_name}. Do NOT list their weak areas or offer another exam."
+            missed_obj_mentions = []
+            for obj in objective_breakdowns[:3]:
+                missed_obj_mentions.append(
+                    f"Chapter {obj['chapter_num']} Objective {obj['objective_num']} ({obj['topic']})"
+                )
+            weak_str = ', '.join(weak_chapters) if weak_chapters else 'none'
+            strong_str = ', '.join(strong_chapters) if strong_chapters else 'none'
+            missed_str = ', '.join(missed_obj_mentions) if missed_obj_mentions else ''
+
+            if state.get('exam_lead_magnet'):
+                debrief_prompt = (
+                    f"A prospective student named {first_name} just completed a {total_q}-question "
+                    f"practice exam for the {course_id} exam paper.\n"
+                    f"Overall: {total_correct}/{total_q} ({score_pct}%)\n"
+                    f"Strong chapters: {strong_str}\n"
+                    f"Chapters needing review: {weak_str}\n"
+                    + (f"Missed objectives: {missed_str}\n" if missed_str else "")
+                    + f"\nWrite a warm, encouraging 5-7 sentence response. "
+                    f"Address them as {first_name}. "
+                    f"Start by acknowledging their score. "
+                    f"Highlight their strong chapters if any exist. "
+                    f"If they have weak chapters, explain that Full Steam Ahead's practice exams "
+                    f"automatically adapt — giving more questions on chapters they struggle with — "
+                    f"so they improve faster. "
+                    f"End with a genuine, warm invitation: a Full Steam Ahead subscription gives them "
+                    f"unlimited adaptive practice exams for all 6 papers, full course content with "
+                    f"step-by-step lessons, and AI tutoring for $149/month. "
+                    f"Invite them to enroll at https://enrollment.fullsteamahead.ca . "
+                    f"Be encouraging and genuine, not pushy."
+                )
+            else:
+                debrief_prompt = (
+                    f"The student {first_name} just completed a {total_q}-question practice exam for {course_id}, "
+                    f"scoring {total_correct}/{total_q} ({score_pct}%).\n"
+                    f"The full score breakdown, per-chapter results, and per-objective teaching notes are ALREADY "
+                    f"displayed on screen next to this chat, so do NOT repeat or list them.\n"
+                    f"\nKeep your reply very brief — 2 to 3 short sentences total, no more. Do this in order:\n"
+                    f"1. Summarize their performance in one short sentence at a high level "
+                    f"(e.g. strong work / solid progress / room to grow) WITHOUT naming specific chapters, "
+                    f"objectives, scores, or percentages.\n"
+                    f"2. Encourage them to review the lessons in the \"Where to focus\" section shown on this page.\n"
+                    f"3. Ask if there's anything they'd like explained in more detail.\n"
+                    f"Address them as {first_name}. Do NOT list their weak areas or offer another exam."
+                )
+
+            debrief_state = {
+                'activity': 'exam_debrief',
+                'mode': 'practice_exam',
+                'complexity_level': state.get('complexity_level', 3),
+                'questions_done': total_q,
+                'session_limit_reached': False,
+                'chat_history': state.get('chat_history', []),
+                'relevant_chunks': [],
+                'display_is_question': False,
+                'awaiting_next_question': False,
+                'is_resume': False,
+                'no_questions_available': False,
+                'first_name': first_name,
+                'exam_debrief_prompt': debrief_prompt,
+            }
+
+            tutor_result = tutor.respond(
+                user_message=debrief_prompt,
+                lesson_context={'title': f'{course_id} Practice Exam', 'summary': '', 'key_points': [],
+                                'narration_text': '', 'video_transcript': ''},
+                progress=progress,
+                state=debrief_state,
+                first_name=first_name,
             )
-
-        debrief_state = {
-            'activity': 'exam_debrief',
-            'mode': 'practice_exam',
-            'complexity_level': state.get('complexity_level', 3),
-            'questions_done': total_q,
-            'session_limit_reached': False,
-            'chat_history': state.get('chat_history', []),
-            'relevant_chunks': [],
-            'display_is_question': False,
-            'awaiting_next_question': False,
-            'is_resume': False,
-            'no_questions_available': False,
-            'first_name': first_name,
-            'exam_debrief_prompt': debrief_prompt,
-        }
-
-        tutor_result = tutor.respond(
-            user_message=debrief_prompt,
-            lesson_context={'title': f'{course_id} Practice Exam', 'summary': '', 'key_points': [],
-                            'narration_text': '', 'video_transcript': ''},
-            progress=progress,
-            state=debrief_state,
-            first_name=first_name,
-        )
-        tutor_response = tutor_result.get('response', '') if isinstance(tutor_result, dict) else str(tutor_result)
+            tutor_response = tutor_result.get('response', '') if isinstance(tutor_result, dict) else str(tutor_result)
 
         display_update = {
             'type': 'exam_done',
