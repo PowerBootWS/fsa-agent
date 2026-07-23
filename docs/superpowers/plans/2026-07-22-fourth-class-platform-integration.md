@@ -1661,6 +1661,168 @@ git commit -m "feat: reduced-AI (stats-only) exam debrief for 4th Class"
 
 ---
 
+## Task 10: Make chapter quizzes reachable for 4th Class (scope correction)
+
+**Added after the whole-branch review and a follow-up conversation with the owner.** Owner clarification: 4th Class subscribers need to complete BOTH chapter practice quizzes (per-chapter) AND overall practice exams (whole-paper) — only lesson content is excluded. Task 4's `QuizOnlyLobbyPage` shipped with a "Chapter Quizzes" stats tile that can never be populated, because nothing links to a chapter-quiz launcher for 4th Class.
+
+**Files:**
+- Modify: `client-v2/src/pages/PracticeExamPage.jsx`
+- Modify: `client-v2/src/pages/QuizOnlyLobbyPage.jsx`
+- Modify: `client-v2/src/ExamRouter.jsx`
+
+**Investigation, for the implementer's context (do not re-derive this — verify it against the current code, then implement):**
+
+A fully-built, currently-orphaned chapter-quiz picker already exists: `client-v2/src/components/PracticeExamLobby.jsx` renders a "Chapter Quizzes" panel (fetches `GET /api/exam/:courseId/chapters`, one button per chapter, `onClick={() => onSelectChapter(chapterId)}`) alongside its "Practice Exam" panel. This is the `phase === 'lobby'` view inside `PracticeExamRouter` (`client-v2/src/ExamRouter.jsx`). The problem: `PracticeExamRouter`'s parent, the exported `ExamRouter` component, computes `startPhase={initialConfig ? 'exam' : 'lobby'}` — and `client-v2/src/pages/PracticeExamPage.jsx` (the actual `/practice-exam` route) ALWAYS builds a truthy `initialConfig` (`count` defaults to `'50'` via `parseInt(params.get('count') || '50', 10)`), so `startPhase` is always `'exam'` and `PracticeExamLobby` never renders in the live platform today, for ANY class. `GET /api/exam/:courseId/chapters` (`server/src/routes/exam.js`) is course-agnostic — no `class_code` gating, works for `4A`/`4B` already, confirmed against the real query.
+
+Chapter-quiz mode reuses the same `QuizExamView` component as practice-exam mode — meaning Task 5's `isFourthClass` guard (`client-v2/src/ExamRouter.jsx:380`) currently hides the tutor-fab/chat overlay for chapter quizzes too. This is a real functional regression waiting to happen once chapter quizzes become reachable: unlike practice exams (which show a full stats debrief and don't need chat for anything essential), chapter quiz mode's entire per-question feedback mechanism (`_process_chapter_quiz` in `ai-service/agents/orchestrator.py`, "one question per turn, immediate right/wrong feedback") is delivered ONLY as a `tutor_response` chat message — there is no other display surface for "Correct!" / "Not quite — the correct answer was X" per question. It's 100% Python f-string templates, not an LLM call, so it isn't "AI tutoring" in the sense the original design spec meant to remove — it's the quiz mechanic itself, riding the same wire format as chat. If Task 5's guard is left as broad as it is, 4th Class chapter quizzes would silently lose all per-question feedback (students would answer blind and only see a bare final score) — a materially worse experience than what 2nd/3rd Class already gets from the same feature. The fix is to narrow the guard to exclude `chapter_quiz` mode, not to touch the AI service at all.
+
+- [ ] **Step 1: Let `/practice-exam` land on the lobby (both panels) when no `count` param is given**
+
+In `client-v2/src/pages/PracticeExamPage.jsx`, change:
+
+```jsx
+export default function PracticeExamPage() {
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const paper = params.get('paper') || '';
+  const count = parseInt(params.get('count') || '50', 10);
+  const timed = params.get('timed') === 'true';
+
+  const user = JSON.parse(localStorage.getItem('fsa_user') || '{}');
+
+  return (
+    <ExamRouter
+      courseId={paper}
+      learnerId={user.email}
+      initialConfig={{ count, timed }}
+      onExit={() => navigate('/lobby')}
+      onComplete={(debrief) =>
+        navigate(`/exam/results?paper=${encodeURIComponent(paper)}`, { state: { debrief } })
+      }
+    />
+  );
+}
+```
+
+to:
+
+```jsx
+export default function PracticeExamPage() {
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const paper = params.get('paper') || '';
+  const countParam = params.get('count');
+  const timed = params.get('timed') === 'true';
+
+  const user = JSON.parse(localStorage.getItem('fsa_user') || '{}');
+
+  // No `count` in the URL → land on PracticeExamLobby (both the exam-count
+  // picker AND the chapter-quiz grid) instead of auto-starting a full exam.
+  // Every existing caller (LobbyPage, ExamResultsPage's retry, and
+  // QuizOnlyLobbyPage's practice-exam launch) always passes an explicit
+  // count, so this branch is new behavior only — nothing existing changes.
+  const initialConfig = countParam ? { count: parseInt(countParam, 10), timed } : null;
+
+  return (
+    <ExamRouter
+      courseId={paper}
+      learnerId={user.email}
+      initialConfig={initialConfig}
+      onExit={() => navigate('/lobby')}
+      onComplete={(debrief) =>
+        navigate(`/exam/results?paper=${encodeURIComponent(paper)}`, { state: { debrief } })
+      }
+    />
+  );
+}
+```
+
+- [ ] **Step 2: Point `QuizOnlyLobbyPage`'s per-paper button at the combined lobby instead of an auto-started exam**
+
+In `client-v2/src/pages/QuizOnlyLobbyPage.jsx`, change the button:
+
+```jsx
+        <button className="qo-btn-primary" onClick={() => onStartExam(paperCode)}>
+          Start Practice Exam
+        </button>
+```
+
+to:
+
+```jsx
+        <button className="qo-btn-primary" onClick={() => onStartExam(paperCode)}>
+          Practice This Paper
+        </button>
+```
+
+and change `handleStartExam`:
+
+```js
+  function handleStartExam(paper) {
+    navigate(`/practice-exam?paper=${paper}&count=50`);
+  }
+```
+
+to:
+
+```js
+  function handleStartExam(paper) {
+    // No count param → lands on the combined practice-exam/chapter-quiz
+    // picker (PracticeExamLobby) instead of auto-starting a 50-question exam.
+    navigate(`/practice-exam?paper=${paper}`);
+  }
+```
+
+- [ ] **Step 3: Narrow Task 5's tutor-hiding guard to exclude chapter-quiz mode**
+
+In `client-v2/src/ExamRouter.jsx`, inside `QuizExamView`, change:
+
+```js
+  const isExam = mode === 'practice_exam';
+  // 4th Class has no AI tutor chat (see
+  // docs/superpowers/specs/2026-07-13-fourth-class-platform-integration-design.md §5).
+  const isFourthClass = user?.class_code === 'fourth';
+```
+
+to:
+
+```js
+  const isExam = mode === 'practice_exam';
+  // 4th Class has no AI tutor CHAT — but chapter-quiz mode's per-question
+  // feedback ("Correct!" / "Not quite — the correct answer was...") is
+  // delivered ONLY via this same tutor_response channel (see
+  // _process_chapter_quiz in ai-service/agents/orchestrator.py — it's plain
+  // templated text, not an LLM call, and there's no other display surface
+  // for it). Hiding it there would silently break chapter quizzes for 4th
+  // Class, not just remove optional tutoring. Only practice_exam mode's
+  // chat is truly optional/supplementary (it shows a full stats debrief
+  // instead), so only that mode gets hidden.
+  const isFourthClass = user?.class_code === 'fourth' && mode !== 'chapter_quiz';
+```
+
+No other line in `QuizExamView` needs to change — both existing `{!isFourthClass && ...}` guards (the tutor-fab button and the chat overlay) now correctly stay visible for 4th Class chapter quizzes while remaining hidden for 4th Class practice exams, with zero change to 2nd/3rd Class behavior (their `isFourthClass` is always `false` regardless of `mode`).
+
+- [ ] **Step 4: Build and verify**
+
+```bash
+cd client-v2 && npm run build
+```
+Must complete with zero errors. No live deploy (see plan Global Constraints).
+
+Read through the three changed files once more and confirm:
+- `PracticeExamPage.jsx`: every existing caller's URL (grep the codebase for `/practice-exam?paper=` navigations) still includes an explicit `count`, so `initialConfig` stays truthy and `startPhase` stays `'exam'` for all of them — zero behavior change for 2nd/3rd Class or for any existing 4th-Class practice-exam launch flow already shipped in Tasks 4/7.
+- `QuizOnlyLobbyPage.jsx`: only this one file's navigation call changed; `LobbyPage.jsx` (2nd/3rd Class) is untouched.
+- `ExamRouter.jsx`: `isFourthClass` is `false` for `mode === 'chapter_quiz'` regardless of `class_code`, and unchanged (`user?.class_code === 'fourth'`) for `mode === 'practice_exam'` — trace both `{!isFourthClass && ...}` sites to confirm chapter-quiz mode now shows the tutor-fab/chat for 4th Class exactly as it already does for 2nd/3rd Class.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add client-v2/src/pages/PracticeExamPage.jsx client-v2/src/pages/QuizOnlyLobbyPage.jsx client-v2/src/ExamRouter.jsx
+git commit -m "fix: make chapter quizzes reachable for 4th Class, keep their feedback chat visible"
+```
+
+---
+
 ## Task 9: Wiki update
 
 **Files:**
