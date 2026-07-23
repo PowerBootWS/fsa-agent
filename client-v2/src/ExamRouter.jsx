@@ -8,6 +8,7 @@ import { TeachingNotes, NextAttemptPreview } from './components/TeachingNotes.js
 import { QuestionReview, QuestionReviewModal } from './components/QuestionReview.jsx';
 import { MathContent } from './components/MathContent.jsx';
 import { CountdownTimer } from './components/CountdownTimer.jsx';
+import { isFourthClassCode } from './utils/fourthClass';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -423,7 +424,7 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
   // and PracticeExamRouter. (Found via live testing: this condition had
   // silently always evaluated to `isFourthClass = false` because
   // `user?.class_code` was checked on a string.)
-  const isFourthClass = classCode === 'fourth' && mode !== 'chapter_quiz';
+  const isFourthClass = isFourthClassCode(classCode) && mode !== 'chapter_quiz';
   const examProgress = chatState.examProgress;
   const [chatOpen, setChatOpen] = useState(false);
   // True between answering the final exam question and the debrief arriving —

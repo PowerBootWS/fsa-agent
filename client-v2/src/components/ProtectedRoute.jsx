@@ -5,6 +5,7 @@
 // instead," which now handles the no-course case itself (an enroll prompt). Routes that
 // are simply optional-paper (Profile, Jobs) must NOT set this.
 import { Navigate } from 'react-router-dom';
+import { isFourthClassCode } from '../utils/fourthClass';
 
 export default function ProtectedRoute({ children, requirePaper = true, requireCourse = false }) {
   const user = JSON.parse(localStorage.getItem('fsa_user') || 'null');
@@ -16,7 +17,7 @@ export default function ProtectedRoute({ children, requirePaper = true, requireC
   // 4th Class never has an active_paper (no paper-switching concept — both 4A and 4B
   // are reachable at once via QuizOnlyLobbyPage), so the paper-picker requirement
   // doesn't apply to it. See client-v2/src/pages/QuizOnlyLobbyPage.jsx.
-  if (requirePaper && !user.active_paper && user.class_code !== 'fourth') return <Navigate to="/select-paper" replace />;
+  if (requirePaper && !user.active_paper && !isFourthClassCode(user.class_code)) return <Navigate to="/select-paper" replace />;
 
   // No active subscription at all → nothing to pick a paper for, back to /lobby
   // (used only by /select-paper — reached both for first-time selection and for

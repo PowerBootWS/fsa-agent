@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ContentPanel } from './components/ContentPanel';
 import { TutorPanel } from './components/TutorPanel';
+import { isFourthClassCode } from './utils/fourthClass';
 
 const CHECKPOINT_INTERVAL = 4;
 
@@ -20,7 +21,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   // 4th Class has no AI tutor chat (defense-in-depth — this route is never actually
   // reached by 4th Class students; see
   // docs/superpowers/specs/2026-07-13-fourth-class-platform-integration-design.md §5).
-  const hideTutor = classCode === 'fourth';
+  const hideTutor = isFourthClassCode(classCode);
 
   // Mobile-only view toggle: the content + tutor panels sit side-by-side on
   // desktop, but stack to a single full-width panel on phones (CSS hides the

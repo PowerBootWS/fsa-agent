@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { InlineLessonPlayer } from '../components/InlineLessonPlayer';
 import { ResultsPanel, QuizExamChatSection } from '../ExamRouter';
+import { isFourthClassCode } from '../utils/fourthClass';
 import './ExamResultsPage.css';
 
 // ── Grade helpers (used by the summary fallback view) ─────────────────────────
@@ -60,7 +61,7 @@ export default function ExamResultsPage() {
   // this standalone results page, reached immediately on exam completion via
   // PracticeExamPage's onComplete navigation, is a separate, unguarded copy
   // of the tutor-fab/chat and needs the same fix).
-  const isFourthClass = user.class_code === 'fourth';
+  const isFourthClass = isFourthClassCode(user.class_code);
 
   const [debrief, setDebrief] = useState(null);   // { courseId, display_update, tutor_response, date }
   const [summary, setSummary] = useState(null);   // fsa_last_exam fallback

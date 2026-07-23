@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { isFourthClassCode } from '../utils/fourthClass';
 
 const styles = {
   page: {
@@ -133,7 +134,7 @@ export default function LoginPage() {
       const isSafeNext = next && next.startsWith('/') && !next.startsWith('//');
       if (isSafeNext) {
         navigate(next, { replace: true });
-      } else if (data.user.class_code === 'fourth') {
+      } else if (isFourthClassCode(data.user.class_code)) {
         // 4th Class has no paper-switching concept (both 4A and 4B are accessible
         // at once via QuizOnlyLobbyPage) and active_paper is always null — route
         // straight to /lobby instead of falling into the !active_paper checks below.

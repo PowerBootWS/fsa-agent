@@ -20,12 +20,13 @@ import JobsCapturePage from './pages/JobsCapturePage';
 import CreditsPage from './pages/CreditsPage';
 import { LessonPlayer } from './LessonPlayer';
 import { ExamRouter } from './ExamRouter';
+import { isFourthClassCode } from './utils/fourthClass';
 
 // 4th Class has no lesson content — it gets a dedicated quiz-only lobby at the
 // same /lobby route path instead of a class_code branch inside LobbyPage itself.
 function LobbyRoute() {
   const user = JSON.parse(localStorage.getItem('fsa_user') || 'null');
-  return user?.class_code === 'fourth' ? <QuizOnlyLobbyPage /> : <LobbyPage />;
+  return isFourthClassCode(user?.class_code) ? <QuizOnlyLobbyPage /> : <LobbyPage />;
 }
 
 export default function App() {
