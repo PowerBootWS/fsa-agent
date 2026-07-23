@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { pool, getCourseOutline } = require('../services/database');
 const { sendMagicLink, sendDeactivationReview } = require('../services/email');
 const { CREDIT_PACKS, PACK_ORDER } = require('../config/creditPacks');
+const { PAPERS_BY_CLASS } = require('../config/papersForClass');
 const credits = require('../services/credits');
 
 // While the LMS transition stabilizes, automated deactivations are held for operator
@@ -288,9 +289,7 @@ router.post('/switch-paper', requireAuth, async (req, res) => {
 // GET /api/platform/papers-for-class
 router.get('/papers-for-class', requireAuth, async (req, res) => {
   const { class_code } = req.user;
-  const papers = class_code === 'second'
-    ? ['2A1', '2A2', '2A3', '2B1', '2B2', '2B3']
-    : ['3A1', '3A2', '3B1', '3B2'];
+  const papers = PAPERS_BY_CLASS[class_code] || PAPERS_BY_CLASS.third;
   return res.json({ papers, class_code });
 });
 

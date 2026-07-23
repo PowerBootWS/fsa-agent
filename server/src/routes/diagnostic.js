@@ -1,14 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../services/database');
+const { PAPERS_BY_CLASS } = require('../config/papersForClass');
 
-const PAPERS_SECOND = ['2A1', '2A2', '2A3', '2B1', '2B2', '2B3'];
 // Note: 3B1/3B2 have no questions authored yet, so a third-class diagnostic
 // effectively draws from 3A1/3A2 only until those papers are populated.
-const PAPERS_THIRD = ['3A1', '3A2', '3B1', '3B2'];
-
+// Deliberately NOT extended to 'fourth' — this is the unauthenticated diagnostic-quiz
+// lead magnet, and no UI ever passes class=fourth (4th Class has no diagnostic funnel;
+// see docs/superpowers/specs/2026-07-13-fourth-class-platform-integration-design.md §8).
 function papersForClass(classCode) {
-  return classCode === 'third' ? PAPERS_THIRD : PAPERS_SECOND;
+  return classCode === 'third' ? PAPERS_BY_CLASS.third : PAPERS_BY_CLASS.second;
 }
 
 /**
