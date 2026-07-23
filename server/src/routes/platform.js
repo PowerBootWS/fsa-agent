@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { pool, getCourseOutline } = require('../services/database');
 const { sendMagicLink, sendDeactivationReview } = require('../services/email');
 const { CREDIT_PACKS, PACK_ORDER } = require('../config/creditPacks');
-const { PAPERS_BY_CLASS } = require('../config/papersForClass');
+const { PAPERS_BY_CLASS, FOURTH_CLASS_CODES } = require('../config/papersForClass');
 const credits = require('../services/credits');
 
 // While the LMS transition stabilizes, automated deactivations are held for operator
@@ -67,19 +67,33 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
       );
     }
 
-    // Insert active subscription if none exists — RETURNING id tells us if it was just created.
-    // Covers both new subscribers and re-enrollment after cancellation.
-    const subInsert = await pool.query(
-      `INSERT INTO subscriptions (user_id, class_code, status, active_paper, stripe_subscription_id)
-       SELECT $1, $2, 'active', NULL, $3
-       WHERE NOT EXISTS (
-         SELECT 1 FROM subscriptions
-         WHERE user_id = $1 AND status = 'active'
-       )
-       RETURNING id`,
-      [user.id, class_code, stripe_subscription_id || null]
+    // Determine whether this purchase is allowed to create a new active row.
+    // - second/third: blocked by ANY existing active subscription (unchanged from
+    //   before the 4th Class split).
+    // - fourth_a/fourth_b: blocked only by an active second/third subscription
+    //   (cross-tier exclusion) or an active row of this SAME class_code
+    //   (duplicate/idempotent-retry) -- but NOT by the other fourth_x code, since
+    //   a student can now own both papers at once.
+    const existingActive = await pool.query(
+      `SELECT class_code FROM subscriptions WHERE user_id = $1 AND status = 'active'`,
+      [user.id]
     );
-    const subIsNew = subInsert.rowCount > 0;
+    const existingCodes = existingActive.rows.map(r => r.class_code);
+    const isFourthClassPurchase = FOURTH_CLASS_CODES.includes(class_code);
+    const blocked = isFourthClassPurchase
+      ? existingCodes.includes(class_code) || existingCodes.some(c => !FOURTH_CLASS_CODES.includes(c))
+      : existingCodes.length > 0;
+
+    let subIsNew = false;
+    if (!blocked) {
+      const subInsert = await pool.query(
+        `INSERT INTO subscriptions (user_id, class_code, status, active_paper, stripe_subscription_id)
+         VALUES ($1, $2, 'active', NULL, $3)
+         RETURNING id`,
+        [user.id, class_code, stripe_subscription_id || null]
+      );
+      subIsNew = subInsert.rowCount > 0;
+    }
 
     // Only send magic link when something was actually new — prevents duplicate emails
     // on Stripe's at-least-once re-delivery of the same checkout event.

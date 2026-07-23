@@ -14,7 +14,7 @@ function buildTestApp() {
   return app;
 }
 
-describe('provision-user — one active subscription per user', () => {
+describe('provision-user — one active subscription per (user, class_code)', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
@@ -32,7 +32,7 @@ describe('provision-user — one active subscription per user', () => {
     await pool.end();
   });
 
-  it('does not create a second active subscription row under a different class_code for the same user', async () => {
+  it('does not create a second active subscription row under a different class_code for the same user (cross-tier, application-enforced)', async () => {
     const app = buildTestApp();
 
     const first = await request(app)
@@ -44,7 +44,7 @@ describe('provision-user — one active subscription per user', () => {
     const second = await request(app)
       .post('/api/platform/provision-user')
       .set('x-internal-secret', 'test-internal-secret')
-      .send({ email: 'dual-class@example.com', first_name: 'Dual', last_name: 'User', class_code: 'fourth' });
+      .send({ email: 'dual-class@example.com', first_name: 'Dual', last_name: 'User', class_code: 'fourth_a' });
     expect(second.status).toBe(200);
 
     const rows = await pool.query(
@@ -56,7 +56,7 @@ describe('provision-user — one active subscription per user', () => {
     expect(rows.rows[0].class_code).toBe('second');
   });
 
-  it('DB rejects a raw second active subscription insert for the same user', async () => {
+  it('DB rejects a raw duplicate active subscription (same class_code) for the same user', async () => {
     const userResult = await pool.query(
       `INSERT INTO platform_users (email, first_name, last_name) VALUES ('raw-dual@example.com', 'Raw', 'User') RETURNING id`
     );
@@ -68,7 +68,7 @@ describe('provision-user — one active subscription per user', () => {
 
     await expect(
       pool.query(
-        `INSERT INTO subscriptions (user_id, class_code, status) VALUES ($1, 'fourth', 'active')`,
+        `INSERT INTO subscriptions (user_id, class_code, status) VALUES ($1, 'second', 'active')`,
         [userId]
       )
     ).rejects.toMatchObject({ code: '23505' });
