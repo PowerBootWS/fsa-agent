@@ -93,7 +93,8 @@ export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, on
         <div className="lobby-panel">
           <h2 className="lobby-panel-heading">Chapter Quizzes</h2>
           <p className="lobby-panel-desc">
-            Drill a specific chapter with a focused 8-question quiz.
+            Drill a specific chapter with a focused quiz — up to 15 questions, drawn
+            randomly each time.
           </p>
 
           {chaptersLoading ? (

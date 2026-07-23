@@ -777,7 +777,10 @@ class Researcher:
                 SELECT id, question_text, options, correct_answer, explanation,
                        difficulty, topic, step_data
                 FROM questions
-                WHERE chapter_id = %s AND question_type = 'chapter_quiz'
+                WHERE chapter_id = %s
+                  AND question_type IN ('chapter_quiz', 'objective_practice')
+                  AND standalone = TRUE
+                  AND options IS NOT NULL AND jsonb_array_length(options) > 0
                 ORDER BY RANDOM()
                 LIMIT %s
                 """,

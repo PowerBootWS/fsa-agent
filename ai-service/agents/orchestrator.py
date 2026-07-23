@@ -21,7 +21,7 @@ CONTEXT_LIMIT_EXCHANGES = 20
 MAX_QUESTIONS_PER_OBJECTIVE = 5
 PROGRESS_SAVE_INTERVAL = 3  # save progress every N exchanges as a heartbeat
 
-CHAPTER_QUIZ_QUESTION_COUNT = 8
+CHAPTER_QUIZ_QUESTION_COUNT = 15
 PRACTICE_EXAM_QUESTION_COUNT = 50
 
 # Courses with no lesson content and a reduced-AI (stats-only) debrief — see
