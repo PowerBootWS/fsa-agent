@@ -1,6 +1,7 @@
 const express = require('express');
 const { pool } = require('../services/database');
 const requireAuth = require('../middleware/requireAuth');
+const nurture = require('../services/nurture');
 const crypto = require('crypto');
 
 const router = express.Router();
@@ -94,6 +95,19 @@ router.post('/save', requireAuth, async (req, res) => {
         description_snapshot || null, ai_summary_snapshot || null, employer_logo_url_snapshot || null, posted_at || null,
       ]
     );
+
+    // Fire-and-forget nurture enrollment - the saved_jobs sequence introduces
+    // resume/cover-letter tailoring. enroll() is idempotent (ON CONFLICT DO
+    // NOTHING per contact+sequence), so it's safe to call on every save, not
+    // just the user's first one.
+    nurture.enroll({
+      email: req.user.email,
+      firstName: req.user.first_name,
+      sequence: 'saved_jobs',
+      source: 'jobs-save',
+    }).catch(err => {
+      console.error('Nurture intake failed for', req.user.email, '-', err.message);
+    });
 
     return res.status(201).json({ ok: true, id: result.rows[0].id });
   } catch (err) {
