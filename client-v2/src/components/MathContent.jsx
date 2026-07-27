@@ -1,4 +1,27 @@
-import { InlineMath, BlockMath } from 'react-katex';
+import katex from 'katex';
+
+// Render one math segment via the top-level `katex` package directly,
+// rather than through `react-katex` (which bundles its own separate nested
+// `katex` copy — a different version than the one this app's KaTeX CSS,
+// `katex/dist/katex.min.css`, is generated from). That version/bundling
+// mismatch was silently breaking symbol lookups for real commands like
+// `\alpha`/`\dfrac`/`\Delta`/`\times` in production (KaTeX's throwOnError:
+// false default then renders the unresolved command as literal red text
+// instead of failing loudly), even though the exact same LaTeX renders
+// correctly via `katex.renderToString` outside a bundled browser build.
+// Calling the top-level package directly — the same one whose CSS is
+// already loaded, and the same integration style already proven to work
+// for chat messages via `rehype-katex` — removes that mismatch entirely.
+export function KatexSpan({ math, displayMode }) {
+  let html;
+  try {
+    html = katex.renderToString(math, { displayMode, throwOnError: false });
+  } catch (e) {
+    html = math;
+  }
+  const Tag = displayMode ? 'div' : 'span';
+  return <Tag dangerouslySetInnerHTML={{ __html: html }} />;
+}
 
 // Render a plain-text run, converting **bold** markdown to <strong>.
 function renderText(str, keyPrefix) {
@@ -45,8 +68,8 @@ export function MathContent({ text }) {
   let cursor = 0;
   segments.forEach((seg, i) => {
     if (seg.start > cursor) parts.push(<span key={`t${i}`}>{renderText(text.slice(cursor, seg.start), `t${i}`)}</span>);
-    if (seg.type === 'block') parts.push(<BlockMath key={`b${i}`} math={seg.math} />);
-    else parts.push(<InlineMath key={`il${i}`} math={seg.math} />);
+    if (seg.type === 'block') parts.push(<KatexSpan key={`b${i}`} math={seg.math} displayMode />);
+    else parts.push(<KatexSpan key={`il${i}`} math={seg.math} displayMode={false} />);
     cursor = seg.end;
   });
   if (cursor < text.length) parts.push(<span key="tail">{renderText(text.slice(cursor), 'tail')}</span>);

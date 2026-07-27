@@ -1,16 +1,16 @@
 // fsa-agent/client-v2/src/components/TutorPanel.jsx
 import { useState, useRef, useEffect } from 'react';
-import { InlineMath, BlockMath } from 'react-katex';
+import { KatexSpan } from './MathContent';
 import 'katex/dist/katex.min.css';
 
 function renderInline(text, keyPrefix) {
   const mathParts = text.split(/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g);
   return mathParts.flatMap((part, i) => {
     if (part.startsWith('$$') && part.endsWith('$$')) {
-      return [<BlockMath key={`${keyPrefix}-m${i}`} math={part.slice(2, -2)} />];
+      return [<KatexSpan key={`${keyPrefix}-m${i}`} math={part.slice(2, -2)} displayMode />];
     }
     if (part.startsWith('$') && part.endsWith('$')) {
-      return [<InlineMath key={`${keyPrefix}-m${i}`} math={part.slice(1, -1)} />];
+      return [<KatexSpan key={`${keyPrefix}-m${i}`} math={part.slice(1, -1)} displayMode={false} />];
     }
     return part.split(/(\*\*[^*]+\*\*)/g).map((p, j) => {
       if (p.startsWith('**') && p.endsWith('**')) {
