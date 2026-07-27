@@ -1013,6 +1013,27 @@ body {
 }
 .results-enroll-btn:hover { background: var(--orange-glow); }
 
+.results-enroll-fab {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 100;
+  display: inline-block;
+  background: var(--orange);
+  color: var(--white);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 12px 20px;
+  border-radius: 999px;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  transition: background 0.15s;
+}
+.results-enroll-fab:hover { background: var(--orange-glow); }
+@media (max-width: 480px) {
+  .results-enroll-fab { left: 12px; bottom: 12px; font-size: 13px; padding: 10px 16px; }
+}
+
 /* Distractor coaching — lead-magnet-only "watch out for these traps" panel,
    red/amber accent matching .results-row--weak's wrong-answer color. */
 .distractor-coaching { margin-top: 1.5rem; }

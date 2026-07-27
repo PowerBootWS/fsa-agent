@@ -10,6 +10,18 @@ function renderText(str, keyPrefix) {
   });
 }
 
+// Question/option text uses `$` both for real LaTeX (per convention, inline
+// `$...$`) and for plain currency amounts (e.g. "$240,000 to $480,000").
+// A pair of `$` around currency text looks exactly like an inline-math match
+// to a naive regex, so reject captures that look like currency/prose rather
+// than math: real LaTeX never starts or ends with whitespace inside the
+// delimiters, and never contains a thousands-separated number.
+function looksLikeMath(content) {
+  if (/^\s|\s$/.test(content)) return false;
+  if (/\d,\d{3}/.test(content)) return false;
+  return true;
+}
+
 export function MathContent({ text }) {
   if (!text) return null;
 
@@ -17,8 +29,8 @@ export function MathContent({ text }) {
   const blockRegex = /\$\$([\s\S]+?)\$\$/g;
   const inlineRegex = /\$((?:[^$]|\\.)+?)\$/g;
 
-  const blockMatches = [...text.matchAll(blockRegex)];
-  const inlineMatches = [...text.matchAll(inlineRegex)];
+  const blockMatches = [...text.matchAll(blockRegex)].filter(m => looksLikeMath(m[1]));
+  const inlineMatches = [...text.matchAll(inlineRegex)].filter(m => looksLikeMath(m[1]));
 
   const segments = [];
   blockMatches.forEach(m => segments.push({ start: m.index, end: m.index + m[0].length, type: 'block', math: m[1] }));

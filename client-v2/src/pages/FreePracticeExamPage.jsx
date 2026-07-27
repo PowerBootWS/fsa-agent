@@ -193,7 +193,7 @@ function AlreadyUsedNotice() {
         full course content, and AI tutoring.
       </p>
       <a href={ENROLL_URL} style={{ ...styles.button, display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
-        Subscribe for $149/month →
+        Subscribe Now →
       </a>
     </div>
   );

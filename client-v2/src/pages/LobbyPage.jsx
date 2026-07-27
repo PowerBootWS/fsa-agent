@@ -11,7 +11,7 @@ const PAPER_NAMES = {
   '2B1': '2nd Class Part B1',
   '2B2': '2nd Class Part B2',
   '2B3': '2nd Class Part B3',
-  '3A1': '3rd Class Power Engineering',
+  '3A1': '3rd Class Part A1',
   '3A2': '3rd Class Part A2',
   '3A3': '3rd Class Part A3',
   '3B1': '3rd Class Part B1',

@@ -1324,8 +1324,10 @@ class Orchestrator:
                     f"automatically adapt — giving more questions on chapters they struggle with — "
                     f"so they improve faster. "
                     f"End with a genuine, warm invitation: a Full Steam Ahead subscription gives them "
-                    f"unlimited adaptive practice exams for all 6 papers, full course content with "
-                    f"step-by-step lessons, and AI tutoring for $149/month. "
+                    f"unlimited adaptive practice exams for every paper in their certificate, full "
+                    f"course content with step-by-step lessons, and AI tutoring. Do not state a price "
+                    f"or a specific paper count — pricing and paper counts vary by class and change "
+                    f"over time, so let the enrollment page speak to that. "
                     f"Invite them to enroll at https://enrollment.fullsteamahead.ca . "
                     f"Be encouraging and genuine, not pushy."
                 )

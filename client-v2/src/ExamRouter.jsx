@@ -234,14 +234,16 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
       )}
 
       {/* Lead-magnet exams have no lobby to return to and no saved
-          progress to retake — instead of onRetry, point at the $149/month
-          subscription (same offer/tone as the orchestrator's lead-magnet
-          debrief prompt in ai-service/agents/orchestrator.py). */}
+          progress to retake — instead of onRetry, point at the subscription
+          CTA. No price mentioned here deliberately: pricing varies by class
+          (e.g. 3rd Class launch pricing differs from 2nd Class) and changes
+          over time — the enrollment page itself always has the current,
+          correct number. */}
       {leadMagnetMode && (
         <div className="results-enroll-block">
           <p className="results-enroll-copy">
             Ready for unlimited adaptive practice exams across every paper,
-            full course content, and AI tutoring? Subscribe for $149/month.
+            full course content, and AI tutoring?
           </p>
           <a
             className="results-enroll-btn"
@@ -286,6 +288,18 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
           questions={question_review}
           onClose={() => setReviewModalOpen(false)}
         />
+      )}
+      {/* Always-reachable enroll CTA, independent of scroll position — the
+          inline enroll block above lives at the bottom of the overview
+          column, which many visitors never scroll to. Positioned bottom-left
+          (the AI tutor FAB already owns bottom-right). */}
+      {leadMagnetMode && (
+        <a
+          className="results-enroll-fab"
+          href="https://enrollment.fullsteamahead.ca"
+        >
+          Enroll Now →
+        </a>
       )}
     </div>
   );
