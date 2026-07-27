@@ -312,7 +312,7 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSele
         displayContent={displayContent}
         isExam={isExam}
         onRetry={(isExam || mode === 'chapter_quiz') ? () => onAnswer('yes') : null}
-        onSelectChapter={onSelectChapter}
+        onSelectChapter={leadMagnetMode ? null : onSelectChapter}
         user={user}
         leadMagnetMode={leadMagnetMode}
       />
