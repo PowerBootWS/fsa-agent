@@ -293,7 +293,7 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
 // Quiz/exam display section
 // ---------------------------------------------------------------------------
 
-function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSelectChapter, user }) {
+function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSelectChapter, user, leadMagnetMode }) {
   if (!displayContent) {
     return (
       <div className="quizexam-display-empty">
@@ -312,6 +312,7 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSele
         onRetry={(isExam || mode === 'chapter_quiz') ? () => onAnswer('yes') : null}
         onSelectChapter={onSelectChapter}
         user={user}
+        leadMagnetMode={leadMagnetMode}
       />
     );
   }
@@ -465,7 +466,7 @@ export function QuizExamChatSection({ messages, setMessages, user, lessonId, set
 // QuizExamView — full exam/quiz page
 // ---------------------------------------------------------------------------
 
-function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter, onComplete, leadMagnetToken, onExamDone }) {
+function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter, onComplete, leadMagnetToken, onExamDone, leadMagnetMode }) {
   const isExam = mode === 'practice_exam';
   // 4th Class has no AI tutor CHAT — but chapter-quiz mode's per-question
   // feedback ("Correct!" / "Not quite — the correct answer was...") is
@@ -659,6 +660,7 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
               isExam={isExam}
               onSelectChapter={onSelectChapter}
               user={user}
+              leadMagnetMode={leadMagnetMode}
             />
           )}
         </div>
@@ -724,7 +726,7 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
 // PracticeExamRouter — orchestrates lobby → exam → results flow
 // ---------------------------------------------------------------------------
 
-function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setChatState, startPhase, initialConfig, onExit, onComplete, leadMagnetToken, onExamDone }) {
+function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setChatState, startPhase, initialConfig, onExit, onComplete, leadMagnetToken, onExamDone, leadMagnetMode }) {
   const [phase, setPhase] = useState(startPhase || 'lobby');
   const [examConfig, setExamConfig] = useState(initialConfig || null);
   const [activeChapterId, setActiveChapterId] = useState(null);
@@ -771,6 +773,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
         onStartExam={handleStartExam}
         onSelectChapter={handleSelectChapter}
         onViewLastResults={handleViewLastResults}
+        leadMagnetMode={leadMagnetMode}
       />
     );
   }
@@ -793,6 +796,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
                 onRetry={null}
                 onSelectChapter={handleSelectChapter}
                 user={user}
+                leadMagnetMode={leadMagnetMode}
               />
             )}
           </div>
@@ -837,6 +841,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
           examConfig={null}
           onSelectChapter={null}
           leadMagnetToken={leadMagnetToken}
+          leadMagnetMode={leadMagnetMode}
         />
       </div>
     );
@@ -863,6 +868,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
         onComplete={onComplete}
         leadMagnetToken={leadMagnetToken}
         onExamDone={onExamDone}
+        leadMagnetMode={leadMagnetMode}
       />
     </div>
   );
@@ -880,6 +886,13 @@ export function ExamRouter({ courseId, learnerId, classCode, initialConfig, onEx
     examProgress: null,
   });
 
+  // A leadMagnetToken is only ever present for the unauthenticated
+  // free-practice-exam flow — its presence is what turns on every
+  // lead-magnet-specific UI treatment (locked chapter quizzes, hidden
+  // retry/last-results, enroll CTA, distractor coaching) all the way down
+  // through PracticeExamLobby / QuizExamView / ResultsPanel.
+  const leadMagnetMode = Boolean(leadMagnetToken);
+
   return (
     <div className="app-fullpage">
       <PracticeExamRouter
@@ -895,6 +908,7 @@ export function ExamRouter({ courseId, learnerId, classCode, initialConfig, onEx
         onComplete={onComplete}
         leadMagnetToken={leadMagnetToken}
         onExamDone={onExamDone}
+        leadMagnetMode={leadMagnetMode}
       />
     </div>
   );

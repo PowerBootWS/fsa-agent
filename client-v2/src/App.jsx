@@ -18,6 +18,7 @@ import AppShell from './components/AppShell';
 import JobsPage from './pages/JobsPage';
 import JobsCapturePage from './pages/JobsCapturePage';
 import CreditsPage from './pages/CreditsPage';
+import FreePracticeExamPage from './pages/FreePracticeExamPage';
 import { LessonPlayer } from './LessonPlayer';
 import { ExamRouter } from './ExamRouter';
 import { isFourthClassCode } from './utils/fourthClass';
@@ -83,6 +84,7 @@ export default function App() {
         }
       />
       <Route path="/jobs/capture" element={<JobsCapturePage />} />
+      <Route path="/free-practice-exam" element={<FreePracticeExamPage />} />
       <Route
         path="/chapters"
         element={
