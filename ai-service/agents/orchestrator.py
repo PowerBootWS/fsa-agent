@@ -1079,6 +1079,52 @@ class Orchestrator:
             print(f'Orchestrator._call_llm_for_teaching_tips error: {e}')
             return {}
 
+    def _call_llm_for_distractor_coaching(self, prompt, expected_count):
+        """
+        Single batched LLM call returning distractor-trap coaching for wrong
+        answers on a lead-magnet exam. Returns dict {1: 'coaching text', ...}.
+        Falls back to empty dict on any error.
+        """
+        if not self._api_key or expected_count == 0:
+            return {}
+        try:
+            session = requests.Session()
+            session.headers.update({
+                'Authorization': f'Bearer {self._api_key}',
+                'Content-Type': 'application/json',
+            })
+            response = session.post(
+                f'{self._base_url}/chat/completions',
+                json={
+                    'model': self._model,
+                    'max_tokens': max(150, 100 * expected_count),
+                    'messages': [
+                        {
+                            'role': 'system',
+                            'content': 'You are an expert 2nd Class Power Engineering instructor explaining why a wrong multiple-choice answer looked tempting.',
+                        },
+                        {'role': 'user', 'content': prompt},
+                    ],
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            content = response.json()['choices'][0]['message']['content'].strip()
+
+            # Parse numbered list: "1. coaching\n\n2. coaching"
+            tips = {}
+            pattern = re.compile(
+                r'^\s*(\d+)\.\s+(.+?)(?=^\s*\d+\.|\Z)',
+                re.MULTILINE | re.DOTALL,
+            )
+            for m in pattern.finditer(content):
+                tips[int(m.group(1))] = m.group(2).strip()
+            return tips
+
+        except Exception as e:
+            print(f'Orchestrator._call_llm_for_distractor_coaching error: {e}')
+            return {}
+
     def _compute_chapter_allocations(self, chapters, total, weights):
         """
         Distribute `total` questions across chapters.
@@ -1336,6 +1382,48 @@ class Orchestrator:
             for r in results
         ]
 
+        # --- Generate distractor-trap coaching for wrong answers, lead-magnet only ---
+        # Paying students never get this LLM call or field. Also skipped for 4th
+        # Class alongside the other generated-prose features above (no FSA-authored
+        # explanations for students already in an accredited program elsewhere).
+        distractor_coaching = {}
+        if not is_fourth_class and state.get('exam_lead_magnet'):
+            wrong_reviews = [q for q in question_review if not q.get('correct')]
+            if wrong_reviews:
+                numbered_lines = []
+                for i, q in enumerate(wrong_reviews, 1):
+                    options = q.get('options') or []
+                    selected_idx = q.get('selected_index')
+                    correct_idx = q.get('correct_index')
+                    selected_text = options[selected_idx] if selected_idx is not None and selected_idx < len(options) else 'unknown'
+                    correct_text = options[correct_idx] if correct_idx is not None and correct_idx < len(options) else 'unknown'
+                    explanation = q.get('explanation') or 'No additional context available.'
+                    numbered_lines.append(
+                        f"{i}. Question: {q.get('question_text', '')}\n"
+                        f"   Student picked: \"{selected_text}\" (wrong)\n"
+                        f"   Correct answer: \"{correct_text}\"\n"
+                        f"   Explanation: {explanation}"
+                    )
+                batch_prompt = (
+                    "A student took a free practice exam and got these questions wrong. "
+                    "For each, write a 1-2 sentence note explaining why the wrong option "
+                    "they picked is a common trap or misconception — not just restating "
+                    "the correct answer, but naming the specific misunderstanding that "
+                    "makes the wrong option tempting.\n\n"
+                    + '\n\n'.join(numbered_lines)
+                )
+                raw_coaching = self._call_llm_for_distractor_coaching(batch_prompt, len(wrong_reviews))
+                # Re-key from 1-based batch index back to the wrong question's
+                # identity so the client can match coaching text to the right
+                # card. question_review entries carry no explicit id (see the
+                # comprehension above), so question_text is the only field
+                # common to both this dict and question_review — use it unless
+                # an 'id' shows up in scope later.
+                for i, q in enumerate(wrong_reviews, 1):
+                    if i in raw_coaching:
+                        key = q.get('id') or q.get('question_text')
+                        distractor_coaching[key] = raw_coaching[i]
+
         display_update = {
             'type': 'exam_done',
             'title': f'{course_id} Exam Results',
@@ -1346,6 +1434,7 @@ class Orchestrator:
             'objective_breakdowns': objective_breakdowns,
             'next_attempt_allocation': next_allocation,
             'question_review': question_review,
+            'distractor_coaching': distractor_coaching,
         }
         # Cache so page refreshes can return results without re-running the LLM.
         state['last_debrief'] = {
