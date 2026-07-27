@@ -35,6 +35,16 @@ async function sendPasswordReset(email, firstName, token) {
   });
 }
 
+async function sendPracticeExamCode(email, firstName, code) {
+  await transporter.sendMail({
+    from: FROM,
+    to: email,
+    subject: `Your Full Steam Ahead verification code: ${code}`,
+    html: `<p>Hi ${firstName},</p><p>Your verification code for your free practice exam is:</p><p style="font-size:32px;font-weight:700;letter-spacing:0.1em;color:#1d4ed8;">${code}</p><p>Enter this code to start your exam. This code expires in 10 minutes.</p><p>If you didn't request this, ignore this email.</p>`,
+    text: `Hi ${firstName},\n\nYour verification code is: ${code}\n\nThis code expires in 10 minutes.`,
+  });
+}
+
 // Notifies the operator that one or more customers are queued for deactivation and
 // need manual confirmation before access is pulled. Used while the deactivation
 // confirmation gate (DEACTIVATION_REQUIRES_CONFIRMATION) is enabled.
@@ -85,4 +95,4 @@ async function sendOpsEmail(to, subject, text) {
   await transporter.sendMail({ from: FROM, to, subject, text });
 }
 
-module.exports = { sendMagicLink, sendPasswordReset, sendDeactivationReview, sendOpsEmail };
+module.exports = { sendMagicLink, sendPasswordReset, sendPracticeExamCode, sendDeactivationReview, sendOpsEmail };
