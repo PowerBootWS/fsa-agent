@@ -43,6 +43,34 @@ function ThinkingDots() {
 }
 
 // ---------------------------------------------------------------------------
+// Chat POST helper — when a leadMagnetToken is present (lead-magnet /
+// free-practice-exam flow), routes through the token-authenticated
+// /api/practice-exam/chat endpoint instead, which derives user/lessonId/
+// examConfig server-side from the token. When leadMagnetToken is absent
+// (the existing authenticated-student path), this sends the exact same
+// request — same URL, headers, and body shape — as before this helper
+// existed.
+// ---------------------------------------------------------------------------
+
+function postChatMessage(message, { leadMagnetToken, user, lessonId, examConfig } = {}) {
+  if (leadMagnetToken) {
+    return fetch('/api/practice-exam/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${leadMagnetToken}`,
+      },
+      body: JSON.stringify({ message }),
+    });
+  }
+  return fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user, lessonId, message, ...(examConfig ? { examConfig } : {}) }),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Typewriter tutor message
 // ---------------------------------------------------------------------------
 
@@ -300,7 +328,7 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSele
 // Quiz/exam chat section (tutor panel for exams)
 // ---------------------------------------------------------------------------
 
-export function QuizExamChatSection({ messages, setMessages, user, lessonId, setChatState, isExam, isDone }) {
+export function QuizExamChatSection({ messages, setMessages, user, lessonId, setChatState, isExam, isDone, leadMagnetToken }) {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
@@ -325,11 +353,7 @@ export function QuizExamChatSection({ messages, setMessages, user, lessonId, set
     ]);
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user, lessonId, message: userMessage }),
-      });
+      const res = await postChatMessage(userMessage, { leadMagnetToken, user, lessonId });
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
 
@@ -405,7 +429,7 @@ export function QuizExamChatSection({ messages, setMessages, user, lessonId, set
 // QuizExamView — full exam/quiz page
 // ---------------------------------------------------------------------------
 
-function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter, onComplete }) {
+function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter, onComplete, leadMagnetToken, onExamDone }) {
   const isExam = mode === 'practice_exam';
   // 4th Class has no AI tutor CHAT — but chapter-quiz mode's per-question
   // feedback ("Correct!" / "Not quite — the correct answer was...") is
@@ -430,6 +454,10 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
   // True between answering the final exam question and the debrief arriving —
   // swaps the question for a "compiling results" panel so it's clearly working.
   const [compilingResults, setCompilingResults] = useState(false);
+  // Guards onExamDone so it can only fire once per session, even across
+  // re-renders (the exam_done display state itself is normally stable once
+  // set, but this makes the "fires exactly once" contract explicit).
+  const examDoneFiredRef = useRef(false);
 
   const updateMessages = (updater) => {
     setChatState(prev => ({
@@ -440,16 +468,7 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
 
   useEffect(() => {
     if (chatState.messages.length === 0) {
-      fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user,
-          lessonId,
-          message: 'hello',
-          ...(examConfig ? { examConfig } : {}),
-        }),
-      })
+      postChatMessage('hello', { leadMagnetToken, user, lessonId, examConfig })
         .then(r => r.json())
         .then(data => {
           const msgs = [];
@@ -474,6 +493,10 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
   // platform app) hand off to the durable /exam/results page via onComplete.
   useEffect(() => {
     if (isExam && displayContent?.type === 'exam_done') {
+      if (onExamDone && !examDoneFiredRef.current) {
+        examDoneFiredRef.current = true;
+        onExamDone();
+      }
       const date = new Date().toISOString();
       // Pull the tutor's debrief summary (latest tutor message) to cache too.
       const tutorMsg = [...(chatState.messages || [])]
@@ -530,11 +553,7 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
       }));
     }
 
-    fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user, lessonId, message: answer }),
-    })
+    postChatMessage(answer, { leadMagnetToken, user, lessonId })
       .then(r => r.json())
       .then(data => {
         setChatState(prev => {
@@ -656,6 +675,7 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
               setChatState={setChatState}
               isExam={isExam}
               isDone={isDone}
+              leadMagnetToken={leadMagnetToken}
             />
           </div>
         </div>
@@ -668,7 +688,7 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
 // PracticeExamRouter — orchestrates lobby → exam → results flow
 // ---------------------------------------------------------------------------
 
-function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setChatState, startPhase, initialConfig, onExit, onComplete }) {
+function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setChatState, startPhase, initialConfig, onExit, onComplete, leadMagnetToken, onExamDone }) {
   const [phase, setPhase] = useState(startPhase || 'lobby');
   const [examConfig, setExamConfig] = useState(initialConfig || null);
   const [activeChapterId, setActiveChapterId] = useState(null);
@@ -780,6 +800,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
           setChatState={setChatState}
           examConfig={null}
           onSelectChapter={null}
+          leadMagnetToken={leadMagnetToken}
         />
       </div>
     );
@@ -804,6 +825,8 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
         examConfig={examConfig}
         onSelectChapter={handleSelectChapter}
         onComplete={onComplete}
+        leadMagnetToken={leadMagnetToken}
+        onExamDone={onExamDone}
       />
     </div>
   );
@@ -813,7 +836,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
 // ExamRouter — top-level export, receives courseId + learnerId from App.jsx
 // ---------------------------------------------------------------------------
 
-export function ExamRouter({ courseId, learnerId, classCode, initialConfig, onExit, onComplete }) {
+export function ExamRouter({ courseId, learnerId, classCode, initialConfig, onExit, onComplete, leadMagnetToken, onExamDone }) {
   const [chatState, setChatState] = useState({
     messages: [],
     displayContent: null,
@@ -834,6 +857,8 @@ export function ExamRouter({ courseId, learnerId, classCode, initialConfig, onEx
         initialConfig={initialConfig}
         onExit={onExit}
         onComplete={onComplete}
+        leadMagnetToken={leadMagnetToken}
+        onExamDone={onExamDone}
       />
     </div>
   );
