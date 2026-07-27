@@ -167,6 +167,17 @@ app.get('/v2/*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client-v2/build/index.html'));
 });
 
+// Retired 2026-07-27: the old Practice Preview lead magnet (client v1,
+// fsachat.*?mode=practice_preview) is superseded by the verification-gated
+// /free-practice-exam flow on learn.*. Redirect (not delete) since old
+// social posts/emails still link here in the wild.
+app.get('/', (req, res, next) => {
+  if (req.isLegacyMode && req.query.mode === 'practice_preview') {
+    return res.redirect(302, 'https://fullsteamahead.ca/free-practice-exam');
+  }
+  next();
+});
+
 // For learn.* serve client-v2 as root; for fsachat.* serve client v1 as root
 app.use((req, res, next) => {
   if (req.isPlatformMode) {
