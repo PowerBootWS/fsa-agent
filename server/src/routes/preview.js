@@ -214,3 +214,5 @@ router.post('/send-results', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.PAPERS_SECOND = PAPERS_SECOND;
+module.exports.PAPERS_THIRD = PAPERS_THIRD;
