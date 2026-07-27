@@ -118,6 +118,9 @@ const examRouter = require('./routes/exam');
 app.use('/api/exam', examRouter);
 app.use('/api/preview', previewRouter);
 
+const practiceExamRouter = require('./routes/practiceExam');
+app.use('/api/practice-exam', practiceExamRouter);
+
 // v2 routes
 const v2LessonRouter = require('./routes/v2/lesson');
 const { gateLessonAccess } = require('./middleware/platformGate');
