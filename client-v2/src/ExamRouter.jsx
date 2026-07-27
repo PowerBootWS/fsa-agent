@@ -47,7 +47,9 @@ function ThinkingDots() {
 // Chat POST helper — when a leadMagnetToken is present (lead-magnet /
 // free-practice-exam flow), routes through the token-authenticated
 // /api/practice-exam/chat endpoint instead, which derives user/lessonId/
-// examConfig server-side from the token. When leadMagnetToken is absent
+// identity (lead_magnet, first_name) server-side from the token — but count/
+// timed are exam preferences, not identity, so they're still forwarded from
+// the client same as the authenticated path. When leadMagnetToken is absent
 // (the existing authenticated-student path), this sends the exact same
 // request — same URL, headers, and body shape — as before this helper
 // existed.
@@ -61,7 +63,7 @@ function postChatMessage(message, { leadMagnetToken, user, lessonId, examConfig 
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${leadMagnetToken}`,
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, ...(examConfig ? { examConfig } : {}) }),
     });
   }
   return fetch('/api/chat', {

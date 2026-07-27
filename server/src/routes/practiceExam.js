@@ -208,11 +208,20 @@ router.post('/chat', async (req, res) => {
       return res.status(403).json({ error: 'This practice exam session is no longer valid.' });
     }
 
+    // Only count/timed are trusted from the client's examConfig — identity
+    // (lead_magnet, first_name) is always forced server-side below, never
+    // taken from the client, so those two can't be spoofed via this path.
+    const clientExamConfig = req.body?.examConfig || {};
     const payload = {
       user: claims.email,
       lessonId: claims.paperCode,
       message: req.body?.message,
-      examConfig: { lead_magnet: true, first_name: row.first_name },
+      examConfig: {
+        count: clientExamConfig.count,
+        timed: clientExamConfig.timed,
+        lead_magnet: true,
+        first_name: row.first_name,
+      },
     };
 
     const response = await axios.post(`${PYTHON_SERVICE_URL}/agent/chat`, payload);
