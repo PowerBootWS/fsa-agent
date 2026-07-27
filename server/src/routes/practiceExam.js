@@ -13,6 +13,11 @@ const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:5
 
 const requestCodeLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 5 });
 const verifyCodeLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
+// Defense-in-depth: keyed on email alone (not ip:email), so rotating IPs
+// can't multiply brute-force attempts against one target email. Slightly
+// looser than verifyCodeLimiter since its blast radius is "one email from
+// anywhere" rather than "one ip+email pair".
+const verifyCodeEmailLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 15 });
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -90,28 +95,34 @@ router.post('/request-code', async (req, res) => {
       return res.status(500).json({ error: 'Failed to send verification code' });
     }
 
-    // Fire-and-forget lead capture — must never block or fail this response.
-    if (process.env.LEAD_CAPTURE_URL) {
-      fetch(`${process.env.LEAD_CAPTURE_URL}/practice-exam`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-internal-secret': process.env.LEAD_CAPTURE_SHARED_SECRET,
-        },
-        body: JSON.stringify({
-          email: cleanEmail,
-          firstName: cleanFirstName,
-          affiliateCode: affiliateCode || '',
-          classCode,
-          paperCode,
-        }),
-      }).catch((err) => console.error('practice-exam lead-capture error:', err.message));
-    }
-
     res.json({ success: true });
   } catch (err) {
     console.error('practice-exam/request-code error:', err.message);
     res.status(500).json({ error: 'Failed to request verification code' });
+    return;
+  }
+
+  // Fire-and-forget lead capture — deliberately outside the try/catch above
+  // so that fetch()'s *synchronous* throw on a malformed LEAD_CAPTURE_URL
+  // (e.g. if it's ever misconfigured to a non-URL string) can never be
+  // caught by that block and turned into a spurious 500 after the
+  // verification code row was already written and the response already
+  // sent. The .catch() below still covers the async-rejection case.
+  if (process.env.LEAD_CAPTURE_URL) {
+    fetch(`${process.env.LEAD_CAPTURE_URL}/practice-exam`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': process.env.LEAD_CAPTURE_SHARED_SECRET,
+      },
+      body: JSON.stringify({
+        email: cleanEmail,
+        firstName: cleanFirstName,
+        affiliateCode: affiliateCode || '',
+        classCode,
+        paperCode,
+      }),
+    }).catch((err) => console.error('practice-exam lead-capture error:', err.message));
   }
 });
 
@@ -125,6 +136,11 @@ router.post('/verify-code', async (req, res) => {
 
   const limiterKey = `${req.ip}:${cleanEmail}`;
   if (!verifyCodeLimiter.check(limiterKey)) {
+    return res.status(429).json({ error: 'Too many requests, try again later.' });
+  }
+  // Defense-in-depth: same 429 shape, but keyed on email alone so an
+  // attacker rotating IPs can't multiply attempts against one target email.
+  if (!verifyCodeEmailLimiter.check(cleanEmail)) {
     return res.status(429).json({ error: 'Too many requests, try again later.' });
   }
 
@@ -180,6 +196,7 @@ router.post('/chat', async (req, res) => {
     return res.status(401).json({ error: 'Missing or invalid token' });
   }
 
+  let displayUpdate = null;
   try {
     const result = await pool.query(
       'SELECT verified_at, completed_at, first_name FROM practice_exam_attempts WHERE email = $1 AND paper_code = $2',
@@ -199,10 +216,34 @@ router.post('/chat', async (req, res) => {
     };
 
     const response = await axios.post(`${PYTHON_SERVICE_URL}/agent/chat`, payload);
+    displayUpdate = response.data?.display_update;
     res.json(response.data);
   } catch (err) {
     console.error('practice-exam/chat error:', err.message);
-    res.status(502).json({ error: 'AI service error' });
+    return res.status(502).json({ error: 'AI service error' });
+  }
+
+  // Server-side completion gate — deliberately structured outside the
+  // try/catch above (same reasoning as request-code's lead-capture fix):
+  // nothing here can end up feeding the catch block and attempting a
+  // second res.status()/res.json() after the response above already sent.
+  //
+  // Don't rely solely on the client's fire-and-forget POST /complete call
+  // (a network blip or a blocked request would leave the once-per-paper-
+  // ever gate open indefinitely). The orchestrator signals exam completion
+  // via display_update.type === 'exam_done' (see
+  // ai-service/agents/orchestrator.py, e.g. lines ~1196 and ~1427-1442 —
+  // the same object ResultsPanel consumes on the client). Mark it here
+  // too; the UPDATE is idempotent (WHERE completed_at IS NULL), so this
+  // and the client's own /complete call are both safe to run. Fire-and-
+  // forget relative to the response, but not a silent unhandled rejection.
+  if (displayUpdate?.type === 'exam_done') {
+    pool.query(
+      'UPDATE practice_exam_attempts SET completed_at = NOW() WHERE email = $1 AND paper_code = $2 AND completed_at IS NULL',
+      [claims.email, claims.paperCode]
+    ).catch((err) => {
+      console.error('practice-exam/chat completion-mark error:', err.message);
+    });
   }
 });
 
