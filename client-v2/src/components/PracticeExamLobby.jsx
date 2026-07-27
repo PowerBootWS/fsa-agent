@@ -106,6 +106,21 @@ export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, on
               {chapters.map(chapterId => {
                 const parts = chapterId.split('-');
                 const label = parts.length >= 2 ? `Chapter ${parts[parts.length - 1]}` : chapterId;
+                if (leadMagnetMode) {
+                  // Chapter quizzes are a member-only feature — show what's
+                  // available on a subscription without letting a lead
+                  // start one (matches the live v1 practice-preview flow).
+                  return (
+                    <button
+                      key={chapterId}
+                      className="lobby-chapter-btn lobby-chapter-btn--locked"
+                      disabled
+                      title="Subscribe to unlock chapter quizzes"
+                    >
+                      🔒 {label}
+                    </button>
+                  );
+                }
                 return (
                   <button
                     key={chapterId}

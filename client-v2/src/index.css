@@ -988,6 +988,64 @@ body {
 .results-retry-btn:disabled { opacity: 0.65; cursor: not-allowed; }
 .results-retry-hint { margin-top: 8px; font-size: 12px; color: var(--gray-mid); }
 
+/* Lead-magnet enrollment CTA — replaces the retry block for unauthenticated
+   free-practice-exam takers (no lobby/saved progress to retake). */
+.results-enroll-block { margin-top: 24px; text-align: center; }
+.results-enroll-copy {
+  font-size: 13px;
+  color: var(--gray-light);
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+.results-enroll-btn {
+  display: inline-block;
+  background: var(--orange);
+  color: var(--white);
+  font-size: 15px;
+  font-weight: 700;
+  padding: 12px 28px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.results-enroll-btn:hover { background: var(--orange-glow); }
+
+/* Distractor coaching — lead-magnet-only "watch out for these traps" panel,
+   red/amber accent matching .results-row--weak's wrong-answer color. */
+.distractor-coaching { margin-top: 1.5rem; }
+.distractor-coaching-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--off-white);
+  margin: 0 0 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.distractor-coaching-item {
+  border-left: 2px solid #dc2626;
+  background: rgba(220,38,38,0.06);
+  border-radius: 0 6px 6px 0;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.distractor-coaching-item:last-child { margin-bottom: 0; }
+.distractor-coaching-question {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--off-white);
+  margin: 0 0 0.35rem;
+}
+.distractor-coaching-text {
+  font-size: 0.85rem;
+  color: var(--gray-light);
+  margin: 0;
+  line-height: 1.5;
+}
+
 .results-view-all-block { margin-top: 16px; text-align: center; }
 .results-view-all-btn {
   display: inline-block;
@@ -1340,6 +1398,19 @@ body {
   font-family: inherit;
 }
 .lobby-chapter-btn:hover { border-color: var(--orange); background: rgba(232,114,12,0.08); color: var(--orange); }
+
+/* Lead-magnet lobby: chapter quizzes are member-only — shown, not hidden,
+   so a lead can see what a subscription unlocks, but non-interactive. */
+.lobby-chapter-btn--locked {
+  cursor: not-allowed;
+  opacity: 0.55;
+  color: var(--gray-mid);
+}
+.lobby-chapter-btn--locked:hover {
+  border-color: var(--plate-edge);
+  background: var(--iron);
+  color: var(--gray-mid);
+}
 
 /* Teaching notes */
 .teaching-notes { margin-top: 1.5rem; }

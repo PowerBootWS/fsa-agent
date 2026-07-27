@@ -6,6 +6,7 @@ import 'katex/dist/katex.min.css';
 import { PracticeExamLobby } from './components/PracticeExamLobby.jsx';
 import { TeachingNotes, NextAttemptPreview } from './components/TeachingNotes.jsx';
 import { QuestionReview, QuestionReviewModal } from './components/QuestionReview.jsx';
+import { DistractorCoaching } from './components/DistractorCoaching.jsx';
 import { MathContent } from './components/MathContent.jsx';
 import { CountdownTimer } from './components/CountdownTimer.jsx';
 import { isFourthClassCode } from './utils/fourthClass';
@@ -145,9 +146,10 @@ function ExamProgressBar({ current, total, correct }) {
 // Results panel
 // ---------------------------------------------------------------------------
 
-export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, user }) {
+export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, user, leadMagnetMode = false }) {
   const { score, total, score_pct, chapter_stats,
-          objective_breakdowns, next_attempt_allocation, question_review } = displayContent;
+          objective_breakdowns, next_attempt_allocation, question_review,
+          distractor_coaching } = displayContent;
   const scoreColor = score_pct >= 75 ? '#16a34a' : score_pct >= 55 ? '#d97706' : '#dc2626';
   const [retrying, setRetrying] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
@@ -210,7 +212,7 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
         </div>
       )}
 
-      {onRetry && (
+      {!leadMagnetMode && onRetry && (
         <div className="results-retry-block">
           <button
             className="results-retry-btn"
@@ -228,6 +230,25 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
           </p>
         </div>
       )}
+
+      {/* Lead-magnet exams have no lobby to return to and no saved
+          progress to retake — instead of onRetry, point at the $149/month
+          subscription (same offer/tone as the orchestrator's lead-magnet
+          debrief prompt in ai-service/agents/orchestrator.py). */}
+      {leadMagnetMode && (
+        <div className="results-enroll-block">
+          <p className="results-enroll-copy">
+            Ready for unlimited adaptive practice exams across every paper,
+            full course content, and AI tutoring? Subscribe for $149/month.
+          </p>
+          <a
+            className="results-enroll-btn"
+            href="https://enrollment.fullsteamahead.ca"
+          >
+            Enroll Now →
+          </a>
+        </div>
+      )}
     </div>
   );
 
@@ -241,7 +262,22 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
             chapterStats={chapter_stats}
             onSelectChapter={onSelectChapter}
           />
+          {leadMagnetMode && (
+            <DistractorCoaching
+              coaching={distractor_coaching}
+              questionReview={question_review}
+            />
+          )}
         </div>
+      )}
+      {/* If there are no objective breakdowns (no split layout), the
+          coaching panel still needs a home — place it directly under the
+          overview column in that case. */}
+      {!hasFocus && leadMagnetMode && (
+        <DistractorCoaching
+          coaching={distractor_coaching}
+          questionReview={question_review}
+        />
       )}
       {hasReview && isExam && reviewModalOpen && (
         <QuestionReviewModal
