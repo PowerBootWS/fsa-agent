@@ -186,11 +186,14 @@ class Researcher:
             return None
 
     def save_progress(self, user_email, lesson_id, score, struggles, attempts,
-                      complexity_level, outcome=None, session_notes=None):
+                      complexity_level, outcome=None, session_notes=None, completed=None):
         """
         Upsert user progress to the database.
         lesson_id can be a lesson_code string or numeric id.
         Uses ON CONFLICT to merge rather than replace existing data.
+        completed is one-way (None leaves it alone, True sets it) — a later
+        session that hasn't re-hit the completion threshold yet must not flip
+        an already-completed objective back to incomplete.
         """
         try:
             db_id = self._resolve_lesson_db_id(lesson_id)
@@ -211,8 +214,8 @@ class Researcher:
                 """
                 INSERT INTO user_progress
                     (user_email, lesson_id, lesson_code, score, struggles, attempts,
-                     complexity_level, outcome, session_notes, last_accessed)
-                VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, NOW())
+                     complexity_level, outcome, session_notes, completed, last_accessed)
+                VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s, NOW())
                 ON CONFLICT (user_email, lesson_id) DO UPDATE SET
                     lesson_code      = COALESCE(EXCLUDED.lesson_code, user_progress.lesson_code),
                     score            = EXCLUDED.score,
@@ -221,10 +224,11 @@ class Researcher:
                     complexity_level = EXCLUDED.complexity_level,
                     outcome          = COALESCE(EXCLUDED.outcome, user_progress.outcome),
                     session_notes    = COALESCE(EXCLUDED.session_notes, user_progress.session_notes),
+                    completed        = COALESCE(EXCLUDED.completed, user_progress.completed),
                     last_accessed    = NOW()
                 """,
                 (user_email, db_id, lesson_code, score, safe_struggles, safe_attempts,
-                 safe_complexity, outcome, session_notes)
+                 safe_complexity, outcome, session_notes, completed)
             )
             conn.commit()
             cursor.close()
@@ -233,6 +237,41 @@ class Researcher:
 
         except Exception as e:
             print(f'Researcher.save_progress error: {e}')
+            return False
+
+    def save_chat_history(self, user_email, lesson_id, messages):
+        """
+        Upsert the full session transcript to the chat_history table.
+        One row per (user_email, lesson_id) — each call replaces the prior
+        snapshot with the current full transcript, same checkpoint pattern
+        as save_progress.
+        """
+        try:
+            db_id = self._resolve_lesson_db_id(lesson_id)
+            if db_id is None:
+                print(f'Researcher.save_chat_history: lesson not found for {lesson_id}')
+                return False
+
+            safe_messages = messages if isinstance(messages, str) else json.dumps(messages or [])
+
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO chat_history (user_email, lesson_id, messages)
+                VALUES (%s, %s, %s::jsonb)
+                ON CONFLICT (user_email, lesson_id) DO UPDATE SET
+                    messages = EXCLUDED.messages
+                """,
+                (user_email, db_id, safe_messages)
+            )
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return True
+
+        except Exception as e:
+            print(f'Researcher.save_chat_history error: {e}')
             return False
 
     # ------------------------------------------------------------------

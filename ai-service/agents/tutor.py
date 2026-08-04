@@ -81,6 +81,12 @@ class TutorAgent:
         if len(state['chat_history']) > MAX_HISTORY_ENTRIES:
             state['chat_history'] = state['chat_history'][-MAX_HISTORY_ENTRIES:]
 
+        # Full untruncated transcript for durable persistence (separate from
+        # the rolling LLM-context window above, which is deliberately capped).
+        state.setdefault('full_transcript', [])
+        state['full_transcript'].append({'role': 'user', 'content': user_message})
+        state['full_transcript'].append({'role': 'assistant', 'content': response_text})
+
         return {'response': response_text}
 
     def _call_api(self, system_prompt, messages):

@@ -124,6 +124,8 @@ async function saveChatHistory(userEmail, lessonId, messages) {
   const result = await pool.query(
     `INSERT INTO chat_history (user_email, lesson_id, messages)
      VALUES ($1, $2, $3::jsonb)
+     ON CONFLICT (user_email, lesson_id) DO UPDATE SET
+       messages = EXCLUDED.messages
      RETURNING id`,
     [userEmail, lessonId, safeMessages]
   );

@@ -111,6 +111,10 @@ class Orchestrator:
 
                 # Chat history for LLM context (rolling, max 12 entries)
                 'chat_history': [],
+                # Full session transcript, untruncated — persisted to the
+                # chat_history DB table (distinct from the rolling LLM-context
+                # window above, which is capped and never written to disk).
+                'full_transcript': [],
 
                 # Profanity tracking
                 'profanity_count': 0,
@@ -280,6 +284,9 @@ class Orchestrator:
 
         if self._should_save_progress(state):
             outcome = self._compute_outcome(state)
+            # One-way: only ever pass True (never explicit False), so a fresh
+            # review session on an already-completed objective can't uncheck it.
+            completed = True if state.get('session_limit_reached') else None
             researcher.save_progress(
                 user_email=state['user'],
                 lesson_id=state['lesson_id'],
@@ -288,6 +295,12 @@ class Orchestrator:
                 attempts=state['attempts'],
                 complexity_level=state['complexity_level'],
                 outcome=outcome,
+                completed=completed,
+            )
+            researcher.save_chat_history(
+                user_email=state['user'],
+                lesson_id=state['lesson_id'],
+                messages=state.get('full_transcript', []),
             )
 
         return {
