@@ -123,12 +123,12 @@ const styles = {
     fontFamily: 'inherit',
   },
   classToggleRow: {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
     gap: '12px',
     marginBottom: '24px',
   },
   classToggleBtn: {
-    flex: 1,
     background: '#0D1117',
     border: '2px solid #252F42',
     borderRadius: '4px',

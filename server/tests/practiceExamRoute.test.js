@@ -1,3 +1,5 @@
+process.env.PRACTICE_EXAM_TOKEN_SECRET ||= 'test-secret';
+
 const request = require('supertest');
 const express = require('express');
 const { pool } = require('./testPool');
@@ -83,6 +85,17 @@ describe('POST /api/practice-exam/request-code — 4th class + cross-class exclu
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ success: true });
+  });
+
+  it('still blocks a resend for a paper the SAME email already completed', async () => {
+    await insertAttempt({ email: 'completed@example.com', classCode: 'fourth_a', paperCode: '4A', completedAt: new Date() });
+
+    const res = await request(buildTestApp())
+      .post('/api/practice-exam/request-code')
+      .send({ firstName: 'Jordan', email: 'completed@example.com', classCode: 'fourth_a', paperCode: '4A' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: false, already_used: true, paper_code: '4A' });
   });
 
   it('a fresh email with no prior rows can pick any of second/third/fourth_a/fourth_b', async () => {
