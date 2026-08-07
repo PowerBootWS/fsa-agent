@@ -4,7 +4,7 @@ const axios = require('axios');
 const router = express.Router();
 
 const { pool } = require('../services/database');
-const { PAPERS_SECOND, PAPERS_THIRD } = require('./preview');
+const { PAPERS_BY_CLASS } = require('../config/papersForClass');
 const practiceExamTokens = require('../services/practiceExamTokens');
 const { createRateLimiter } = require('../utils/rateLimit');
 const { sendPracticeExamCode } = require('../services/email');
@@ -20,9 +20,10 @@ const verifyCodeLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 
 const verifyCodeEmailLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 15 });
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const VALID_CLASS_CODES = Object.keys(PAPERS_BY_CLASS); // ['second','third','fourth_a','fourth_b']
 
 function paperListForClass(classCode) {
-  return classCode === 'third' ? PAPERS_THIRD : PAPERS_SECOND;
+  return PAPERS_BY_CLASS[classCode] || [];
 }
 
 // Extracts and verifies the bearer token, returning claims or null.
@@ -50,7 +51,7 @@ router.post('/request-code', async (req, res) => {
     return res.status(400).json({ error: 'Invalid email format' });
   }
 
-  if (classCode !== 'second' && classCode !== 'third') {
+  if (!VALID_CLASS_CODES.includes(classCode)) {
     return res.status(400).json({ error: 'Invalid classCode' });
   }
 
@@ -64,12 +65,23 @@ router.post('/request-code', async (req, res) => {
   }
 
   try {
+    // Cross-class exclusivity: a lead gets exactly one free exam total,
+    // across every class/paper — not one per paper. An uncompleted,
+    // abandoned attempt still counts (blocks switching mid-attempt too).
+    const otherAttempt = await pool.query(
+      'SELECT paper_code FROM practice_exam_attempts WHERE email = $1 AND paper_code != $2 LIMIT 1',
+      [cleanEmail, paperCode]
+    );
+    if (otherAttempt.rows.length > 0) {
+      return res.status(200).json({ success: false, already_used: true, paper_code: otherAttempt.rows[0].paper_code });
+    }
+
     const existing = await pool.query(
       'SELECT completed_at FROM practice_exam_attempts WHERE email = $1 AND paper_code = $2',
       [cleanEmail, paperCode]
     );
     if (existing.rows.length > 0 && existing.rows[0].completed_at !== null) {
-      return res.status(200).json({ success: false, already_used: true });
+      return res.status(200).json({ success: false, already_used: true, paper_code: paperCode });
     }
 
     const code = String(crypto.randomInt(100000, 1000000));
