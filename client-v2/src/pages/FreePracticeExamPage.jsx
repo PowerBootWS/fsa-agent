@@ -190,15 +190,17 @@ const styles = {
   },
 };
 
-function AlreadyUsedNotice({ existingPaperCode }) {
+function AlreadyUsedNotice({ existingPaperCode, classCode }) {
+  const isFourthClass = classCode === 'fourth_a' || classCode === 'fourth_b';
   return (
     <div>
       <p style={{ color: '#F4F5F7', fontSize: '14px', lineHeight: 1.6, textAlign: 'center' }}>
         {existingPaperCode
           ? `Looks like you've already used your one free practice exam (${existingPaperCode}).`
           : `Looks like you've already used your free practice exam for this paper.`}{' '}
-        Subscribe to get unlimited adaptive practice exams across every paper,
-        full course content, and AI tutoring.
+        {isFourthClass
+          ? 'Subscribe to get unlimited adaptive practice exams across every paper and full course content.'
+          : 'Subscribe to get unlimited adaptive practice exams across every paper, full course content, and AI tutoring.'}
       </p>
       <a href={ENROLL_URL} style={{ ...styles.button, display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
         Subscribe Now →
@@ -509,7 +511,7 @@ export default function FreePracticeExamPage() {
               {CLASS_OPTIONS.find(opt => opt.value === classCode)?.label || classCode} — {paperCode}
             </p>
             {alreadyUsed ? (
-              <AlreadyUsedNotice existingPaperCode={alreadyUsedPaperCode} />
+              <AlreadyUsedNotice existingPaperCode={alreadyUsedPaperCode} classCode={classCode} />
             ) : (
               <form onSubmit={handleSignupSubmit}>
                 <label style={styles.label} htmlFor="fpe-firstName">First Name</label>
@@ -550,7 +552,7 @@ export default function FreePracticeExamPage() {
           <div>
             <p style={styles.hint}>We sent a 6-digit code to {email}. Enter it below to start your free practice exam.</p>
             {alreadyUsed ? (
-              <AlreadyUsedNotice existingPaperCode={alreadyUsedPaperCode} />
+              <AlreadyUsedNotice existingPaperCode={alreadyUsedPaperCode} classCode={classCode} />
             ) : (
               <form onSubmit={handleVerifySubmit}>
                 <label style={styles.label} htmlFor="fpe-code">Verification Code</label>
