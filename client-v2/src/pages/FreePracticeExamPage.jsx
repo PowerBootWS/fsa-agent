@@ -502,7 +502,7 @@ export default function FreePracticeExamPage() {
 
         {phase === 'signup' && (
           <div>
-            <button type="button" style={styles.backLink} onClick={() => { setAlreadyUsed(false); setAlreadyUsedPaperCode(null); setPhase('picker'); }}>
+            <button type="button" style={styles.backLink} onClick={() => { setAlreadyUsed(false); setAlreadyUsedPaperCode(null); setClassCode(null); setPaperCode(null); setPapers([]); setPhase('picker'); }}>
               ← Start over
             </button>
             <p style={styles.hint}>
