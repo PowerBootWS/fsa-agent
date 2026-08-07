@@ -18,7 +18,13 @@ import { ExamRouter } from '../ExamRouter';
 const CLASS_OPTIONS = [
   { value: 'second', label: '2nd Class' },
   { value: 'third', label: '3rd Class' },
+  { value: 'fourth_a', label: '4th Class – Part A' },
+  { value: 'fourth_b', label: '4th Class – Part B' },
 ];
+
+// 4th Class is sold as two standalone papers, not a subscription with a
+// paper grid inside it — picking the class IS picking the paper.
+const FOURTH_CLASS_PAPER = { fourth_a: '4A', fourth_b: '4B' };
 
 const ENROLL_URL = 'https://enrollment.fullsteamahead.ca';
 
@@ -184,11 +190,13 @@ const styles = {
   },
 };
 
-function AlreadyUsedNotice() {
+function AlreadyUsedNotice({ existingPaperCode }) {
   return (
     <div>
       <p style={{ color: '#F4F5F7', fontSize: '14px', lineHeight: 1.6, textAlign: 'center' }}>
-        Looks like you've already used your free practice exam for this paper.
+        {existingPaperCode
+          ? `Looks like you've already used your one free practice exam (${existingPaperCode}).`
+          : `Looks like you've already used your free practice exam for this paper.`}{' '}
         Subscribe to get unlimited adaptive practice exams across every paper,
         full course content, and AI tutoring.
       </p>
@@ -225,6 +233,7 @@ export default function FreePracticeExamPage() {
   const [resendMessage, setResendMessage] = useState('');
 
   const [alreadyUsed, setAlreadyUsed] = useState(false);
+  const [alreadyUsedPaperCode, setAlreadyUsedPaperCode] = useState(null);
 
   // Never persisted to localStorage — short-lived, single-session credential.
   const [token, setToken] = useState('');
@@ -256,6 +265,16 @@ export default function FreePracticeExamPage() {
       const urlClass = searchParams.get('class');
       const urlPaper = searchParams.get('paper');
 
+      if (FOURTH_CLASS_PAPER[urlClass]) {
+        // 4th Class deep link: class IS the paper, no papers-for-class
+        // fetch needed — go straight to signup.
+        setClassCode(urlClass);
+        setPaperCode(FOURTH_CLASS_PAPER[urlClass]);
+        setPhase('signup');
+        setInitializing(false);
+        return;
+      }
+
       const validClass = urlClass === 'second' || urlClass === 'third';
       if (!validClass) {
         setInitializing(false);
@@ -277,6 +296,18 @@ export default function FreePracticeExamPage() {
   function handleClassToggle(cls) {
     if (cls === classCode) return;
     setClassCode(cls);
+    setAlreadyUsed(false);
+    setAlreadyUsedPaperCode(null);
+    setRequestError('');
+
+    if (FOURTH_CLASS_PAPER[cls]) {
+      // 4th Class: the class IS the paper — no paper-grid step, go
+      // straight to signup like handleSelectPaper does for 2nd/3rd.
+      setPaperCode(FOURTH_CLASS_PAPER[cls]);
+      setPhase('signup');
+      return;
+    }
+
     setPaperCode(null);
     fetchPapersForClass(cls);
   }
@@ -284,6 +315,7 @@ export default function FreePracticeExamPage() {
   function handleSelectPaper(paper) {
     setPaperCode(paper);
     setAlreadyUsed(false);
+    setAlreadyUsedPaperCode(null);
     setRequestError('');
     setPhase('signup');
   }
@@ -305,6 +337,7 @@ export default function FreePracticeExamPage() {
       }
       if (data.success === false && data.already_used) {
         setAlreadyUsed(true);
+        setAlreadyUsedPaperCode(data.paper_code || null);
         return;
       }
       if (data.success) {
@@ -339,6 +372,11 @@ export default function FreePracticeExamPage() {
       }
       if (data.success === false && data.already_used) {
         setAlreadyUsed(true);
+        // verify-code's already_used is always for the currently-selected
+        // paper (it doesn't return paper_code) — clear any stale value
+        // from an earlier request-code call so the notice falls back to
+        // the generic "for this paper" wording, not a wrong one.
+        setAlreadyUsedPaperCode(null);
         return;
       }
       if (data.success) {
@@ -372,6 +410,7 @@ export default function FreePracticeExamPage() {
       }
       if (data.success === false && data.already_used) {
         setAlreadyUsed(true);
+        setAlreadyUsedPaperCode(data.paper_code || null);
         return;
       }
       if (data.success) {
@@ -463,14 +502,14 @@ export default function FreePracticeExamPage() {
 
         {phase === 'signup' && (
           <div>
-            <button type="button" style={styles.backLink} onClick={() => { setAlreadyUsed(false); setPhase('picker'); }}>
-              ← Choose a different paper
+            <button type="button" style={styles.backLink} onClick={() => { setAlreadyUsed(false); setAlreadyUsedPaperCode(null); setPhase('picker'); }}>
+              ← Start over
             </button>
             <p style={styles.hint}>
-              {classCode === 'third' ? '3rd Class' : '2nd Class'} — {paperCode}
+              {CLASS_OPTIONS.find(opt => opt.value === classCode)?.label || classCode} — {paperCode}
             </p>
             {alreadyUsed ? (
-              <AlreadyUsedNotice />
+              <AlreadyUsedNotice existingPaperCode={alreadyUsedPaperCode} />
             ) : (
               <form onSubmit={handleSignupSubmit}>
                 <label style={styles.label} htmlFor="fpe-firstName">First Name</label>
@@ -511,7 +550,7 @@ export default function FreePracticeExamPage() {
           <div>
             <p style={styles.hint}>We sent a 6-digit code to {email}. Enter it below to start your free practice exam.</p>
             {alreadyUsed ? (
-              <AlreadyUsedNotice />
+              <AlreadyUsedNotice existingPaperCode={alreadyUsedPaperCode} />
             ) : (
               <form onSubmit={handleVerifySubmit}>
                 <label style={styles.label} htmlFor="fpe-code">Verification Code</label>
