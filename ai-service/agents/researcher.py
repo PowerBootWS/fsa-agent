@@ -95,30 +95,48 @@ class Researcher:
     # User data
     # ------------------------------------------------------------------
 
+    # Tables that can hold a student's real first name, in order of authority.
+    # `platform_users` is the self-hosted platform's system of record; `users`
+    # is the legacy pre-migration table that most current students have no row
+    # in at all. Querying `users` alone meant those students fell through to
+    # the email-derived fallback and got greeted by their email prefix — which
+    # for kromanoff@ is a SURNAME ("Hi Kromanoff"). Fixed 2026-08-10.
+    _NAME_SOURCE_TABLES = ('platform_users', 'users')
+
     def get_user_by_email(self, email):
         """
-        Fetch user first name by email.
-        Falls back to deriving a name from the email address if user not found.
+        Fetch a student's first name by email.
+
+        Looks in platform_users first, then the legacy users table, and only
+        derives a name from the email address as a last resort.
         """
-        try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            cursor.execute('SELECT first_name, email FROM users WHERE email = %s', (email,))
-            result = cursor.fetchone()
-            cursor.close()
-            conn.close()
+        if not email:
+            return {'first_name': 'there', 'email': email}
 
-            if result:
-                # Guard against NULL first_name stored in DB
-                stored_name = result['first_name']
-                if stored_name and str(stored_name).strip():
-                    return {'first_name': str(stored_name).strip(), 'email': result['email']}
-                # Name is NULL/empty — fall through to email-derived fallback
+        for table in self._NAME_SOURCE_TABLES:
+            try:
+                conn = self._get_connection()
+                cursor = conn.cursor()
+                # Table name is interpolated from a module-level literal tuple,
+                # never from user input — no injection surface here.
+                cursor.execute(
+                    f'SELECT first_name, email FROM {table} WHERE LOWER(email) = LOWER(%s)',
+                    (email,)
+                )
+                result = cursor.fetchone()
+                cursor.close()
+                conn.close()
 
-        except Exception as e:
-            print(f'Researcher.get_user_by_email error: {e}')
+                if result:
+                    # Guard against NULL/blank first_name stored in DB
+                    stored_name = result['first_name']
+                    if stored_name and str(stored_name).strip():
+                        return {'first_name': str(stored_name).strip(), 'email': result['email']}
+                    # Name is NULL/empty — try the next source
+            except Exception as e:
+                print(f'Researcher.get_user_by_email({table}) error: {e}')
 
-        # Fallback: derive name from email (e.g. john.doe@example.com → John)
+        # Last resort: derive name from email (e.g. john.doe@example.com → John)
         first_name = email.split('@')[0].split('.')[0].title()
         return {'first_name': first_name, 'email': email}
 
@@ -392,6 +410,109 @@ class Researcher:
             print(f'Researcher.get_relevant_chunks error: {e}')
             return []
 
+    # Words that carry no retrieval signal — stripped before building a tsquery.
+    _FTS_STOPWORDS = {
+        'the', 'and', 'how', 'why', 'what', 'does', 'can', 'you', 'are',
+        'for', 'this', 'that', 'with', 'from', 'explain', 'tell', 'about',
+        'more', 'detail', 'please', 'work', 'works', 'would', 'like',
+        'mean', 'means', 'remind', 'again', 'was', 'were', 'has', 'have',
+    }
+
+    def _build_or_tsquery(self, context_hint):
+        """
+        Turn a natural-language phrase into an OR-joined tsquery string.
+
+        OR rather than AND: "explain how a safety valve works" should match
+        chunks about any of its key terms, ranked by relevance.
+        plainto_tsquery would AND every word and almost always miss.
+
+        Returns None when there is nothing worth searching for.
+        """
+        if not context_hint:
+            return None
+        import re
+        words = re.findall(r'[a-z0-9]{3,}', str(context_hint).lower())
+        terms = [w for w in dict.fromkeys(words) if w not in self._FTS_STOPWORDS]
+        if not terms:
+            return None
+        return ' | '.join(terms)
+
+    def search_library(self, context_hint, exclude_lesson_code=None, limit=3):
+        """
+        Full-text search lesson_chunks across the ENTIRE library — every paper,
+        every certification level — not just the student's current course.
+
+        This is the research step behind cross-paper tutoring. A lesson often
+        *references* a concept that is formally taught in an earlier chapter or
+        a different paper; when the student asks about one of those, the
+        in-lesson chunks cannot answer it. Rather than have the tutor deflect,
+        the researcher goes and finds the material and hands it over.
+
+        Results are capped at one chunk per lesson so three hits mean three
+        different sources rather than three slides from the same deck.
+
+        Returns chunk dicts in the get_relevant_chunks shape, plus
+        'lesson_code' and 'lesson_title' so the tutor can cite where a topic
+        is actually taught.
+        """
+        tsquery = self._build_or_tsquery(context_hint)
+        if not tsquery:
+            return []
+        try:
+            conn = self._get_connection()
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT c.lesson_code, c.slide_number, c.title, c.body,
+                       c.narration, c.source_content,
+                       l.title AS lesson_title,
+                       ts_rank(
+                           to_tsvector('english',
+                               coalesce(c.title,'') || ' ' ||
+                               coalesce(c.body,'') || ' ' ||
+                               coalesce(c.narration,'')),
+                           to_tsquery('english', %s)
+                       ) AS rank
+                FROM lesson_chunks c
+                LEFT JOIN lessons l ON l.lesson_code = c.lesson_code
+                WHERE to_tsvector('english',
+                          coalesce(c.title,'') || ' ' ||
+                          coalesce(c.body,'') || ' ' ||
+                          coalesce(c.narration,''))
+                      @@ to_tsquery('english', %s)
+                  AND (%s::varchar IS NULL OR c.lesson_code <> %s)
+                ORDER BY rank DESC
+                LIMIT %s
+                """,
+                (tsquery, tsquery, exclude_lesson_code, exclude_lesson_code, limit * 6)
+            )
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+
+            results = []
+            seen_lessons = set()
+            for r in rows:
+                code = r['lesson_code']
+                if code in seen_lessons:
+                    continue
+                seen_lessons.add(code)
+                results.append({
+                    'lesson_code': code,
+                    'lesson_title': r['lesson_title'] or '',
+                    'slide_number': r['slide_number'],
+                    'title': r['title'] or '',
+                    'body': r['body'] or '',
+                    'narration': r['narration'] or '',
+                    'source_content': r['source_content'] or '',
+                })
+                if len(results) >= limit:
+                    break
+            return results
+        except Exception as e:
+            print(f'Researcher.search_library error: {e}')
+            return []
+
     def get_course_chunks(self, course_id, context_hint, limit=4):
         """
         Full-text search lesson_chunks across an ENTIRE course (all lessons
@@ -399,21 +520,9 @@ class Researcher:
         post-exam follow-up questions, where there is no single active lesson.
         Returns the same chunk dict shape as get_relevant_chunks.
         """
-        if not context_hint:
+        tsquery = self._build_or_tsquery(context_hint)
+        if not tsquery:
             return []
-        # Build an OR query from the significant words so a natural-language
-        # question ("explain how a safety valve works") matches chunks about
-        # any of its key terms, ranked by relevance — plainto_tsquery would AND
-        # every word and almost always miss.
-        import re
-        words = re.findall(r'[a-z0-9]{3,}', context_hint.lower())
-        stop = {'the', 'and', 'how', 'why', 'what', 'does', 'can', 'you', 'are',
-                'for', 'this', 'that', 'with', 'from', 'explain', 'tell', 'about',
-                'more', 'detail', 'please', 'work', 'works', 'would', 'like'}
-        terms = [w for w in dict.fromkeys(words) if w not in stop]
-        if not terms:
-            return []
-        tsquery = ' | '.join(terms)
         try:
             conn = self._get_connection()
             cur = conn.cursor()
