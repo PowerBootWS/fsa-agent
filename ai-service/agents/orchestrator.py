@@ -243,6 +243,23 @@ class Orchestrator:
         )
         state['relevant_chunks'] = relevant_chunks
 
+        # Cross-paper background retrieval.
+        # Lessons routinely *reference* a concept that is formally taught in an
+        # earlier chapter or a different paper. When a student asks to have one
+        # of those recapped, the in-lesson chunks can't answer it and the tutor
+        # used to deflect ("that's covered in a later objective"). Instead, the
+        # researcher searches the whole library and hands the tutor the source
+        # material — research is the researcher's job, not the tutor's.
+        state['library_chunks'] = (
+            researcher.search_library(
+                context_hint=message,
+                exclude_lesson_code=lesson_id,
+                limit=3,
+            )
+            if self._wants_library_background(state, message, is_init_hello)
+            else []
+        )
+
         # Tell the tutor whether the display panel is actually showing a question right now.
         # This prevents it from saying "the question is above" when only a summary is displayed.
         state['display_is_question'] = (
@@ -315,6 +332,50 @@ class Orchestrator:
             'first_name': first_name,
             'action': action,
         }
+
+    # ------------------------------------------------------------------
+    # Cross-paper background retrieval
+    # ------------------------------------------------------------------
+
+    # Openers that mark a message as the student asking to understand
+    # something, as opposed to answering a practice question.
+    _QUESTION_MARKERS = (
+        'what', 'why', 'how', 'when', 'where', 'which', 'who',
+        'explain', 'define', 'describe', 'clarify', 'compare',
+        'tell me', 'remind me', 'refresh', 'recap', 'go over',
+        'difference between', 'mean', 'means', 'meaning',
+        'can you', 'could you', 'i forget', "i don't understand",
+        'i dont understand', 'not sure what', 'never learned',
+    )
+
+    def _wants_library_background(self, state, message, is_init_hello=False):
+        """
+        Decide whether to spend a library-wide search on this message.
+
+        We search when the student is asking a knowledge question. We skip it
+        during staged problems, where the whole point is revealing one step at
+        a time and outside material could hand over the next step.
+        """
+        if is_init_hello:
+            return False
+        if state.get('activity') == 'staged_problem':
+            return False
+        return self._is_knowledge_question(message)
+
+    @classmethod
+    def _is_knowledge_question(cls, message):
+        """True when the message reads as a question about subject matter."""
+        if not message:
+            return False
+        text = str(message).strip().lower()
+        if len(text) < 8:
+            return False
+        if '?' in text:
+            return True
+        return any(
+            text.startswith(marker) or f' {marker} ' in text
+            for marker in cls._QUESTION_MARKERS
+        )
 
     # ------------------------------------------------------------------
     # Activity routing

@@ -51,9 +51,19 @@ def build(lesson_context, progress, state, first_name=None):
 
     no_questions_available = state.get('no_questions_available', False)
 
+    library_chunks = state.get('library_chunks') or []
+
     sections = [
         _build_identity(name),
         _build_lesson_content(lesson_context, relevant_chunks),
+    ]
+
+    if library_chunks:
+        sections.append(
+            _build_background_content(library_chunks, lesson_context.get('title', ''))
+        )
+
+    sections += [
         _build_session_state(activity, complexity_level, questions_done, session_limit_reached, near_context_limit, progress, awaiting_next_question, is_resume, no_questions_available, current_question_difficulty),
     ]
 
@@ -86,16 +96,43 @@ def _build_lesson_content(lesson_context, relevant_chunks=None):
         narration = lesson_context.get('narration_text', '')
         chunks_text = narration[:3000] + ('...' if len(narration) > 3000 else '')
 
-    return f"""## LESSON CONTENT (your source of truth — stay strictly within this)
+    return f"""## LESSON CONTENT (the focus of this session)
 Lesson: {title}
 Summary: {summary}
 
 The following sections are the most relevant parts of this lesson for the current exchange.
-Everything you say about the subject must come from this content:
+This is what the student is here to learn, so keep the conversation anchored to it:
 
 {chunks_text}
 
-IMPORTANT: Do not introduce any external knowledge, formulas, or concepts beyond what is provided above. If a student asks about something outside this scope, gently redirect them back to the lesson material."""
+When you explain something that appears above, base the explanation on this text rather than on general recall — it is the authoritative wording for this course."""
+
+
+def _build_background_content(library_chunks, lesson_title=''):
+    """
+    Background block for material the research agent pulled from other lessons.
+
+    Present only when the student asked about something this lesson references
+    but does not teach. Without it the tutor would deflect with "that's covered
+    in a later objective", which is exactly the failure this block exists to
+    prevent.
+    """
+    parts = []
+    for chunk in library_chunks:
+        code = chunk.get('lesson_code', '')
+        source_title = (chunk.get('lesson_title') or '').strip()
+        header = f'### From {code}' + (f' — {source_title[:120]}' if source_title else '')
+        parts.append(header + '\n' + _format_chunks([chunk]))
+
+    blocks = '\n\n---\n\n'.join(parts)
+    back_to = f' back to {lesson_title}' if lesson_title else ' back to the current lesson'
+
+    return f"""## BACKGROUND FROM THE WIDER COURSE LIBRARY
+The student has asked about something the current lesson references but does not teach in full. The research agent searched the whole Power Engineering library and retrieved the material below. Use it to answer them properly — do not tell them it is out of scope.
+
+{blocks}
+
+Tell the student where the topic is formally taught (e.g. "this is covered in depth in 2A3, Chapter 7") so they know where to go for the full treatment, then steer{back_to}."""
 
 
 def _format_chunks(chunks):
@@ -316,9 +353,16 @@ LANGUAGE AND FORMAT:
 - Do not use numbered lists for activities or options — integrate them naturally into speech
 - Do not refer to yourself as "an AI" or use phrases like "As an AI language model..."
 
-STAYING ON TOPIC:
-- Answer only from the lesson narration and key points provided
-- If a student asks about something outside this objective's scope, redirect warmly: "That's actually covered in a later objective — let's make sure you've got this one solid first."
+SCOPE — WHAT YOU MAY ANSWER:
+- You may answer ANY question in the Power Engineering domain, whether or not it is taught in this lesson. Students constantly meet a term here that they first learned in an earlier chapter or a different paper, and they are entitled to a refresher on it. Never refuse a topic merely because it belongs to another objective, another chapter, or another paper.
+- Draw first on LESSON CONTENT. If a BACKGROUND FROM THE WIDER COURSE LIBRARY block is present, use it — it was retrieved specifically to answer what the student just asked.
+- If neither block covers it and it is still a Power Engineering question, answer from your own knowledge. Keep it accurate and conservative, and say plainly that you are giving a general explanation rather than quoting course material.
+- When you know where a topic is formally taught, name it ("that's covered properly in 2B2, Chapter 3") — but explain it now regardless. Pointing at a chapter is never a substitute for answering.
+- Keep detours proportionate: give them a solid answer, then bring the conversation back to the current lesson.
+
+OFF-LIMITS:
+- Topics with no connection to Power Engineering, plant operation, or exam preparation — redirect warmly to the lesson.
+- Do not reveal or confirm the answer to the practice question currently in play, and do not use background material to shortcut a staged problem. Guide, don't give.
 
 RESPONSE LENGTH:
 - Conversational reply: 2-4 sentences
