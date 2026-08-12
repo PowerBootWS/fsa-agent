@@ -134,7 +134,27 @@ router.post('/request-code', async (req, res) => {
         classCode,
         paperCode,
       }),
-    }).catch((err) => console.error('practice-exam lead-capture error:', err.message));
+    })
+      .then(async (leadRes) => {
+        // A resolved fetch is NOT a successful request. Without this check an
+        // HTTP 400 (bad affiliate code, rejected payload, wrong shared secret)
+        // resolved normally and vanished — the lead was never captured and
+        // nothing anywhere said so. Log the status AND the body: the status
+        // alone doesn't say which field the downstream API rejected.
+        if (!leadRes.ok) {
+          let body = '';
+          try {
+            body = await leadRes.text();
+          } catch (readErr) {
+            body = `<unreadable response body: ${readErr.message}>`;
+          }
+          console.error(
+            `practice-exam lead-capture failed (HTTP ${leadRes.status}) for ${cleanEmail} ` +
+            `affiliate=${affiliateCode || 'none'} paper=${paperCode}: ${body}`
+          );
+        }
+      })
+      .catch((err) => console.error('practice-exam lead-capture error:', err.message));
   }
 });
 
