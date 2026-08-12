@@ -98,6 +98,17 @@ class Orchestrator:
                 'session_limit_reached': False,
                 'seen_question_ids': [],
 
+                # Objective-practice answer checking. The correct option index
+                # of the question currently on display — without this the
+                # answer evaluator has nothing to compare against, which is why
+                # every attempt used to be recorded as incorrect.
+                'current_question_correct_answer': None,
+                # Count of practice answers actually evaluated this session.
+                # Gates _adjust_complexity so it only moves on real answers,
+                # not on every conversational turn.
+                'answers_evaluated': 0,
+                'last_complexity_eval_at': 0,
+
                 # Staged problem state
                 'staged_step': 1,
                 'staged_problem_id': None,
@@ -497,6 +508,9 @@ class Orchestrator:
         question = questions[0]
         state['current_question_id'] = question['id']
         state['current_question_difficulty'] = question.get('difficulty', 3)
+        # Carry the correct option index alongside the question — the answer
+        # evaluator needs it and has no other route back to the question row.
+        state['current_question_correct_answer'] = question.get('correct_answer')
         state['seen_question_ids'].append(question['id'])
 
         # Check if this is a multi-step problem
@@ -543,6 +557,8 @@ class Orchestrator:
                     state['attempts'][q_id] = {'count': 1, 'correct': True}
                 else:
                     state['attempts'][q_id]['correct'] = True
+                # Counts as an evaluated answer so _adjust_complexity gets to run.
+                state['answers_evaluated'] = state.get('answers_evaluated', 0) + 1
 
                 return None  # Tutor generates completion message
             else:
@@ -586,25 +602,26 @@ class Orchestrator:
     def _evaluate_practice_answer(self, state, message, lesson_context):
         """Evaluate a multiple-choice practice answer and update score/attempts."""
         q_id = str(state.get('current_question_id', 'unknown'))
-        message_lower = message.lower().strip()
 
-        # Look up the current question's correct answer from lesson context
-        # (Simplified: tutor LLM provides full evaluation; here we track attempt count)
         if q_id not in state['attempts']:
             state['attempts'][q_id] = {'count': 0, 'correct': False, 'last_answer': ''}
 
         state['attempts'][q_id]['count'] += 1
         state['attempts'][q_id]['last_answer'] = message
 
-        # Basic letter matching for score tracking
-        selected = None
-        if message_lower in ('a', 'b', 'c', 'd'):
-            selected = ord(message_lower) - ord('a')
-        elif message_lower in ('1', '2', '3', '4'):
-            selected = int(message_lower) - 1
+        # Compare against the question's correct option index, stashed on state
+        # by _load_next_question. Reuses the same parser the exam and chapter
+        # quiz paths already use, so 'b', 'B', '2', 'I think it's B' all work.
+        correct_index = state.get('current_question_correct_answer')
+        if correct_index is not None:
+            is_correct = self._evaluate_mc_answer(message, correct_index)
+            # Sticky: a question answered correctly stays correct even if the
+            # student then talks through it again.
+            if is_correct:
+                state['attempts'][q_id]['correct'] = True
 
-        # We'd need the question data to compare to correct_answer.
-        # For now, increment questions_done; full evaluation is in tutor LLM.
+        state['answers_evaluated'] = state.get('answers_evaluated', 0) + 1
+
         state['questions_done'] += 1
         if state['questions_done'] >= MAX_QUESTIONS_PER_OBJECTIVE:
             state['session_limit_reached'] = True
@@ -614,20 +631,41 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def _update_score(self, state, message, lesson_context):
-        """Simple score tracking based on attempt patterns."""
-        # Score is primarily maintained by specific evaluation methods above.
-        # This is a lightweight check for any outstanding adjustments.
-        pass
+        """Recompute the session score as the share of questions answered correctly.
 
-    def _adjust_complexity(self, state):
-        """Adjust complexity level (1-5) based on performance."""
-        if not state['attempts']:
+        Persisted to user_progress.score and read back by _compute_outcome. With
+        no questions answered yet the score stays at its initial value rather
+        than reporting a misleading 0.
+        """
+        attempts = state.get('attempts') or {}
+        if not attempts:
             return
 
-        total = sum(a.get('count', 1) for a in state['attempts'].values())
-        avg_attempts = total / len(state['attempts'])
-        correct_count = sum(1 for a in state['attempts'].values() if a.get('correct'))
-        accuracy = correct_count / len(state['attempts'])
+        correct_count = sum(1 for a in attempts.values() if a.get('correct'))
+        state['score'] = int(round(100 * correct_count / len(attempts)))
+
+    def _adjust_complexity(self, state):
+        """Adjust complexity level (1-5) based on performance.
+
+        Only moves when a new answer has actually been evaluated. This runs on
+        every message, so without that gate a run of conversational turns after
+        a single wrong answer would decrement the level once per turn — which is
+        how live students ended up pinned at complexity 1, cutting them off from
+        the difficulty-3+ half of the question bank.
+        """
+        attempts = state.get('attempts') or {}
+        if not attempts:
+            return
+
+        answers_evaluated = state.get('answers_evaluated', 0)
+        if answers_evaluated <= state.get('last_complexity_eval_at', 0):
+            return
+        state['last_complexity_eval_at'] = answers_evaluated
+
+        total = sum(a.get('count', 1) for a in attempts.values())
+        avg_attempts = total / len(attempts)
+        correct_count = sum(1 for a in attempts.values() if a.get('correct'))
+        accuracy = correct_count / len(attempts)
 
         if accuracy > 0.8 and avg_attempts < 1.5:
             state['complexity_level'] = min(5, state['complexity_level'] + 1)
