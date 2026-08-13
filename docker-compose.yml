@@ -11,6 +11,11 @@ services:
       - PGTZ=America/Edmonton
     volumes:
       - fsa_postgres_data:/var/lib/postgresql/data
+      # WAL archive for point-in-time recovery. Deliberately a LOCAL bind mount,
+      # not the NFS share: if archive_command fails, Postgres stops recycling WAL
+      # and pg_wal grows until the disk fills and the database stops. A flaky NFS
+      # mount is exactly how that happens. A timer syncs this to /mnt/ovhbackup.
+      - /var/backups/fsa-wal:/wal_archive
     networks:
       - fsa-network
     ports:
