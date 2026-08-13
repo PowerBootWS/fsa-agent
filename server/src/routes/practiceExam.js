@@ -261,7 +261,14 @@ router.post('/chat', async (req, res) => {
     res.json(response.data);
   } catch (err) {
     console.error('practice-exam/chat error:', err.message);
-    return res.status(502).json({ error: 'AI service error' });
+    // 500, not 502 — Cloudflare's edge overrides 502/504/52x response bodies
+    // with its own HTML error page, so the client's res.json() throws on a
+    // parse error instead of reading this JSON. Same reasoning as
+    // platform.js, admin.js and tailoring.js. This route matters more than
+    // most: it is the free-practice-exam lead magnet, and ExamRouter.jsx
+    // consumes it with a bare `.then(r => r.json())` on the init and answer
+    // paths, so an unparseable body leaves the student staring at a dead UI.
+    return res.status(500).json({ error: 'AI service error' });
   }
 
   // Server-side completion gate — deliberately structured outside the
