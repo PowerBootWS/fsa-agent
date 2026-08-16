@@ -190,21 +190,30 @@ const MEDIA_DIR = process.env.MEDIA_DIR || '/srv/fsa-media';
 // Gate it exactly like /api/lesson: requireAuth (identity) then
 // requireActiveSubscription (entitlement) ahead of the static handler.
 //
-// Cache-Control is deliberately `private, no-store`, replacing the previous
-// `{ maxAge: '5m' }`. Cloudflare was caching this content at the edge under the
-// old public/max-age header (cf-cache-status: REVALIDATED, cache-control:
-// public, max-age=14400) — origin-side auth alone leaves those already-cached
-// objects publicly retrievable straight from Cloudflare's cache regardless of
-// this fix. A Cloudflare-side purge of the cached /media objects and a check of
-// the edge cache rule for this path are still required and are tracked
-// separately — not attempted here.
+// Cache-Control is deliberately `private, max-age=300`, replacing the previous
+// `{ maxAge: '5m' }` (which express.static emits as `public, max-age=300`).
+// `private` is the actual security requirement here — it excludes Cloudflare
+// and every other shared cache, so a request that reaches this handler is
+// cached only in the requesting student's own browser, never re-servable to
+// anyone else. `no-store` was considered and rejected on review (fix round 1,
+// 2026-08-16): it buys only "not on the browser's disk cache", which isn't a
+// meaningful control (a logged-in student can save the file regardless), and
+// it costs a full narration re-download plus an extra Postgres auth
+// round-trip every time a student navigates back to a slide, on mobile data.
+// Cloudflare was caching this content at the edge under the old public/max-age
+// header (cf-cache-status: REVALIDATED, cache-control: public, max-age=14400)
+// — origin-side auth alone leaves those already-cached objects publicly
+// retrievable straight from Cloudflare's cache regardless of this fix. A
+// Cloudflare-side purge of the cached /media objects and a check of the edge
+// cache rule for this path are still required and are tracked separately —
+// not attempted here.
 app.use(
   '/media',
   requireAuth,
   requireActiveSubscription,
   express.static(MEDIA_DIR, {
     setHeaders: (res) => {
-      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('Cache-Control', 'private, max-age=300');
     },
   })
 );

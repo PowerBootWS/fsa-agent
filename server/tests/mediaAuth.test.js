@@ -13,7 +13,11 @@
  *    It was also served with `Cache-Control: public, max-age=14400`, which
  *    Cloudflare honoured at the edge (cf-cache-status: REVALIDATED) — so
  *    origin auth alone is not sufficient; the header must also change to
- *    `private, no-store`.
+ *    `private, max-age=300` so no shared cache stores it, while still letting
+ *    the requesting student's own browser cache the file briefly (fix round 1,
+ *    2026-08-16: `no-store` was rejected — it costs a full narration
+ *    re-download and an extra Postgres round-trip per slide revisit, for no
+ *    real security gain over `private` alone).
  *
  * 2. `GET /api/platform/lesson-preview/:lessonCode` (src/routes/platform.js)
  *    was mounted with no auth and returned narration_text/summary/key_points
@@ -52,14 +56,29 @@ const LEARN = 'learn.fullsteamahead.ca';
 
 const OWNER = 'media-auth-owner@example.com';
 
+// Fix round 1 (2026-08-16 review): the original afterEach here did unscoped
+// `DELETE FROM subscriptions` / `DELETE FROM platform_users` with no WHERE —
+// faithfully mirroring ten other suites in this repo, which is exactly the
+// pattern that wiped ten production tables on 2026-08-12 when one of those
+// suites ran against a production POSTGRES_DB. This file must be harmless on
+// its own regardless of which database it is pointed at, so every delete
+// below is scoped to this suite's own fixture email, not to "everything in
+// the table." FIXTURE_EMAIL_LIKE intentionally never matches a real student
+// address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'media-auth-%@example.com';
+
 afterAll(async () => {
   await pool.end();
   fs.rmSync(MEDIA_FIXTURE_DIR, { recursive: true, force: true });
 });
 
 afterEach(async () => {
-  await pool.query('DELETE FROM subscriptions');
-  await pool.query('DELETE FROM platform_users');
+  await pool.query(
+    `DELETE FROM subscriptions
+     WHERE user_id IN (SELECT id FROM platform_users WHERE email LIKE $1)`,
+    [FIXTURE_EMAIL_LIKE]
+  );
+  await pool.query('DELETE FROM platform_users WHERE email LIKE $1', [FIXTURE_EMAIL_LIKE]);
 });
 
 async function createUser({ email, withSubscription }) {
@@ -120,14 +139,14 @@ describe('GET /media requires authentication', () => {
     expect(res.text || '').not.toMatch(/<!doctype html/i);
   });
 
-  it('sends Cache-Control: private, no-store so no shared cache stores lesson media', async () => {
+  it('sends Cache-Control: private, max-age=300 so no shared cache stores lesson media', async () => {
     const { token } = await createUser({ email: OWNER, withSubscription: true });
     const res = await request(app)
       .get('/media/2A1-1-1/slide-003.mp3')
       .set('Host', LEARN)
       .set('Cookie', `fsa_session=${token}`);
     expect(res.status).toBe(200);
-    expect(res.headers['cache-control']).toBe('private, no-store');
+    expect(res.headers['cache-control']).toBe('private, max-age=300');
   });
 });
 
