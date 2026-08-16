@@ -71,3 +71,17 @@ describe('legacy-host auth bypass', () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe('host guard', () => {
+  it('returns 421 for /api on the legacy host', async () => {
+    const res = await request(app)
+      .get('/api/v2/course/2A1/outline')
+      .set('Host', 'fsachat.fullsteamahead.ca');
+    expect(res.status).toBe(421);
+  });
+
+  it('does not block /health', async () => {
+    const res = await request(app).get('/health').set('Host', 'fsachat.fullsteamahead.ca');
+    expect(res.status).toBe(200);
+  });
+});

@@ -38,9 +38,12 @@ describe('unknown /api paths return a real 404', () => {
     expect(res.headers['content-type']).toMatch(/application\/json/);
   });
 
-  it('404s an unknown GET under /api on the legacy host', async () => {
+  it('refuses an unknown GET under /api on the legacy host via the host guard', async () => {
+    // Task 3's host guard (requireLearnHost) intercepts every /api/* request on a
+    // non-platform Host before the router (and therefore before the 404 handler)
+    // ever sees it, so this is 421 (Wrong host), not a 404 route-not-found.
     const res = await request(app).get('/api/definitely-not-a-route').set('Host', LEGACY);
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(421);
   });
 
   it('404s an unknown POST under /api', async () => {

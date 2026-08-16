@@ -102,6 +102,8 @@ const responsesRouter = require('./routes/responses');
 const demoRouter = require('./routes/demo');
 const previewRouter = require('./routes/preview');
 
+const requireLearnHost = require('./middleware/requireLearnHost');
+app.use('/api', requireLearnHost);
 app.use('/api', limiter);
 app.use('/api/validate', validateRouter);
 app.use('/api/lesson', requireAuth, requireActiveSubscription, lessonRouter);
