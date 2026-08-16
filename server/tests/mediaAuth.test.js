@@ -47,6 +47,13 @@ process.env.MEDIA_DIR = MEDIA_FIXTURE_DIR;
 fs.mkdirSync(path.join(MEDIA_FIXTURE_DIR, '2A1-1-1'), { recursive: true });
 const FIXTURE_BYTES = Buffer.from('fake mp3 bytes for test fixture');
 fs.writeFileSync(path.join(MEDIA_FIXTURE_DIR, '2A1-1-1', 'slide-003.mp3'), FIXTURE_BYTES);
+// Slide images go through the same mount as the audio. Covered explicitly
+// because on 2026-08-16 "audio plays but no images appear" was reported right
+// after this gate shipped, and the only way to answer it without guessing is a
+// test that pins both content types. (The real cause was content, not auth:
+// 2A1 and 2A2 have zero rows with an image_url and no .png files on disk.)
+const PNG_FIXTURE_BYTES = Buffer.from('fake png bytes for test fixture');
+fs.writeFileSync(path.join(MEDIA_FIXTURE_DIR, '2A1-1-1', 'slide-004.png'), PNG_FIXTURE_BYTES);
 
 const request = require('supertest');
 const { pool } = require('./testPool');
@@ -125,6 +132,27 @@ describe('GET /media requires authentication', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/audio\/mpeg/);
     expect(res.headers['content-length']).toBe(String(FIXTURE_BYTES.length));
+  });
+
+  // Same mount, different content type. Slide images and narration audio are
+  // served by one express.static handler, so nothing can gate one and not the
+  // other — this pins that, so the next "images don't load" report can be
+  // answered from the test suite instead of by inspecting production.
+  it('serves a slide image to an authenticated subscriber (200)', async () => {
+    const { token } = await createUser({ email: OWNER, withSubscription: true });
+    const res = await request(app)
+      .get('/media/2A1-1-1/slide-004.png')
+      .set('Host', LEARN)
+      .set('Cookie', `fsa_session=${token}`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/image\/png/);
+    expect(res.headers['content-length']).toBe(String(PNG_FIXTURE_BYTES.length));
+    expect(res.headers['cache-control']).toBe('private, max-age=300');
+  });
+
+  it('refuses a slide image to an anonymous caller (401)', async () => {
+    const res = await request(app).get('/media/2A1-1-1/slide-004.png').set('Host', LEARN);
+    expect(res.status).toBe(401);
   });
 
   it('404s a missing file for an authenticated subscriber, as JSON, not the SPA shell', async () => {
