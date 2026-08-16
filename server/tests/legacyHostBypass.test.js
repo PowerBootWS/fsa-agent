@@ -52,7 +52,17 @@ describe('legacy-host auth bypass', () => {
   for (const host of LEGACY_HOSTS) {
     for (const path of PROTECTED_PATHS) {
       it(`refuses ${path} with Host "${host || '(empty)'}"`, async () => {
-        const res = await request(app).get(path).set('Host', host || 'localhost');
+        // Fix round 2 (2026-08-16 re-review): the '' case in LEGACY_HOSTS means
+        // "an absent Host", but `.set('Host', '')` is not reliably sent as an
+        // empty header by supertest/node's http client, and the previous
+        // substitution ('localhost') was itself allow-listed by the guard
+        // (before round 2 removed it), so this case never actually exercised
+        // "refused" for the reason its name claims — it passed by reaching
+        // requireAuth instead. '127.0.0.1' is genuinely sent as a literal Host
+        // value and is not in ALLOWED_HOSTS, so it genuinely exercises refusal
+        // (via the host guard for the empty-Host case, same as every other
+        // entry in LEGACY_HOSTS).
+        const res = await request(app).get(path).set('Host', host || '127.0.0.1');
         expect([401, 403, 421]).toContain(res.status);
         expect(JSON.stringify(res.body)).not.toMatch(/lesson_code|chapters/);
       });

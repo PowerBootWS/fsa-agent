@@ -25,11 +25,21 @@
 //     credits/grant-purchase, deactivate-user) and must be allow-listed or
 //     new-student provisioning, credit grants, and deactivation on
 //     cancellation all silently break.
-//   - `localhost` is allow-listed for local/host-side testing and tooling.
 //   - fsa-dashboard (`PLATFORM_BASE_URL=https://learn.fullsteamahead.ca`),
 //     fsa-overwatch (hits only the exempt `/health`), and ai-service (makes
 //     no calls back into this API) need no entry — confirmed by grep, not
 //     assumed.
+//
+// Fix round 2 (2026-08-16 re-review): `localhost` was removed from the
+// allowlist. It was added on a guess ("local/host-side testing and tooling")
+// with no verified caller — the exact mistake this allowlist exists to
+// avoid. `Host` is client-supplied, so any allow-listed value is a
+// permanent hole for whatever unauthenticated route gets mounted next.
+// Nothing in fsa-webhook-listener, fsa-dashboard, fsa-overwatch, ai-service,
+// docker-compose.yml (no healthcheck), or the three named Jest suites sends
+// `Host: localhost` to `/api` — verified by grep, not assumed. This project's
+// own infrastructure rules also say never to test via localhost; only the
+// public URL through the Cloudflare Tunnel is real traffic.
 
 const LEARN_DOMAIN = (process.env.LEARN_DOMAIN || 'learn.fullsteamahead.ca').toLowerCase();
 
@@ -38,7 +48,7 @@ const LEARN_DOMAIN = (process.env.LEARN_DOMAIN || 'learn.fullsteamahead.ca').toL
 // Host comparison strips the port before matching, so the port is not listed here.
 const INTERNAL_SERVICE_HOST = 'fsa-agent-api-1';
 
-const ALLOWED_HOSTS = new Set([LEARN_DOMAIN, INTERNAL_SERVICE_HOST, 'localhost']);
+const ALLOWED_HOSTS = new Set([LEARN_DOMAIN, INTERNAL_SERVICE_HOST]);
 
 module.exports = function requireLearnHost(req, res, next) {
   const rawHost = req.headers.host || '';
