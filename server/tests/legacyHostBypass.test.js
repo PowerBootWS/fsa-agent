@@ -42,6 +42,13 @@ const PROTECTED_PATHS = [
   '/api/v2/lesson/2A1-1-1',
   '/api/v2/course/2A1/outline',
   '/api/lesson/2A1-1-1',
+  // /media (server/src/index.js) is not behind requireLearnHost — that guard
+  // is mounted on /api only. It is safe on a legacy Host today only because
+  // the fsa_session cookie is host-only for learn.fullsteamahead.ca, so a
+  // legacy-host request carries no cookie and requireAuth 401s it. That's a
+  // real property worth pinning here rather than a coincidence to rediscover
+  // later (fix round 1, 2026-08-16 re-review).
+  '/media/2A1-1-1/slide-003.mp3',
 ];
 
 afterAll(async () => {

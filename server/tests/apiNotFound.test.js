@@ -64,9 +64,15 @@ describe('unknown /api paths return a real 404', () => {
 });
 
 describe('missing static resources return a real 404', () => {
-  it('404s a missing /media file', async () => {
+  // /media now requires auth (2026-08-16, separate fix from this file's own
+  // audit): an anonymous request must be refused by requireAuth before it ever
+  // reaches the static handler that would decide 404 vs 200. So this is 401,
+  // not 404, for an anonymous caller. The authenticated missing-file -> 404
+  // case (proving the soft-404 fix here still holds once past auth) is covered
+  // in tests/mediaAuth.test.js.
+  it('401s an anonymous request for a missing /media file (auth runs before the file layer)', async () => {
     const res = await request(app).get('/media/does-not-exist-abc123.mp3').set('Host', LEARN);
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(401);
   });
 
   it('404s a missing /v2 build asset', async () => {
