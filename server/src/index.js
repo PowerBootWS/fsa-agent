@@ -84,11 +84,12 @@ app.get('/health', (req, res) => {
 const requireAuth = require('./middleware/requireAuth');
 const requireActiveSubscription = require('./middleware/requireActiveSubscription');
 
-// Apply requireAuth only when request comes from learn.* (platform mode)
-function platformAuth(req, res, next) {
-  if (req.isPlatformMode) return requireAuth(req, res, next);
-  return next();
-}
+// platformAuth used to call requireAuth only when the Host header contained
+// LEARN_DOMAIN, and pass through otherwise. Because fsachat.fullsteamahead.ca
+// is routed to this same container, that made every route below anonymously
+// readable from the public internet — verified 2026-08-16 with a 265 KB paid
+// lesson payload. Auth is not conditional on a request header. There is no
+// legacy caller to preserve: client/ (v1) was retired 2026-06-13.
 
 // Routes
 const validateRouter = require('./routes/validate');
@@ -103,11 +104,11 @@ const previewRouter = require('./routes/preview');
 
 app.use('/api', limiter);
 app.use('/api/validate', validateRouter);
-app.use('/api/lesson', platformAuth, requireActiveSubscription, lessonRouter);
-app.use('/api/chat', platformAuth, requireActiveSubscription, chatRouter);
-// requireAuth unconditionally (not platformAuth): this route was reachable with
-// no credentials on BOTH learn.* and fsachat.*, and platformAuth passes through
-// on the legacy host, so it would have left the hole open there. Nothing in
+app.use('/api/lesson', requireAuth, requireActiveSubscription, lessonRouter);
+app.use('/api/chat', requireAuth, requireActiveSubscription, chatRouter);
+// requireAuth unconditionally: this route was reachable with no credentials on
+// BOTH learn.* and fsachat.*, and platformAuth (now removed) passed through on
+// the legacy host, so it would have left the hole open there. Nothing in
 // client/, client-v2/ or ai-service/ calls this route, so there is no legacy
 // caller to preserve. Entitlement gate matches /api/lesson and /api/chat.
 app.use('/api/progress', requireAuth, requireActiveSubscription, progressRouter);
@@ -129,19 +130,19 @@ app.use('/api/practice-exam', practiceExamRouter);
 // v2 routes
 const v2LessonRouter = require('./routes/v2/lesson');
 const { gateLessonAccess } = require('./middleware/platformGate');
-app.use('/api/v2/lesson', platformAuth, requireActiveSubscription, gateLessonAccess, v2LessonRouter);
+app.use('/api/v2/lesson', requireAuth, requireActiveSubscription, gateLessonAccess, v2LessonRouter);
 
 const v2SessionRouter = require('./routes/v2/session');
-app.use('/api/v2/session', platformAuth, requireActiveSubscription, v2SessionRouter);
+app.use('/api/v2/session', requireAuth, requireActiveSubscription, v2SessionRouter);
 
 const v2CheckpointRouter = require('./routes/v2/checkpoint');
-app.use('/api/v2/checkpoint', platformAuth, requireActiveSubscription, v2CheckpointRouter);
+app.use('/api/v2/checkpoint', requireAuth, requireActiveSubscription, v2CheckpointRouter);
 
 const v2CourseRouter = require('./routes/v2/course');
-app.use('/api/v2/course', platformAuth, requireActiveSubscription, v2CourseRouter);
+app.use('/api/v2/course', requireAuth, requireActiveSubscription, v2CourseRouter);
 
 const v2ProgressRouter = require('./routes/v2/progress');
-app.use('/api/v2/progress', platformAuth, requireActiveSubscription, v2ProgressRouter);
+app.use('/api/v2/progress', requireAuth, requireActiveSubscription, v2ProgressRouter);
 
 const authRouter = require('./routes/auth');
 const platformRouter = require('./routes/platform');
