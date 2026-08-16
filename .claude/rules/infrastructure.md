@@ -12,7 +12,7 @@
 | App | Public URL | Notes |
 |-----|-----------|-------|
 | fsa-agent (API + React) | `https://learn.fullsteamahead.ca` | **The live platform** (client-v2, authenticated). The only active front end. |
-| fsa-agent (legacy) | `https://fsachat.fullsteamahead.ca` | **RETIRED 2026-06-13** — old GHL-iframe / client-v1 path. Wired in code, no live traffic. Don't build against it. |
+| fsa-agent (legacy) | `https://fsachat.fullsteamahead.ca` | **RETIRED 2026-06-13** — old GHL-iframe / client-v1 path. "Retired, no live traffic" was read as "harmless" for two months: until 2026-08-16 this host bypassed `requireAuth` **and** `requireActiveSubscription` entirely (`platformAuth` only ran auth when `Host` contained `learn.fullsteamahead.ca`), so it served the full paid library to anonymous callers over the public internet. `/api` now returns 421 on any non-platform host. Don't build against it, and don't assume a retired route is a closed one. |
 
 ## Testing Endpoints
 

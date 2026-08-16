@@ -18,7 +18,7 @@ fsa-agent/
 
 ## Key facts (don't get these wrong)
 
-1. **`client-v2/` is the only live front end.** `client/` (v1) and the `fsachat.*` GHL-iframe path are retired — wired in code but zero live traffic. Do new work in `client-v2/`.
+1. **`client-v2/` is the only live front end.** `client/` (v1) and the `fsachat.*` GHL-iframe path are retired — wired in code but zero live traffic. Do new work in `client-v2/`. **"Retired" never meant "closed":** until 2026-08-16 the `fsachat.*` host skipped `requireAuth` and `requireActiveSubscription` outright and served the whole paid library anonymously. Auth is now unconditional and `/api` returns 421 on any host that is not `learn.fullsteamahead.ca` (`server/src/middleware/requireLearnHost.js`).
 2. **Platform mode, not iframe.** On `learn.*` the server runs in platform mode with `requireAuth` (session cookie) on lesson/chat/v2 routes. The old "iframe-only / validate parent domain" model is gone.
 3. **DB:** PostgreSQL container **`fsa-postgres`**, database `fsa_agent`. All DB access goes through the Express API. `docker exec fsa-postgres psql -U postgres -d fsa_agent ...`
 4. **Single-session auth:** each login overwrites `platform_users.current_session_token`; the other device gets a 401. Intentional — device-switch frequency is instrumented (`login_events.device_type` + `displaced_active_session`, migration 007).
