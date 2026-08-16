@@ -102,9 +102,16 @@ const responsesRouter = require('./routes/responses');
 const demoRouter = require('./routes/demo');
 const previewRouter = require('./routes/preview');
 
+// requireLearnHost is mounted AFTER the rate limiter (fix round 1, 2026-08-16
+// review): mounting it first would let a flood of requests on a forged/legacy
+// Host bypass the 300-per-15-min cap entirely and each get logged via
+// console.warn — with no log rotation configured in docker-compose.yml, that
+// is an unbounded log-growth vector. Rate-limiting first means a flood is
+// capped before the host guard ever runs, so it can only ever log ~300
+// warnings per IP per window.
+app.use('/api', limiter);
 const requireLearnHost = require('./middleware/requireLearnHost');
 app.use('/api', requireLearnHost);
-app.use('/api', limiter);
 app.use('/api/validate', validateRouter);
 app.use('/api/lesson', requireAuth, requireActiveSubscription, lessonRouter);
 app.use('/api/chat', requireAuth, requireActiveSubscription, chatRouter);
