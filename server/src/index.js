@@ -182,9 +182,36 @@ fs.mkdirSync(USER_UPLOADS_DIR, { recursive: true });
 
 // Serve lesson media files (bind-mounted from host)
 const MEDIA_DIR = process.env.MEDIA_DIR || '/srv/fsa-media';
-app.use('/media', express.static(MEDIA_DIR, { maxAge: '5m' }));
+// Paid narration/slide media was reachable with no credentials whatsoever, on
+// any host, and deliberately outside the /api rate limiter — verified live
+// 2026-08-16: GET /media/2A1-1-1/slide-003.mp3 -> 200, audio/mpeg, 380,736
+// bytes, no cookie. Paths are fully enumerable ({LESSON_CODE}/slide-NNN.{mp3,png}),
+// so the whole narration/slide corpus for every paper was scrapeable in a loop.
+// Gate it exactly like /api/lesson: requireAuth (identity) then
+// requireActiveSubscription (entitlement) ahead of the static handler.
+//
+// Cache-Control is deliberately `private, no-store`, replacing the previous
+// `{ maxAge: '5m' }`. Cloudflare was caching this content at the edge under the
+// old public/max-age header (cf-cache-status: REVALIDATED, cache-control:
+// public, max-age=14400) — origin-side auth alone leaves those already-cached
+// objects publicly retrievable straight from Cloudflare's cache regardless of
+// this fix. A Cloudflare-side purge of the cached /media objects and a check of
+// the edge cache rule for this path are still required and are tracked
+// separately — not attempted here.
+app.use(
+  '/media',
+  requireAuth,
+  requireActiveSubscription,
+  express.static(MEDIA_DIR, {
+    setHeaders: (res) => {
+      res.setHeader('Cache-Control', 'private, no-store');
+    },
+  })
+);
 // A missing media file is a missing media file. Without this it fell through to
-// the SPA catch-all below and came back as 200 + index.html.
+// the SPA catch-all below and came back as 200 + index.html. Only reached once
+// requireAuth/requireActiveSubscription above have already let the request
+// through, so no auth duplication needed here.
 app.use('/media', (req, res) => {
   res.status(404).json({ error: 'Not found' });
 });

@@ -631,26 +631,6 @@ router.get('/course-structure/:paperCode', requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/platform/lesson-preview/:lessonCode
-// No auth required — used for exam debrief lesson preview
-router.get('/lesson-preview/:lessonCode', async (req, res) => {
-  try {
-    const { lessonCode } = req.params;
-    const result = await pool.query(
-      `SELECT lesson_code, title, narration_text, summary, key_points
-       FROM lessons WHERE lesson_code = $1`,
-      [lessonCode]
-    );
-    if (!result.rows.length) {
-      return res.status(404).json({ error: 'Lesson not found' });
-    }
-    return res.json(result.rows[0]);
-  } catch (err) {
-    console.error('GET /api/platform/lesson-preview error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 // GET /api/platform/check-access
 // Query params: type ('lesson'|'chapter_quiz'), lesson_code or chapter_id
 // Returns: { allowed: boolean, reason: string|null, required_lesson_code?: string, required_chapter_id?: string }
