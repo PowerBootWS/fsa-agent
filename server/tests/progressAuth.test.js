@@ -86,8 +86,12 @@ describe('/api/progress requires authentication', () => {
   });
 
   it('rejects an unauthenticated GET on the legacy host too', async () => {
+    // Task 3's host guard (requireLearnHost, mounted before the auth middleware)
+    // now intercepts every /api/* request on a non-platform Host and returns 421
+    // before requireAuth ever runs — still an unconditional refusal, just at an
+    // earlier layer, so this is 421 rather than 401.
     const res = await request(app).get('/api/progress/84?user=someone@example.com').set('Host', LEGACY);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(421);
   });
 
   it('does not leak a real progress row to an unauthenticated caller', async () => {
