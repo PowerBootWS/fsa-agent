@@ -29,6 +29,17 @@ async function statusOf(id) {
   return result.rows[0].status;
 }
 
+// NOTE (2026-08-17 review, fix round 1): archiveStaleSavedJobs() scans and
+// UPDATEs across ALL of saved_jobs — it is not scoped to this file's fixture
+// user, so `expect(count).toBe(1)` below is only deterministic because
+// saved_jobs is empty of anything except this test's own rows at the moment
+// it runs. That was true "for free" back when every suite did an unscoped
+// `DELETE FROM saved_jobs` in its own teardown; now it's true because (a)
+// jest.config.js pins maxWorkers: 1 so suites run serially, not concurrently,
+// and (b) every suite that touches saved_jobs cleans up its own fixture rows
+// via deleteFixtureUsersByEmailLike's cascade before the next suite starts.
+// This is a real dependency on other files' teardown behaving, not a bug in
+// this file — flagging it so the next person doesn't spend an hour on it.
 describe('archiveStaleSavedJobs', () => {
   afterEach(async () => {
     await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);

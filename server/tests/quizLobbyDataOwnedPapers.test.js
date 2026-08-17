@@ -59,17 +59,40 @@ async function createUser({ email, classCodes }) {
   return { userId, token };
 }
 
+// Fix round 1 (2026-08-17 review): jest-circus runs afterEach UNCONDITIONALLY
+// — a thrown beforeEach only skips subsequent beforeEach hooks and the test
+// body, not afterEach. So the previous version of this file, which ran the
+// exact-tuple DELETE in afterEach unconditionally, would delete the very rows
+// assertNoRealDataAtFixtureKeys had just correctly detected and refused to
+// touch: guard throws (real data found, nothing inserted) -> test body never
+// runs -> afterEach still fires -> DELETE removes the real rows anyway. This
+// flag is the fix: only set true right after this test's own chapters INSERT
+// actually succeeds, reset false at the top of every beforeEach (before the
+// guard, so a throw leaves it false), and checked in afterEach so a guard
+// failure — or any other failure before the insert — cleans up nothing. Once
+// true, deleting BOTH fixture tuples is still safe even for the tests that
+// only inserted one of them — the other simply never existed, so its DELETE
+// is a no-op — because the guard already proved neither was real data.
+let chaptersInserted = false;
+
 describe('GET /api/platform/quiz-lobby-data — owned papers only', () => {
-  beforeEach(assertNoRealDataAtFixtureKeys);
+  beforeEach(async () => {
+    chaptersInserted = false;
+    await assertNoRealDataAtFixtureKeys();
+  });
 
   afterEach(async () => {
     // Scoped to exactly the tuples this test may have inserted (see
-    // assertNoRealDataAtFixtureKeys above for why not "WHERE course_id IN (...)").
-    await pool.query(
-      `DELETE FROM chapters WHERE ` +
-      FIXTURE_CHAPTERS.map((_, i) => `(course_id = $${i * 2 + 1} AND chapter_num = $${i * 2 + 2})`).join(' OR '),
-      FIXTURE_CHAPTERS.flat()
-    );
+    // assertNoRealDataAtFixtureKeys above for why not "WHERE course_id IN
+    // (...)"), and only run at all if this test's own insert actually
+    // happened (see the flag comment above).
+    if (chaptersInserted) {
+      await pool.query(
+        `DELETE FROM chapters WHERE ` +
+        FIXTURE_CHAPTERS.map((_, i) => `(course_id = $${i * 2 + 1} AND chapter_num = $${i * 2 + 2})`).join(' OR '),
+        FIXTURE_CHAPTERS.flat()
+      );
+    }
     await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
 
@@ -80,6 +103,7 @@ describe('GET /api/platform/quiz-lobby-data — owned papers only', () => {
   it('returns only 4A for a student who owns just fourth_a', async () => {
     const { token } = await createUser({ email: 'qlop-a-only@example.com', classCodes: ['fourth_a'] });
     await pool.query(`INSERT INTO chapters (course_id, chapter_num, title) VALUES ('4A', 1, 'Intro')`);
+    chaptersInserted = true;
 
     const res = await request(buildTestApp())
       .get('/api/platform/quiz-lobby-data')
@@ -92,6 +116,7 @@ describe('GET /api/platform/quiz-lobby-data — owned papers only', () => {
   it('returns only 4B for a student who owns just fourth_b', async () => {
     const { token } = await createUser({ email: 'qlop-b-only@example.com', classCodes: ['fourth_b'] });
     await pool.query(`INSERT INTO chapters (course_id, chapter_num, title) VALUES ('4B', 1, 'Lubrication')`);
+    chaptersInserted = true;
 
     const res = await request(buildTestApp())
       .get('/api/platform/quiz-lobby-data')
@@ -106,6 +131,7 @@ describe('GET /api/platform/quiz-lobby-data — owned papers only', () => {
     await pool.query(
       `INSERT INTO chapters (course_id, chapter_num, title) VALUES ('4A', 1, 'Intro'), ('4B', 1, 'Lubrication')`
     );
+    chaptersInserted = true;
 
     const res = await request(buildTestApp())
       .get('/api/platform/quiz-lobby-data')

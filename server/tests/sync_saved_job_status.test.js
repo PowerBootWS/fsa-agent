@@ -31,6 +31,17 @@ async function sourceStatusOf(id) {
   return result.rows[0].source_status;
 }
 
+// NOTE (2026-08-17 review, fix round 1): syncSavedJobStatuses() scans ALL
+// saved_jobs rows that have a source_job_id — it is not scoped to this
+// file's fixture user, so `expect(result.checked).toBe(2)` below (both its)
+// is only deterministic because saved_jobs holds only this test's own rows
+// at the moment it runs, and the axios mock throws on any source_job_id it
+// doesn't recognize (so a stray row from elsewhere would fail loudly, not
+// silently). That's true because jest.config.js pins maxWorkers: 1 (suites
+// run serially) and every suite that touches saved_jobs cleans up its own
+// fixture rows via deleteFixtureUsersByEmailLike's cascade before the next
+// suite starts. A real dependency on other files' teardown behaving, not a
+// bug in this file — flagging it so the next person doesn't spend an hour on it.
 describe('syncSavedJobStatuses', () => {
   afterEach(async () => {
     jest.resetAllMocks();

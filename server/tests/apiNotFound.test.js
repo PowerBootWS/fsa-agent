@@ -25,6 +25,16 @@ process.env.CLIENT_V2_BUILD_DIR =
 process.env.CLIENT_V1_BUILD_DIR =
   process.env.CLIENT_V1_BUILD_DIR || path.join(__dirname, '../../client/build');
 
+// NOTE (2026-08-17 review, fix round 1): this file never requires
+// tests/testPool — it requires ../src/index directly, which builds its own
+// pool from process.env.POSTGRES_DB with the app's own default
+// (`process.env.POSTGRES_DB || 'fsa_agent'`, i.e. PRODUCTION — see
+// src/services/database.js), not testPool.js's guarded, no-fallback
+// resolution. That pool is unguarded: nothing in this file stops it from
+// running against production. It happens to be safe today only because this
+// file makes no writes — every request here just asserts a status code. If
+// you copy this file's pattern into something that writes, `require('./testPool')`
+// FIRST (before any src/* require) to inherit the guard.
 const request = require('supertest');
 const app = require('../src/index');
 

@@ -67,20 +67,43 @@ async function createUser({ email, classCodes }) {
   return { userId, token };
 }
 
+// Fix round 1 (2026-08-17 review): jest-circus runs afterEach UNCONDITIONALLY
+// — a thrown beforeEach only skips subsequent beforeEach hooks and the test
+// body, not afterEach. So the previous version of this file, which ran the
+// exact-tuple/id DELETEs in afterEach unconditionally, would delete the very
+// rows assertNoRealDataAtFixtureKeys had just correctly detected and refused
+// to touch: guard throws (real data found, nothing inserted) -> test body
+// never runs -> afterEach still fires -> DELETE removes the real rows anyway.
+// These flags are the fix: only set true right after this test's own INSERT
+// actually succeeds, reset false at the top of every beforeEach (before the
+// guard, so a throw leaves them false), and checked in afterEach so a guard
+// failure — or any other failure before the insert — cleans up nothing.
+let chaptersInserted = false;
+let questionsInserted = false;
+
 describe('GET /api/platform/quiz-lobby-data', () => {
-  beforeEach(assertNoRealDataAtFixtureKeys);
+  beforeEach(async () => {
+    chaptersInserted = false;
+    questionsInserted = false;
+    await assertNoRealDataAtFixtureKeys();
+  });
 
   afterEach(async () => {
     // Scoped to exactly the tuples/ids this test may have inserted (see
     // assertNoRealDataAtFixtureKeys above for why not "WHERE course_id IN
-    // (...)") — question_responses cascades automatically via its FK on
-    // questions.id.
-    await pool.query(`DELETE FROM questions WHERE id = ANY($1::int[])`, [FIXTURE_QUESTION_IDS]);
-    await pool.query(
-      `DELETE FROM chapters WHERE ` +
-      FIXTURE_CHAPTERS.map((_, i) => `(course_id = $${i * 2 + 1} AND chapter_num = $${i * 2 + 2})`).join(' OR '),
-      FIXTURE_CHAPTERS.flat()
-    );
+    // (...)"), and only run at all if this test's own insert actually
+    // happened (see the flag comment above) — question_responses cascades
+    // automatically via its FK on questions.id.
+    if (questionsInserted) {
+      await pool.query(`DELETE FROM questions WHERE id = ANY($1::int[])`, [FIXTURE_QUESTION_IDS]);
+    }
+    if (chaptersInserted) {
+      await pool.query(
+        `DELETE FROM chapters WHERE ` +
+        FIXTURE_CHAPTERS.map((_, i) => `(course_id = $${i * 2 + 1} AND chapter_num = $${i * 2 + 2})`).join(' OR '),
+        FIXTURE_CHAPTERS.flat()
+      );
+    }
     await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
 
@@ -103,6 +126,7 @@ describe('GET /api/platform/quiz-lobby-data', () => {
       `INSERT INTO chapters (course_id, chapter_num, title) VALUES
         ('4A', 1, 'Intro'), ('4A', 2, 'Forces'), ('4B', 1, 'Lubrication')`
     );
+    chaptersInserted = true;
     await pool.query(
       `INSERT INTO questions (id, question_text, options, correct_answer, question_type, chapter_id, course_id)
        VALUES
@@ -111,6 +135,7 @@ describe('GET /api/platform/quiz-lobby-data', () => {
         (900003, 'Q3', '["A","B","C","D"]'::jsonb, 0, 'chapter_quiz', '4A-1', '4A'),
         (900004, 'Q4', '["A","B","C","D"]'::jsonb, 0, 'chapter_quiz', '4A-1', '4A')`
     );
+    questionsInserted = true;
     await pool.query(
       `INSERT INTO question_responses (user_email, question_id, session_type, course_id, chapter_id, correct)
        VALUES
