@@ -27,7 +27,6 @@ def test_exam_results_capture_question_text_options_and_selected_index():
         ],
         'exam_index': 1,
         'exam_results': [],
-        'exam_init_hello': False,
         'complexity_level': 3,
     }
     mock_researcher = MagicMock()

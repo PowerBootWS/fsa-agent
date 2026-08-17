@@ -1054,10 +1054,17 @@ class Orchestrator:
             }
 
         # ---- Record answer for previous question ----
-        if idx > 0 and not state.get('exam_init_hello'):
+        # `idx > 0` is the whole guard. The turn that opens an exam is always
+        # the turn where exam_index is still 0, so the lobby's 'hello' can
+        # never be scored as an answer. There used to be a second condition on
+        # `state['exam_init_hello']`, a flag set when question 1 was served and
+        # cleared only AFTER this check ran on the following turn — which meant
+        # the answer to question 1 was silently discarded on every exam ever
+        # taken (100-question exams recorded 99, 50 recorded 49). Reported
+        # 2026-08-11 by a student on the free 2A2 exam; see
+        # tests/test_practice_exam_answer_count.py.
+        if idx > 0:
             self._record_exam_answer(state, user, course_id, message, researcher)
-
-        state['exam_init_hello'] = False
 
         # ---- Transition to debrief ----
         if idx >= total:
@@ -1073,7 +1080,6 @@ class Orchestrator:
         state['exam_index'] = idx + 1
 
         if idx == 0:
-            state['exam_init_hello'] = True  # Don't record the hello as an answer
             intro = (
                 f"Welcome to your {course_id} Practice Exam, {first_name}! "
                 f"You'll get **{total} questions** from across all chapters. "
@@ -1680,7 +1686,6 @@ class Orchestrator:
         state['exam_results'] = []
         state['exam_phase'] = 'answering'
         state['exam_done'] = False
-        state['exam_init_hello'] = True
 
         display_update = self._build_exam_question_display(qs[0], 0, len(qs))
         state['exam_index'] = 1
@@ -1772,7 +1777,6 @@ class Orchestrator:
             'exam_results': results,
             'exam_phase': 'debrief',
             'exam_done': True,
-            'exam_init_hello': False,
         }
 
         correct_count = sum(1 for r in results if r['correct'])

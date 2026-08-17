@@ -126,7 +126,6 @@ def test_exam_results_include_objective_enrichment():
         ],
         'exam_index': 1,  # question 0 already presented
         'exam_results': [],
-        'exam_init_hello': False,
     }
     orch.conversation_state['test@example.com:2B1'] = state
 
