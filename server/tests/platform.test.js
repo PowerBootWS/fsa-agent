@@ -2,7 +2,11 @@ const request = require('supertest');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 const platformRouter = require('../src/routes/platform');
+
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'switchpaper-%@example.com';
 
 function buildTestApp() {
   const app = express();
@@ -32,8 +36,7 @@ async function createUser({ email, withSubscription }) {
 
 describe('POST /api/platform/switch-paper', () => {
   afterEach(async () => {
-    await pool.query(`DELETE FROM subscriptions`);
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
 
   afterAll(async () => {
@@ -41,7 +44,7 @@ describe('POST /api/platform/switch-paper', () => {
   });
 
   it('403s a job-only account with no subscription instead of silently no-op-ing', async () => {
-    const { token } = await createUser({ email: 'jobonly-switch@example.com', withSubscription: false });
+    const { token } = await createUser({ email: 'switchpaper-jobonly@example.com', withSubscription: false });
     const res = await request(buildTestApp())
       .post('/api/platform/switch-paper')
       .set('Cookie', `fsa_session=${token}`)
@@ -50,7 +53,7 @@ describe('POST /api/platform/switch-paper', () => {
   });
 
   it('allows a paid student with an active subscription to switch papers', async () => {
-    const { token } = await createUser({ email: 'paid-switch@example.com', withSubscription: true });
+    const { token } = await createUser({ email: 'switchpaper-paid@example.com', withSubscription: true });
     const res = await request(buildTestApp())
       .post('/api/platform/switch-paper')
       .set('Cookie', `fsa_session=${token}`)

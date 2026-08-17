@@ -1,5 +1,9 @@
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 const { archiveStaleSavedJobs } = require('../src/scripts/archive_stale_saved_jobs');
+
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'archivestale-%@example.com';
 
 async function createUser(email) {
   const result = await pool.query(
@@ -25,17 +29,27 @@ async function statusOf(id) {
   return result.rows[0].status;
 }
 
+// NOTE (2026-08-17 review, fix round 1): archiveStaleSavedJobs() scans and
+// UPDATEs across ALL of saved_jobs — it is not scoped to this file's fixture
+// user, so `expect(count).toBe(1)` below is only deterministic because
+// saved_jobs is empty of anything except this test's own rows at the moment
+// it runs. That was true "for free" back when every suite did an unscoped
+// `DELETE FROM saved_jobs` in its own teardown; now it's true because (a)
+// jest.config.js pins maxWorkers: 1 so suites run serially, not concurrently,
+// and (b) every suite that touches saved_jobs cleans up its own fixture rows
+// via deleteFixtureUsersByEmailLike's cascade before the next suite starts.
+// This is a real dependency on other files' teardown behaving, not a bug in
+// this file — flagging it so the next person doesn't spend an hour on it.
 describe('archiveStaleSavedJobs', () => {
   afterEach(async () => {
-    await pool.query(`DELETE FROM saved_jobs`);
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
   afterAll(async () => {
     await pool.end();
   });
 
   it('archives only saved jobs older than the threshold, leaving other statuses and fresh jobs untouched', async () => {
-    const userId = await createUser('archive-test@example.com');
+    const userId = await createUser('archivestale-test@example.com');
     const staleSaved = await insertSavedJob(userId, 'saved', 100);
     const freshSaved = await insertSavedJob(userId, 'saved', 10);
     const staleApplied = await insertSavedJob(userId, 'applied', 100);
@@ -53,7 +67,7 @@ describe('archiveStaleSavedJobs', () => {
   });
 
   it('respects a custom day threshold', async () => {
-    const userId = await createUser('archive-test-2@example.com');
+    const userId = await createUser('archivestale-test-2@example.com');
     const at45Days = await insertSavedJob(userId, 'saved', 45);
 
     const countAt90 = await archiveStaleSavedJobs(90);

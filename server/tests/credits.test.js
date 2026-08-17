@@ -2,6 +2,7 @@ const request = require('supertest');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 
 const credits = require('../src/services/credits');
 const { addCredits } = require('../src/services/credits');
@@ -39,13 +40,12 @@ async function createDummyDocument(userId, documentId) {
   );
 }
 
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'creditsvc-%@example.com';
+
 describe('credits service', () => {
   afterEach(async () => {
-    await pool.query(`DELETE FROM credit_transactions`);
-    await pool.query(`DELETE FROM generated_documents`);
-    await pool.query(`DELETE FROM saved_jobs`);
-    await pool.query(`DELETE FROM credit_balances`);
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
 
   afterAll(async () => {
@@ -54,7 +54,7 @@ describe('credits service', () => {
 
   describe('getBalance', () => {
     it('returns 0 for a user with no row', async () => {
-      const { userId } = await createUser('nobal@example.com', 0);
+      const { userId } = await createUser('creditsvc-nobal@example.com', 0);
       await pool.query(`DELETE FROM credit_balances WHERE user_id = $1`, [userId]);
       const balance = await credits.getBalance(userId);
       expect(balance).toBe(0);
@@ -63,7 +63,7 @@ describe('credits service', () => {
 
   describe('GET /api/platform/credits', () => {
     it('returns the balance for the logged-in user', async () => {
-      const { token } = await createUser('bal1@example.com', 3);
+      const { token } = await createUser('creditsvc-bal1@example.com', 3);
       const app = buildTestApp();
       const res = await request(app).get('/api/platform/credits').set('Cookie', `fsa_session=${token}`);
       expect(res.status).toBe(200);
@@ -73,7 +73,7 @@ describe('credits service', () => {
 
   describe('debitCredits', () => {
     it('decrements balance and records one transaction per document', async () => {
-      const { userId } = await createUser('bal2@example.com', 2);
+      const { userId } = await createUser('creditsvc-bal2@example.com', 2);
       await createDummyDocument(userId, 101);
       await createDummyDocument(userId, 102);
       const generatedDocs = await pool.query(
@@ -96,7 +96,7 @@ describe('credits service', () => {
     });
 
     it('throws INSUFFICIENT_CREDITS and changes nothing when balance is too low', async () => {
-      const { userId } = await createUser('bal3@example.com', 1);
+      const { userId } = await createUser('creditsvc-bal3@example.com', 1);
       await createDummyDocument(userId, 201);
       await createDummyDocument(userId, 202);
       const generatedDocs = await pool.query(
@@ -117,7 +117,7 @@ describe('credits service', () => {
 
   describe('addCredits', () => {
     it('increments balance and records a stripe_purchase transaction', async () => {
-      const { userId } = await createUser('purchase1@example.com', 0);
+      const { userId } = await createUser('creditsvc-purchase1@example.com', 0);
       const client = await pool.connect();
       try {
         const result = await addCredits(client, userId, 5, 'stripe_purchase', 'cs_test_abc');
@@ -135,7 +135,7 @@ describe('credits service', () => {
     });
 
     it('creates a credit_balances row if none exists yet', async () => {
-      const { userId } = await createUser('purchase2@example.com', 0);
+      const { userId } = await createUser('creditsvc-purchase2@example.com', 0);
       await pool.query(`DELETE FROM credit_balances WHERE user_id = $1`, [userId]);
       const client = await pool.connect();
       try {
@@ -148,7 +148,7 @@ describe('credits service', () => {
     });
 
     it('is idempotent — the same stripe_session_id never double-credits', async () => {
-      const { userId } = await createUser('purchase3@example.com', 0);
+      const { userId } = await createUser('creditsvc-purchase3@example.com', 0);
       const client = await pool.connect();
       try {
         const first = await addCredits(client, userId, 5, 'stripe_purchase', 'cs_test_dup');

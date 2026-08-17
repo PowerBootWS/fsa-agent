@@ -2,6 +2,10 @@ const request = require('supertest');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
+
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'checkout%@example.com';
 
 jest.mock('stripe', () => {
   return jest.fn().mockImplementation(() => ({
@@ -50,7 +54,7 @@ describe('POST /api/platform/credits/checkout', () => {
   });
   afterEach(async () => {
     process.env = originalEnv;
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
   afterAll(async () => {
     await pool.end();

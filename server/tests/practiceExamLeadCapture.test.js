@@ -18,6 +18,9 @@ const express = require('express');
 const { pool } = require('./testPool');
 const practiceExamRouter = require('../src/routes/practiceExam');
 
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'lead-%@example.com';
+
 jest.mock('../src/services/email');
 
 function buildTestApp() {
@@ -58,7 +61,7 @@ describe('practice-exam lead capture surfaces downstream HTTP failures', () => {
     global.fetch = realFetch;
     if (realUrl === undefined) delete process.env.LEAD_CAPTURE_URL;
     else process.env.LEAD_CAPTURE_URL = realUrl;
-    await pool.query(`DELETE FROM practice_exam_attempts`);
+    await pool.query(`DELETE FROM practice_exam_attempts WHERE email LIKE $1`, [FIXTURE_EMAIL_LIKE]);
   });
 
   afterAll(async () => {

@@ -5,8 +5,12 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 
 const tailoringRouter = require('../src/routes/tailoring');
+
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'taildl-%@example.com';
 
 function buildTestApp() {
   const app = express();
@@ -43,10 +47,7 @@ describe('generated-documents history + download', () => {
   });
 
   afterEach(async () => {
-    await pool.query(`DELETE FROM credit_transactions`);
-    await pool.query(`DELETE FROM generated_documents`);
-    await pool.query(`DELETE FROM saved_jobs`);
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
 
   afterAll(async () => {
@@ -55,7 +56,7 @@ describe('generated-documents history + download', () => {
   });
 
   it('lists generated documents for a saved job, newest first', async () => {
-    const { userId, token } = await createUser('hist1@example.com');
+    const { userId, token } = await createUser('taildl-hist1@example.com');
     const savedJobId = await createSavedJob(userId);
     await pool.query(
       `INSERT INTO generated_documents (user_id, saved_job_id, doc_type, docx_path, pdf_path, changes_summary, placeholder_count, model_used, generated_at)
@@ -75,9 +76,9 @@ describe('generated-documents history + download', () => {
   });
 
   it('404s listing history for a job that belongs to another user', async () => {
-    const { userId: ownerId } = await createUser('owner2@example.com');
+    const { userId: ownerId } = await createUser('taildl-owner2@example.com');
     const savedJobId = await createSavedJob(ownerId);
-    const { token } = await createUser('attacker2@example.com');
+    const { token } = await createUser('taildl-attacker2@example.com');
     const app = buildTestApp();
 
     const res = await request(app)
@@ -88,7 +89,7 @@ describe('generated-documents history + download', () => {
   });
 
   it('downloads the docx and pdf for a generated document', async () => {
-    const { userId, token } = await createUser('dl1@example.com');
+    const { userId, token } = await createUser('taildl-dl1@example.com');
     const savedJobId = await createSavedJob(userId);
     const docxPath = path.join(tmpDir, 'resume.docx');
     const pdfPath = path.join(tmpDir, 'resume.pdf');
@@ -119,7 +120,7 @@ describe('generated-documents history + download', () => {
   });
 
   it('404s downloading a document that belongs to another user', async () => {
-    const { userId: ownerId } = await createUser('owner3@example.com');
+    const { userId: ownerId } = await createUser('taildl-owner3@example.com');
     const savedJobId = await createSavedJob(ownerId);
     const docxPath = path.join(tmpDir, 'other.docx');
     fs.writeFileSync(docxPath, 'x');
@@ -129,7 +130,7 @@ describe('generated-documents history + download', () => {
       [ownerId, savedJobId, docxPath]
     );
     const docId = insertResult.rows[0].id;
-    const { token } = await createUser('attacker3@example.com');
+    const { token } = await createUser('taildl-attacker3@example.com');
     const app = buildTestApp();
 
     const res = await request(app)
@@ -139,7 +140,7 @@ describe('generated-documents history + download', () => {
   });
 
   it('400s an invalid format query param', async () => {
-    const { userId, token } = await createUser('fmt1@example.com');
+    const { userId, token } = await createUser('taildl-fmt1@example.com');
     const savedJobId = await createSavedJob(userId);
     const insertResult = await pool.query(
       `INSERT INTO generated_documents (user_id, saved_job_id, doc_type, docx_path, pdf_path, changes_summary, placeholder_count, model_used)

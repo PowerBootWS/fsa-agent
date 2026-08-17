@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 
 const TEST_UPLOAD_DIR = path.join(os.tmpdir(), 'fsa-test-uploads');
 process.env.USER_UPLOADS_DIR = TEST_UPLOAD_DIR;
@@ -30,14 +31,16 @@ async function createUser(email) {
   return { userId: result.rows[0].id, token };
 }
 
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'doc%@example.com';
+
 describe('document upload/download', () => {
   beforeAll(() => {
     fs.mkdirSync(TEST_UPLOAD_DIR, { recursive: true });
   });
 
   afterEach(async () => {
-    await pool.query(`DELETE FROM user_documents`);
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
 
   afterAll(async () => {

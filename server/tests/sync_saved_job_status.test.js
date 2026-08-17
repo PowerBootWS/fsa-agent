@@ -1,7 +1,11 @@
 jest.mock('axios');
 const axios = require('axios');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 const { syncSavedJobStatuses } = require('../src/scripts/sync_saved_job_status');
+
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'syncjob-%@example.com';
 
 async function createUser(email) {
   const result = await pool.query(
@@ -27,18 +31,28 @@ async function sourceStatusOf(id) {
   return result.rows[0].source_status;
 }
 
+// NOTE (2026-08-17 review, fix round 1): syncSavedJobStatuses() scans ALL
+// saved_jobs rows that have a source_job_id — it is not scoped to this
+// file's fixture user, so `expect(result.checked).toBe(2)` below (both its)
+// is only deterministic because saved_jobs holds only this test's own rows
+// at the moment it runs, and the axios mock throws on any source_job_id it
+// doesn't recognize (so a stray row from elsewhere would fail loudly, not
+// silently). That's true because jest.config.js pins maxWorkers: 1 (suites
+// run serially) and every suite that touches saved_jobs cleans up its own
+// fixture rows via deleteFixtureUsersByEmailLike's cascade before the next
+// suite starts. A real dependency on other files' teardown behaving, not a
+// bug in this file — flagging it so the next person doesn't spend an hour on it.
 describe('syncSavedJobStatuses', () => {
   afterEach(async () => {
     jest.resetAllMocks();
-    await pool.query(`DELETE FROM saved_jobs`);
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
   afterAll(async () => {
     await pool.end();
   });
 
   it('updates source_status for saved/applied/interviewing rows with a source_job_id, skips archived and manual jobs', async () => {
-    const userId = await createUser('sync-test@example.com');
+    const userId = await createUser('syncjob-test@example.com');
     const closedJob = await insertSavedJob(userId, 'saved', 'jb-closed');
     const activeJob = await insertSavedJob(userId, 'applied', 'jb-active');
     const archivedJob = await insertSavedJob(userId, 'archived', 'jb-archived');
@@ -63,7 +77,7 @@ describe('syncSavedJobStatuses', () => {
   });
 
   it('continues past a failed request for one row', async () => {
-    const userId = await createUser('sync-test-2@example.com');
+    const userId = await createUser('syncjob-test-2@example.com');
     const failingJob = await insertSavedJob(userId, 'saved', 'jb-fail');
     const okJob = await insertSavedJob(userId, 'saved', 'jb-ok');
 
