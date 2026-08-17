@@ -1,7 +1,11 @@
 jest.mock('axios');
 const axios = require('axios');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 const { syncSavedJobStatuses } = require('../src/scripts/sync_saved_job_status');
+
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'syncjob-%@example.com';
 
 async function createUser(email) {
   const result = await pool.query(
@@ -30,15 +34,14 @@ async function sourceStatusOf(id) {
 describe('syncSavedJobStatuses', () => {
   afterEach(async () => {
     jest.resetAllMocks();
-    await pool.query(`DELETE FROM saved_jobs`);
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
   afterAll(async () => {
     await pool.end();
   });
 
   it('updates source_status for saved/applied/interviewing rows with a source_job_id, skips archived and manual jobs', async () => {
-    const userId = await createUser('sync-test@example.com');
+    const userId = await createUser('syncjob-test@example.com');
     const closedJob = await insertSavedJob(userId, 'saved', 'jb-closed');
     const activeJob = await insertSavedJob(userId, 'applied', 'jb-active');
     const archivedJob = await insertSavedJob(userId, 'archived', 'jb-archived');
@@ -63,7 +66,7 @@ describe('syncSavedJobStatuses', () => {
   });
 
   it('continues past a failed request for one row', async () => {
-    const userId = await createUser('sync-test-2@example.com');
+    const userId = await createUser('syncjob-test-2@example.com');
     const failingJob = await insertSavedJob(userId, 'saved', 'jb-fail');
     const okJob = await insertSavedJob(userId, 'saved', 'jb-ok');
 

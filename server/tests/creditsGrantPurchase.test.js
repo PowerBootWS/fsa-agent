@@ -2,8 +2,12 @@ const request = require('supertest');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 
 const platformRouter = require('../src/routes/platform');
+
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'grant%@example.com';
 
 function buildTestApp() {
   const app = express();
@@ -29,9 +33,7 @@ describe('POST /api/platform/credits/grant-purchase', () => {
   });
   afterEach(async () => {
     process.env = originalEnv;
-    await pool.query(`DELETE FROM credit_transactions`);
-    await pool.query(`DELETE FROM credit_balances`);
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
   afterAll(async () => {
     await pool.end();

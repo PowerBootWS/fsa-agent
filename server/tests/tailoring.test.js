@@ -2,6 +2,10 @@ const request = require('supertest');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
+
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'tailor-%@example.com';
 
 jest.mock('../src/services/aiServiceClient');
 const { requestTailoredDocuments } = require('../src/services/aiServiceClient');
@@ -50,12 +54,7 @@ async function uploadResumeRow(userId) {
 describe('POST /api/platform/jobs/:savedJobId/tailor', () => {
   afterEach(async () => {
     jest.clearAllMocks();
-    await pool.query(`DELETE FROM credit_transactions`);
-    await pool.query(`DELETE FROM generated_documents`);
-    await pool.query(`DELETE FROM saved_jobs`);
-    await pool.query(`DELETE FROM credit_balances`);
-    await pool.query(`DELETE FROM user_documents`);
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
 
   afterAll(async () => {
@@ -63,7 +62,7 @@ describe('POST /api/platform/jobs/:savedJobId/tailor', () => {
   });
 
   it('rejects with 400 when no resume is on file', async () => {
-    const { token, userId } = await createUser('t1@example.com');
+    const { token, userId } = await createUser('tailor-t1@example.com');
     const savedJobId = await createSavedJob(userId);
     const app = buildTestApp();
 
@@ -77,7 +76,7 @@ describe('POST /api/platform/jobs/:savedJobId/tailor', () => {
   });
 
   it('rejects with 402 when balance is insufficient', async () => {
-    const { token, userId } = await createUser('t2@example.com', 0);
+    const { token, userId } = await createUser('tailor-t2@example.com', 0);
     const savedJobId = await createSavedJob(userId);
     await uploadResumeRow(userId);
     const app = buildTestApp();
@@ -92,7 +91,7 @@ describe('POST /api/platform/jobs/:savedJobId/tailor', () => {
   });
 
   it('generates a document, debits one credit, and records the generation', async () => {
-    const { token, userId } = await createUser('t3@example.com', 1);
+    const { token, userId } = await createUser('tailor-t3@example.com', 1);
     const savedJobId = await createSavedJob(userId);
     await uploadResumeRow(userId);
     requestTailoredDocuments.mockResolvedValue({
@@ -128,7 +127,7 @@ describe('POST /api/platform/jobs/:savedJobId/tailor', () => {
   });
 
   it('does not debit credits when ai-service generation fails', async () => {
-    const { token, userId } = await createUser('t4@example.com', 1);
+    const { token, userId } = await createUser('tailor-t4@example.com', 1);
     const savedJobId = await createSavedJob(userId);
     await uploadResumeRow(userId);
     requestTailoredDocuments.mockRejectedValue(new Error('ai-service unreachable'));
@@ -145,7 +144,7 @@ describe('POST /api/platform/jobs/:savedJobId/tailor', () => {
   });
 
   it('de-duplicates docTypes so a duplicate resume request only charges one credit', async () => {
-    const { token, userId } = await createUser('t5@example.com', 1);
+    const { token, userId } = await createUser('tailor-t5@example.com', 1);
     const savedJobId = await createSavedJob(userId);
     await uploadResumeRow(userId);
     requestTailoredDocuments.mockResolvedValue({
@@ -179,7 +178,7 @@ describe('POST /api/platform/jobs/:savedJobId/tailor', () => {
   });
 
   it('returns 402 (not 500) and rolls back the DB insert when a credit-race loses to debitCredits', async () => {
-    const { token, userId } = await createUser('t6@example.com', 1);
+    const { token, userId } = await createUser('tailor-t6@example.com', 1);
     const savedJobId = await createSavedJob(userId);
     await uploadResumeRow(userId);
     requestTailoredDocuments.mockResolvedValue({
@@ -212,9 +211,9 @@ describe('POST /api/platform/jobs/:savedJobId/tailor', () => {
   });
 
   it('404s tailoring a job that belongs to another user', async () => {
-    const { userId: otherUserId } = await createUser('owner@example.com');
+    const { userId: otherUserId } = await createUser('tailor-owner@example.com');
     const savedJobId = await createSavedJob(otherUserId);
-    const { token } = await createUser('attacker@example.com');
+    const { token } = await createUser('tailor-attacker@example.com');
     const app = buildTestApp();
 
     const res = await request(app)

@@ -2,7 +2,11 @@ const request = require('supertest');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 const jobsRouter = require('../src/routes/jobs');
+
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'jobs%@example.com';
 const { pool: routerPool } = require('../src/services/database');
 
 function buildTestApp() {
@@ -25,8 +29,7 @@ async function createUser(email) {
 
 describe('saved jobs', () => {
   afterEach(async () => {
-    await pool.query(`DELETE FROM saved_jobs`);
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
   afterAll(async () => {
     await pool.end();

@@ -4,7 +4,11 @@ const request = require('supertest');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 const platformRouter = require('../src/routes/platform');
+
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'prov4-%@example.com';
 
 function buildTestApp() {
   const app = express();
@@ -34,9 +38,7 @@ describe('provision-user — 4th Class split (fourth_a / fourth_b)', () => {
 
   afterEach(async () => {
     process.env = originalEnv;
-    await pool.query(`DELETE FROM auth_tokens`);
-    await pool.query(`DELETE FROM subscriptions`);
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
 
   afterAll(async () => {
@@ -47,53 +49,53 @@ describe('provision-user — 4th Class split (fourth_a / fourth_b)', () => {
     const app = buildTestApp();
     await request(app).post('/api/platform/provision-user')
       .set('x-internal-secret', 'test-internal-secret')
-      .send({ email: 'both-papers@example.com', first_name: 'Both', last_name: 'Papers', class_code: 'fourth_a' });
+      .send({ email: 'prov4-both-papers@example.com', first_name: 'Both', last_name: 'Papers', class_code: 'fourth_a' });
     await request(app).post('/api/platform/provision-user')
       .set('x-internal-secret', 'test-internal-secret')
-      .send({ email: 'both-papers@example.com', first_name: 'Both', last_name: 'Papers', class_code: 'fourth_b' });
+      .send({ email: 'prov4-both-papers@example.com', first_name: 'Both', last_name: 'Papers', class_code: 'fourth_b' });
 
-    expect(await activeCodes('both-papers@example.com')).toEqual(['fourth_a', 'fourth_b']);
+    expect(await activeCodes('prov4-both-papers@example.com')).toEqual(['fourth_a', 'fourth_b']);
   });
 
   it('buying fourth_a twice does not create a duplicate row', async () => {
     const app = buildTestApp();
     await request(app).post('/api/platform/provision-user')
       .set('x-internal-secret', 'test-internal-secret')
-      .send({ email: 'repeat-buyer@example.com', first_name: 'Repeat', last_name: 'Buyer', class_code: 'fourth_a' });
+      .send({ email: 'prov4-repeat-buyer@example.com', first_name: 'Repeat', last_name: 'Buyer', class_code: 'fourth_a' });
     await request(app).post('/api/platform/provision-user')
       .set('x-internal-secret', 'test-internal-secret')
-      .send({ email: 'repeat-buyer@example.com', first_name: 'Repeat', last_name: 'Buyer', class_code: 'fourth_a' });
+      .send({ email: 'prov4-repeat-buyer@example.com', first_name: 'Repeat', last_name: 'Buyer', class_code: 'fourth_a' });
 
-    expect(await activeCodes('repeat-buyer@example.com')).toEqual(['fourth_a']);
+    expect(await activeCodes('prov4-repeat-buyer@example.com')).toEqual(['fourth_a']);
   });
 
   it('buying fourth_a while second is active is blocked (cross-tier)', async () => {
     const app = buildTestApp();
     await request(app).post('/api/platform/provision-user')
       .set('x-internal-secret', 'test-internal-secret')
-      .send({ email: 'cross-tier-1@example.com', first_name: 'Cross', last_name: 'Tier', class_code: 'second' });
+      .send({ email: 'prov4-cross-tier-1@example.com', first_name: 'Cross', last_name: 'Tier', class_code: 'second' });
     await request(app).post('/api/platform/provision-user')
       .set('x-internal-secret', 'test-internal-secret')
-      .send({ email: 'cross-tier-1@example.com', first_name: 'Cross', last_name: 'Tier', class_code: 'fourth_a' });
+      .send({ email: 'prov4-cross-tier-1@example.com', first_name: 'Cross', last_name: 'Tier', class_code: 'fourth_a' });
 
-    expect(await activeCodes('cross-tier-1@example.com')).toEqual(['second']);
+    expect(await activeCodes('prov4-cross-tier-1@example.com')).toEqual(['second']);
   });
 
   it('buying second while fourth_a is active is blocked (cross-tier, reverse direction)', async () => {
     const app = buildTestApp();
     await request(app).post('/api/platform/provision-user')
       .set('x-internal-secret', 'test-internal-secret')
-      .send({ email: 'cross-tier-2@example.com', first_name: 'Cross', last_name: 'Tier', class_code: 'fourth_a' });
+      .send({ email: 'prov4-cross-tier-2@example.com', first_name: 'Cross', last_name: 'Tier', class_code: 'fourth_a' });
     await request(app).post('/api/platform/provision-user')
       .set('x-internal-secret', 'test-internal-secret')
-      .send({ email: 'cross-tier-2@example.com', first_name: 'Cross', last_name: 'Tier', class_code: 'second' });
+      .send({ email: 'prov4-cross-tier-2@example.com', first_name: 'Cross', last_name: 'Tier', class_code: 'second' });
 
-    expect(await activeCodes('cross-tier-2@example.com')).toEqual(['fourth_a']);
+    expect(await activeCodes('prov4-cross-tier-2@example.com')).toEqual(['fourth_a']);
   });
 
   it('DB allows a raw fourth_a + fourth_b active pair for the same user', async () => {
     const userResult = await pool.query(
-      `INSERT INTO platform_users (email, first_name, last_name) VALUES ('raw-both@example.com', 'Raw', 'Both') RETURNING id`
+      `INSERT INTO platform_users (email, first_name, last_name) VALUES ('prov4-raw-both@example.com', 'Raw', 'Both') RETURNING id`
     );
     const userId = userResult.rows[0].id;
     await pool.query(`INSERT INTO subscriptions (user_id, class_code, status) VALUES ($1, 'fourth_a', 'active')`, [userId]);
@@ -105,7 +107,7 @@ describe('provision-user — 4th Class split (fourth_a / fourth_b)', () => {
 
   it('DB still rejects two active rows with the exact same class_code', async () => {
     const userResult = await pool.query(
-      `INSERT INTO platform_users (email, first_name, last_name) VALUES ('raw-dup@example.com', 'Raw', 'Dup') RETURNING id`
+      `INSERT INTO platform_users (email, first_name, last_name) VALUES ('prov4-raw-dup@example.com', 'Raw', 'Dup') RETURNING id`
     );
     const userId = userResult.rows[0].id;
     await pool.query(`INSERT INTO subscriptions (user_id, class_code, status) VALUES ($1, 'fourth_a', 'active')`, [userId]);

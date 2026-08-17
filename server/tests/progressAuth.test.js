@@ -19,6 +19,7 @@ process.env.USER_UPLOADS_DIR = process.env.USER_UPLOADS_DIR || '/tmp/fsa-test-us
 
 const request = require('supertest');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 const app = require('../src/index');
 
 const LEARN = 'learn.fullsteamahead.ca';
@@ -26,6 +27,15 @@ const LEGACY = 'fsachat.fullsteamahead.ca';
 
 const OWNER = 'progress-owner@example.com';
 const OTHER = 'progress-other@example.com';
+
+// Never matches a real student address (no real account uses @example.com).
+// Fix round 1 (2026-08-16 review, this file included): the original afterEach
+// here did unscoped `DELETE FROM user_progress` / `DELETE FROM subscriptions`
+// / `DELETE FROM platform_users` — the exact pattern that wiped ten
+// production tables (user_progress among them) on 2026-08-12 when a suite
+// ran against a production POSTGRES_DB. Every delete below is scoped to this
+// suite's own fixture emails.
+const FIXTURE_EMAIL_LIKE = 'progress-%@example.com';
 
 afterAll(async () => {
   await pool.end();
@@ -75,9 +85,8 @@ describe('/api/progress requires authentication', () => {
   });
 
   afterEach(async () => {
-    await pool.query(`DELETE FROM user_progress`);
-    await pool.query(`DELETE FROM subscriptions`);
-    await pool.query(`DELETE FROM platform_users`);
+    await pool.query(`DELETE FROM user_progress WHERE user_email LIKE $1`, [FIXTURE_EMAIL_LIKE]);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
 
   it('rejects an unauthenticated GET on the platform host', async () => {
@@ -148,9 +157,8 @@ describe('/api/progress requires authentication', () => {
 
 describe('/api/progress is scoped to the authenticated user', () => {
   afterEach(async () => {
-    await pool.query(`DELETE FROM user_progress`);
-    await pool.query(`DELETE FROM subscriptions`);
-    await pool.query(`DELETE FROM platform_users`);
+    await pool.query(`DELETE FROM user_progress WHERE user_email LIKE $1`, [FIXTURE_EMAIL_LIKE]);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
 
   it('ignores a ?user= naming a different student', async () => {

@@ -1,5 +1,9 @@
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 const { archiveStaleSavedJobs } = require('../src/scripts/archive_stale_saved_jobs');
+
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'archivestale-%@example.com';
 
 async function createUser(email) {
   const result = await pool.query(
@@ -27,15 +31,14 @@ async function statusOf(id) {
 
 describe('archiveStaleSavedJobs', () => {
   afterEach(async () => {
-    await pool.query(`DELETE FROM saved_jobs`);
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
   afterAll(async () => {
     await pool.end();
   });
 
   it('archives only saved jobs older than the threshold, leaving other statuses and fresh jobs untouched', async () => {
-    const userId = await createUser('archive-test@example.com');
+    const userId = await createUser('archivestale-test@example.com');
     const staleSaved = await insertSavedJob(userId, 'saved', 100);
     const freshSaved = await insertSavedJob(userId, 'saved', 10);
     const staleApplied = await insertSavedJob(userId, 'applied', 100);
@@ -53,7 +56,7 @@ describe('archiveStaleSavedJobs', () => {
   });
 
   it('respects a custom day threshold', async () => {
-    const userId = await createUser('archive-test-2@example.com');
+    const userId = await createUser('archivestale-test-2@example.com');
     const at45Days = await insertSavedJob(userId, 'saved', 45);
 
     const countAt90 = await archiveStaleSavedJobs(90);

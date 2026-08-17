@@ -2,7 +2,11 @@ const request = require('supertest');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 const platformRouter = require('../src/routes/platform');
+
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'papersclass-%@example.com';
 
 function buildTestApp() {
   const app = express();
@@ -30,8 +34,7 @@ async function createUser({ email, classCode }) {
 
 describe('GET /api/platform/papers-for-class', () => {
   afterEach(async () => {
-    await pool.query(`DELETE FROM subscriptions`);
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
 
   afterAll(async () => {
@@ -39,7 +42,7 @@ describe('GET /api/platform/papers-for-class', () => {
   });
 
   it('returns 4A for a fourth_a subscriber', async () => {
-    const { token } = await createUser({ email: 'fourth-a-papers@example.com', classCode: 'fourth_a' });
+    const { token } = await createUser({ email: 'papersclass-fourth-a@example.com', classCode: 'fourth_a' });
     const res = await request(buildTestApp())
       .get('/api/platform/papers-for-class')
       .set('Cookie', `fsa_session=${token}`);
@@ -49,7 +52,7 @@ describe('GET /api/platform/papers-for-class', () => {
   });
 
   it('returns 4B for a fourth_b subscriber', async () => {
-    const { token } = await createUser({ email: 'fourth-b-papers@example.com', classCode: 'fourth_b' });
+    const { token } = await createUser({ email: 'papersclass-fourth-b@example.com', classCode: 'fourth_b' });
     const res = await request(buildTestApp())
       .get('/api/platform/papers-for-class')
       .set('Cookie', `fsa_session=${token}`);
@@ -59,7 +62,7 @@ describe('GET /api/platform/papers-for-class', () => {
   });
 
   it('still returns the six second-class papers for a second-class subscriber (unchanged)', async () => {
-    const { token } = await createUser({ email: 'second-papers@example.com', classCode: 'second' });
+    const { token } = await createUser({ email: 'papersclass-second@example.com', classCode: 'second' });
     const res = await request(buildTestApp())
       .get('/api/platform/papers-for-class')
       .set('Cookie', `fsa_session=${token}`);

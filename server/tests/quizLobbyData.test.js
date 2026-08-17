@@ -2,7 +2,44 @@ const request = require('supertest');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 const platformRouter = require('../src/routes/platform');
+
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'qld-%@example.com';
+
+// chapters/questions have no per-file-safe key to scope by — 4A/4B are real
+// production course ids (see src/config/papersForClass.js), and chapters'
+// primary key is the natural (course_id, chapter_num) pair, not a surrogate
+// id, so a delete scoped by course_id alone (the pre-fix pattern) would wipe
+// every real chapter for that course, not just this test's two rows, if ever
+// pointed at production. Instead: assert nothing already occupies these exact
+// keys before inserting (so a real production row makes the INSERT itself
+// fail loudly with a duplicate-key error, never gets touched), then the
+// teardown below only ever deletes rows this test created.
+const FIXTURE_CHAPTERS = [['4A', 1], ['4A', 2], ['4B', 1]];
+const FIXTURE_QUESTION_IDS = [900001, 900002, 900003, 900004];
+
+async function assertNoRealDataAtFixtureKeys() {
+  const rows = await pool.query(
+    `SELECT course_id, chapter_num FROM chapters WHERE ` +
+    FIXTURE_CHAPTERS.map((_, i) => `(course_id = $${i * 2 + 1} AND chapter_num = $${i * 2 + 2})`).join(' OR '),
+    FIXTURE_CHAPTERS.flat()
+  );
+  if (rows.rows.length > 0) {
+    throw new Error(
+      `Refusing to run: chapters already has row(s) at ${JSON.stringify(rows.rows)} — this does ` +
+      `not look like a disposable test database. Aborting before inserting/deleting anything.`
+    );
+  }
+  const qRows = await pool.query(`SELECT id FROM questions WHERE id = ANY($1::int[])`, [FIXTURE_QUESTION_IDS]);
+  if (qRows.rows.length > 0) {
+    throw new Error(
+      `Refusing to run: questions already has row(s) at id ${JSON.stringify(qRows.rows.map(r => r.id))} — ` +
+      `this does not look like a disposable test database. Aborting before inserting/deleting anything.`
+    );
+  }
+}
 
 function buildTestApp() {
   const app = express();
@@ -31,11 +68,20 @@ async function createUser({ email, classCodes }) {
 }
 
 describe('GET /api/platform/quiz-lobby-data', () => {
+  beforeEach(assertNoRealDataAtFixtureKeys);
+
   afterEach(async () => {
-    await pool.query(`DELETE FROM questions WHERE course_id IN ('4A', '4B')`);
-    await pool.query(`DELETE FROM chapters WHERE course_id IN ('4A', '4B')`);
-    await pool.query(`DELETE FROM subscriptions`);
-    await pool.query(`DELETE FROM platform_users`);
+    // Scoped to exactly the tuples/ids this test may have inserted (see
+    // assertNoRealDataAtFixtureKeys above for why not "WHERE course_id IN
+    // (...)") — question_responses cascades automatically via its FK on
+    // questions.id.
+    await pool.query(`DELETE FROM questions WHERE id = ANY($1::int[])`, [FIXTURE_QUESTION_IDS]);
+    await pool.query(
+      `DELETE FROM chapters WHERE ` +
+      FIXTURE_CHAPTERS.map((_, i) => `(course_id = $${i * 2 + 1} AND chapter_num = $${i * 2 + 2})`).join(' OR '),
+      FIXTURE_CHAPTERS.flat()
+    );
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
 
   afterAll(async () => {
@@ -43,7 +89,7 @@ describe('GET /api/platform/quiz-lobby-data', () => {
   });
 
   it('rejects a non-fourth-class subscriber with 400', async () => {
-    const { token } = await createUser({ email: 'not-fourth@example.com', classCodes: ['second'] });
+    const { token } = await createUser({ email: 'qld-not-fourth@example.com', classCodes: ['second'] });
     const res = await request(buildTestApp())
       .get('/api/platform/quiz-lobby-data')
       .set('Cookie', `fsa_session=${token}`);
@@ -51,7 +97,7 @@ describe('GET /api/platform/quiz-lobby-data', () => {
   });
 
   it('returns both 4A and 4B with chapter-quiz and practice-exam stats, no lesson data', async () => {
-    const { token } = await createUser({ email: 'fourth-lobby@example.com', classCodes: ['fourth_a', 'fourth_b'] });
+    const { token } = await createUser({ email: 'qld-fourth-lobby@example.com', classCodes: ['fourth_a', 'fourth_b'] });
 
     await pool.query(
       `INSERT INTO chapters (course_id, chapter_num, title) VALUES
@@ -68,10 +114,10 @@ describe('GET /api/platform/quiz-lobby-data', () => {
     await pool.query(
       `INSERT INTO question_responses (user_email, question_id, session_type, course_id, chapter_id, correct)
        VALUES
-        ('fourth-lobby@example.com', 900001, 'chapter_quiz', '4A', '4A-1', true),
-        ('fourth-lobby@example.com', 900002, 'chapter_quiz', '4A', '4A-1', true),
-        ('fourth-lobby@example.com', 900003, 'chapter_quiz', '4A', '4A-1', false),
-        ('fourth-lobby@example.com', 900004, 'chapter_quiz', '4A', '4A-1', true)`
+        ('qld-fourth-lobby@example.com', 900001, 'chapter_quiz', '4A', '4A-1', true),
+        ('qld-fourth-lobby@example.com', 900002, 'chapter_quiz', '4A', '4A-1', true),
+        ('qld-fourth-lobby@example.com', 900003, 'chapter_quiz', '4A', '4A-1', false),
+        ('qld-fourth-lobby@example.com', 900004, 'chapter_quiz', '4A', '4A-1', true)`
     );
 
     const res = await request(buildTestApp())

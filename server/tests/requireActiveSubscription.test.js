@@ -2,8 +2,12 @@ const request = require('supertest');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const { pool } = require('./testPool');
+const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 const requireAuth = require('../src/middleware/requireAuth');
 const requireActiveSubscription = require('../src/middleware/requireActiveSubscription');
+
+// Never matches a real student address (no real account uses @example.com).
+const FIXTURE_EMAIL_LIKE = 'reqactivesub-%@example.com';
 
 function buildTestApp() {
   const app = express();
@@ -37,8 +41,7 @@ async function createUser({ email, withSubscription }) {
 
 describe('requireActiveSubscription', () => {
   afterEach(async () => {
-    await pool.query(`DELETE FROM subscriptions`);
-    await pool.query(`DELETE FROM platform_users`);
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
   });
 
   afterAll(async () => {
@@ -46,13 +49,13 @@ describe('requireActiveSubscription', () => {
   });
 
   it('blocks a job-only account (no subscription) with 403', async () => {
-    const { token } = await createUser({ email: 'jobonly-paid-check@example.com', withSubscription: false });
+    const { token } = await createUser({ email: 'reqactivesub-jobonly-paid-check@example.com', withSubscription: false });
     const res = await request(buildTestApp()).get('/paid').set('Cookie', `fsa_session=${token}`);
     expect(res.status).toBe(403);
   });
 
   it('allows a paid student with an active subscription', async () => {
-    const { token } = await createUser({ email: 'paid-check@example.com', withSubscription: true });
+    const { token } = await createUser({ email: 'reqactivesub-paid-check@example.com', withSubscription: true });
     const res = await request(buildTestApp()).get('/paid').set('Cookie', `fsa_session=${token}`);
     expect(res.status).toBe(200);
   });
