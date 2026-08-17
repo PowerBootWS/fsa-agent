@@ -23,6 +23,15 @@ Run this over any newly generated bank BEFORE it reaches a student.
   POSTGRES_PASSWORD=... python3 scripts/audit_question_keys.py --detail 2A2 KEY_MISMATCH
   POSTGRES_PASSWORD=... python3 scripts/audit_question_keys.py --ids
 
+Known blind spots, each found the hard way:
+  - Questions whose four options do not all reduce to a distinct number are
+    only checked for confessional language, never for a key/working mismatch.
+    Options that repeat a value with a different qualifier ("80 km/h south" vs
+    "80 km/h, no direction specified") are skipped entirely for the same
+    reason, and one such question (id 10817) had a genuinely wrong key.
+  - It cannot detect a question with TWO defensible answers; that has to be
+    read by a human or an agent.
+
 Defaults to localhost:5434 (fsa-postgres as seen from the host) and database
 fsa_agent. Override with PGHOST / PGPORT / PGDATABASE. Note that a bare
 localhost:5432 on this host is a DIFFERENT business's database.
