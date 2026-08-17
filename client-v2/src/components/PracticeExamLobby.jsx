@@ -24,8 +24,10 @@ export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, on
   useEffect(() => {
     if (!user) return;
     if (leadMagnetMode) return;
-    fetch(`/api/exam/${encodeURIComponent(courseId)}/last-results?user=${encodeURIComponent(user)}`)
-      .then(r => r.json())
+    // Backlog #88: identity comes from the session cookie server-side now,
+    // not a ?user= query param, so this must send credentials.
+    fetch(`/api/exam/${encodeURIComponent(courseId)}/last-results`, { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : { available: false }))
       .then(data => setLastResults(data.available ? data : null))
       .catch(() => setLastResults(null));
   }, [courseId, user]);

@@ -96,9 +96,7 @@ const validateRouter = require('./routes/validate');
 const lessonRouter = require('./routes/lesson');
 const chatRouter = require('./routes/chat');
 const progressRouter = require('./routes/progress');
-const chatHistoryRouter = require('./routes/chat-history');
 const enrollRouter = require('./routes/enroll');
-const responsesRouter = require('./routes/responses');
 const demoRouter = require('./routes/demo');
 const previewRouter = require('./routes/preview');
 
@@ -121,9 +119,20 @@ app.use('/api/chat', requireAuth, requireActiveSubscription, chatRouter);
 // client/, client-v2/ or ai-service/ calls this route, so there is no legacy
 // caller to preserve. Entitlement gate matches /api/lesson and /api/chat.
 app.use('/api/progress', requireAuth, requireActiveSubscription, progressRouter);
-app.use('/api/chat-history', chatHistoryRouter);
+// /api/chat-history (server/src/routes/chat-history.js) and /api/responses
+// (server/src/routes/responses.js, both POST / and GET
+// /chapter-weights/:user/:courseId) were deleted outright (backlog #88,
+// 2026-08-16): both were unauthenticated and DB-backed — POST /api/responses
+// let anyone write question responses under any email, feeding
+// isChapterQuizPassed, and GET /chapter-weights/:user/:courseId returned a
+// named student's per-chapter accuracy to anyone. `grep -rl` for
+// "/api/chat-history", "/api/responses" and "chapter-weights" across
+// client-v2/src, the compiled client-v2/build/assets bundle, the retired
+// client/, ai-service/, and server/src outside the route files themselves
+// found zero callers — see server/tests/idorRoutes.test.js for the same
+// search recorded as a comment. Deleted rather than authenticated, matching
+// the lesson-preview precedent from earlier today (mediaAuth.test.js).
 app.use('/api/enroll', enrollRouter);
-app.use('/api/responses', responsesRouter);
 app.use('/api/demo', demoRouter);
 
 const diagnosticRouter = require('./routes/diagnostic');
