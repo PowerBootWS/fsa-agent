@@ -1,44 +1,38 @@
-const nodemailer = require('nodemailer');
+// Platform transactional email. All sending goes through fsa-common, which is
+// the single Gmail-API sender for every FSA project — there is no SMTP path
+// anywhere. `FROM` picks the sending mailbox: change it to a russ@ address and
+// the mail genuinely comes from Russ, no alias or Send-As grant involved.
+const { email } = require('fsa-common');
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.GOOGLE_SMTP_USER,
-    pass: process.env.GOOGLE_SMTP_PASS,
-  },
-});
-
-const FROM = 'Full Steam Ahead <support@fullsteamahead.ca>';
+const FROM = process.env.EMAIL_FROM || 'Full Steam Ahead <support@fullsteamahead.ca>';
 const BASE_URL = process.env.PLATFORM_BASE_URL || 'https://learn.fullsteamahead.ca';
 
-async function sendMagicLink(email, firstName, token) {
+async function sendMagicLink(email_, firstName, token) {
   const link = `${BASE_URL}/setup?token=${token}`;
-  await transporter.sendMail({
+  await email.sendEmail({
     from: FROM,
-    to: email,
+    to: email_,
     subject: 'Set up your Full Steam Ahead account',
     html: `<p>Hi ${firstName},</p><p>Welcome to Full Steam Ahead! Click the button below to set up your account password.</p><p><a href="${link}" style="background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">Set Up My Account</a></p><p>This link expires in 48 hours.</p><p>If you didn't sign up, ignore this email.</p>`,
     text: `Hi ${firstName},\n\nWelcome to Full Steam Ahead! Set up your account here:\n${link}\n\nThis link expires in 48 hours.`,
   });
 }
 
-async function sendPasswordReset(email, firstName, token) {
+async function sendPasswordReset(email_, firstName, token) {
   const link = `${BASE_URL}/reset-password?token=${token}`;
-  await transporter.sendMail({
+  await email.sendEmail({
     from: FROM,
-    to: email,
+    to: email_,
     subject: 'Reset your Full Steam Ahead password',
     html: `<p>Hi ${firstName},</p><p>Click below to reset your password. This link expires in 1 hour.</p><p><a href="${link}" style="background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">Reset Password</a></p><p>If you didn't request this, ignore this email.</p>`,
     text: `Hi ${firstName},\n\nReset your password here:\n${link}\n\nThis link expires in 1 hour.`,
   });
 }
 
-async function sendPracticeExamCode(email, firstName, code) {
-  await transporter.sendMail({
+async function sendPracticeExamCode(email_, firstName, code) {
+  await email.sendEmail({
     from: FROM,
-    to: email,
+    to: email_,
     subject: `Your Full Steam Ahead verification code: ${code}`,
     html: `<p>Hi ${firstName},</p><p>Your verification code for your free practice exam is:</p><p style="font-size:32px;font-weight:700;letter-spacing:0.1em;color:#1d4ed8;">${code}</p><p>Enter this code to start your exam. This code expires in 10 minutes.</p><p>If you didn't request this, ignore this email.</p>`,
     text: `Hi ${firstName},\n\nYour verification code is: ${code}\n\nThis code expires in 10 minutes.`,
@@ -72,7 +66,7 @@ async function sendDeactivationReview(items) {
       ? `Confirm deactivation: ${list[0].email}`
       : `Confirm deactivation: ${list.length} customers pending`;
 
-  await transporter.sendMail({
+  await email.sendEmail({
     from: FROM,
     to,
     subject,
@@ -92,7 +86,7 @@ async function sendDeactivationReview(items) {
 
 // Generic plain-text ops/report email (e.g. scheduled telemetry reports).
 async function sendOpsEmail(to, subject, text) {
-  await transporter.sendMail({ from: FROM, to, subject, text });
+  await email.sendEmail({ from: FROM, to, subject, text });
 }
 
 module.exports = { sendMagicLink, sendPasswordReset, sendPracticeExamCode, sendDeactivationReview, sendOpsEmail };

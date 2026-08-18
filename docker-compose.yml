@@ -26,6 +26,8 @@ services:
     build:
       context: .
       dockerfile: ./server/Dockerfile
+      secrets:
+        - github_token
     env_file: ../.env
     environment:
       - NODE_ENV=production
@@ -44,8 +46,8 @@ services:
       - LEGACY_DOMAIN=${LEGACY_DOMAIN}
       - INTERNAL_SECRET=${INTERNAL_SECRET}
       - ADMIN_API_KEY=${ADMIN_API_KEY}
-      - GOOGLE_SMTP_USER=${GOOGLE_SMTP_USER}
-      - GOOGLE_SMTP_PASS=${GOOGLE_SMTP_PASS}
+      - SUPPORT_GMAIL_SA=${SUPPORT_GMAIL_SA}
+      - EMAIL_FROM=${EMAIL_FROM}
       - PLATFORM_BASE_URL=${PLATFORM_BASE_URL}
       - PAPER_SWITCH_COOLDOWN_DAYS=${PAPER_SWITCH_COOLDOWN_DAYS}
       - SAVED_JOB_ARCHIVE_DAYS=${SAVED_JOB_ARCHIVE_DAYS}
@@ -58,6 +60,8 @@ services:
       - ${FSA_MEDIA_DIR}:/srv/fsa-media:ro
       - ${FSA_USER_UPLOADS_DIR}:/srv/fsa-user-uploads
       - ${FSA_GENERATED_DOCS_DIR}:/srv/fsa-generated-documents:ro
+      # Gmail service-account key — the only outbound mail credential.
+      - /home/debian/.secrets/support_gmail_sa.json:/home/debian/.secrets/support_gmail_sa.json:ro
     depends_on:
       - ai-service
     networks:
@@ -90,6 +94,10 @@ services:
     networks:
       - fsa-network
     restart: unless-stopped
+
+secrets:
+  github_token:
+    environment: GITHUB_TOKEN
 
 networks:
   fsa-network:
