@@ -56,6 +56,11 @@ DOTENV_PATH = PROJECT_DIR.parent / ".env"
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+# Sized for a full 7-question batch WITH worked explanations, plus headroom for
+# reasoning: Claude Sonnet 5 thinks by default and counts that thinking against
+# max_tokens. At 4096 half the 2A2 run failed with truncated JSON mid-array.
+MAX_TOKENS = 16384
+
 PRACTICE_COUNT = 5   # objective_practice questions per lesson_code
 QUIZ_COUNT = 2       # chapter_quiz questions per lesson_code
 
@@ -241,7 +246,7 @@ def call_model(client: OpenAI, system: str, user: str, model: str, retries: int 
         try:
             response = client.chat.completions.create(
                 model=model,
-                max_tokens=4096,
+                max_tokens=MAX_TOKENS,
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
