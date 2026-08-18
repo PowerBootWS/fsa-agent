@@ -17,7 +17,7 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
-    "fsa-common": "github:PowerBootWS/fsa-common",
+    "fsa-common": "git+https://github.com/PowerBootWS/fsa-common.git",
     "helmet": "^7.1.0",
     "multer": "^2.2.0",
     "pg": "^8.11.3",
