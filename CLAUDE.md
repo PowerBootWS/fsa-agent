@@ -53,4 +53,4 @@ docker compose --env-file /home/debian/.env up -d ai-service
 
 ## Environment
 
-Single shared `/home/debian/.env`. Key vars: `LEARN_DOMAIN`, `INTERNAL_SECRET` (webhook → provision/deactivate), `ADMIN_API_KEY`, `GOOGLE_SMTP_USER`/`GOOGLE_SMTP_PASS`, `PLATFORM_BASE_URL`, `PAPER_SWITCH_COOLDOWN_DAYS`, `QUIZ_PASSING_THRESHOLD`, `POSTGRES_*`, `PYTHON_SERVICE_URL`. See the wiki for the full table.
+Single shared `/home/debian/.env`. Key vars: `LEARN_DOMAIN`, `INTERNAL_SECRET` (webhook → provision/deactivate), `ADMIN_API_KEY`, `SUPPORT_GMAIL_SA`/`EMAIL_FROM` (all outbound mail — Gmail API, no SMTP), `PLATFORM_BASE_URL`, `PAPER_SWITCH_COOLDOWN_DAYS`, `QUIZ_PASSING_THRESHOLD`, `POSTGRES_*`, `PYTHON_SERVICE_URL`. See the wiki for the full table.
