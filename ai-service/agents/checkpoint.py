@@ -7,10 +7,18 @@ import requests
 
 _OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
+# The caller always renders a practice question directly beneath this message,
+# so the message must introduce it, not offer it. The earlier wording asked
+# "would you like to try a practice question?" and the question then appeared
+# regardless — which read as the question being part of the slide rather than a
+# separate exercise.
 _SYSTEM = (
     "You are a helpful Power Engineering instructor assistant. "
     "Your role is to briefly check in with a student who just finished watching a portion of the lesson. "
-    "Ask if they want to try a practice question, or if anything in that content didn't make sense. "
+    "A separate practice question is shown directly below your message, so introduce it as an extra "
+    "question on the same topic for them to try themselves — never as the worked example they were "
+    "just shown, and never as something they can opt out of receiving. "
+    "Also invite them to say if anything in that content didn't make sense. "
     "End with a short prompt to click Next if they're good to keep going. "
     "Keep your message to 2-3 sentences. Be encouraging but concise. "
     "Do not reference 'sections' or tell them to move to the next section. "
@@ -47,7 +55,9 @@ def generate_checkin(sections_covered: list[dict], correct_pct: float, question_
         f"The student just finished sections covering: {topics}. "
         f"{performance_note} "
         "Write a brief check-in message. "
-        "Ask if they'd like to try a practice question, or if anything in that content didn't make sense or needs clarification. "
+        "Introduce the practice question shown below your message as a separate question on the same "
+        "topic for them to work through themselves — it is not the worked example from the lesson. "
+        "Invite them to say if anything in that content didn't make sense or needs clarification. "
         "End with: if they're good, they can click Next to continue through the content. "
         "Do not mention moving to the next section."
     )
@@ -72,4 +82,6 @@ def generate_checkin(sections_covered: list[dict], correct_pct: float, question_
         response.raise_for_status()
         return response.json()['choices'][0]['message']['content'].strip()
     except Exception:
-        return "Nice work! Would you like to try a practice question, or did anything in that content not quite click? If you're good, go ahead and click Next to keep going."
+        return ("Nice work! Here's a separate practice question on the same topic — give it a try "
+                "yourself. If anything in that content didn't quite click, just ask. Otherwise click "
+                "Next to keep going.")

@@ -49,6 +49,14 @@ function QuestionCard({ question, onAnswer }) {
 
   return (
     <div className="question-card">
+      {/* Without this header the card reads as a continuation of whatever is on
+          the slide — students hit a same-topic question next to a worked
+          example and assume it is the same problem. Say plainly that it is a
+          separate exercise. */}
+      <div className="q-label">Practice question</div>
+      <div className="q-sublabel">
+        Separate from the example on the left — same topic, your turn to try it.
+      </div>
       <div className="q-text">{renderInline(question.question_text || '', 'qt')}</div>
       {options.map((opt, idx) => {
         const optText = typeof opt === 'string' ? opt : opt.text || JSON.stringify(opt);
