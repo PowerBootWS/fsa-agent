@@ -8,6 +8,7 @@
 """
 import pytest
 
+from agents import tutor as tutor_module
 from agents.tutor import PROFANITY_RE, TutorAgent
 from agents import tutor_prompt
 from agents.orchestrator import _remember_current_question
@@ -56,6 +57,33 @@ def test_brass_question_does_not_warn_or_end_session():
     assert state['profanity_count'] == 0
     # Second paste of the same text must not end the session either.
     assert agent._check_profanity(msg, state) is None
+
+
+def test_profanity_filter_is_disabled_by_default():
+    """Owner decision 2026-08-19: the gate must never warn or end a session."""
+    assert tutor_module.PROFANITY_FILTER_ENABLED is False
+
+
+@pytest.mark.parametrize('text', DIRTY)
+def test_real_profanity_passes_through_when_filter_disabled(text):
+    agent = TutorAgent.__new__(TutorAgent)
+    state = {'profanity_count': 0}
+    # Same message twice: still no warning, no stop, no state mutation.
+    assert agent._check_profanity(text, state) is None
+    assert agent._check_profanity(text, state) is None
+    assert state['profanity_count'] == 0
+
+
+def test_filter_still_works_when_explicitly_re_enabled(monkeypatch):
+    monkeypatch.setattr(tutor_module, 'PROFANITY_FILTER_ENABLED', True)
+    agent = TutorAgent.__new__(TutorAgent)
+    state = {'profanity_count': 0}
+    first = agent._check_profanity('this is fucking broken', state)
+    assert first['action'] == 'warning'
+    second = agent._check_profanity('this is fucking broken', state)
+    assert second['action'] == 'stop'
+    # And clean domain vocabulary is still clean even when enabled.
+    assert agent._check_profanity(CLEAN[0], {'profanity_count': 0}) is None
 
 
 def test_remember_current_question_populates_state():

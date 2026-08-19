@@ -9,7 +9,24 @@ import requests
 from agents import tutor_prompt
 
 
-# Profanity word list — checked before any API call.
+# ---------------------------------------------------------------------------
+# PROFANITY FILTER — DISABLED 2026-08-19 (owner decision, Russ).
+#
+# The gate no longer produces any user-facing response. It never warns and it
+# never ends a session. Rationale: it caused more harm than good (see the
+# Katrina 2026-08-18 incident below), and a paying student swearing at the
+# tutor is a signal that something is frustrating them, not a discipline
+# problem — we want to look at WHY, not shut the session down.
+#
+# The word list and regex are kept intact so a future "flag it quietly for the
+# owner" feature has something to build on. To re-enable the warn/stop
+# behaviour, set TUTOR_PROFANITY_FILTER=1 in /home/debian/.env and restart
+# ai-service. Default is OFF.
+# ---------------------------------------------------------------------------
+PROFANITY_FILTER_ENABLED = os.getenv('TUTOR_PROFANITY_FILTER', '0') == '1'
+
+
+# Profanity word list — retained for future flagging, not currently enforced.
 #
 # MUST be matched on whole words only. These were previously matched as bare
 # substrings, which fired on ordinary Power Engineering vocabulary: 'ass'
@@ -182,9 +199,17 @@ class TutorAgent:
 
     def _check_profanity(self, user_message, state):
         """
-        Check for profanity. First offence: warning. Second: stop.
-        Returns a dict on offence, None if clean.
+        Profanity gate. DISABLED by default (see PROFANITY_FILTER_ENABLED).
+
+        When disabled this always returns None, so the student's message goes
+        straight to the tutor like any other message — no warning, no session
+        end, no state mutation.
+
+        When enabled: first offence warning, second offence stop.
         """
+        if not PROFANITY_FILTER_ENABLED:
+            return None
+
         profanity_count = state.get('profanity_count', 0)
 
         if PROFANITY_RE.search(user_message or ''):
