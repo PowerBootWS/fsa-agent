@@ -4,15 +4,39 @@ All conversational responses are LLM-generated via OpenRouter.
 No scripted fallback — requires a valid OPENROUTER_API_KEY.
 """
 import os
+import re
 import requests
 from agents import tutor_prompt
 
 
-# Profanity word list — checked before any API call
+# Profanity word list — checked before any API call.
+#
+# MUST be matched on whole words only. These were previously matched as bare
+# substrings, which fired on ordinary Power Engineering vocabulary: 'ass'
+# matched br-ASS-, m-ASS-, cl-ASS-, gl-ASS-, g-ASS-es, comp-ASS-; 'crap'
+# matched s-CRAP-; 'cock' matched pea-COCK-, -COCK-pit. A student pasting
+# "600 kg of brass is mixed with 400 kg of aluminum" got a profanity warning,
+# and pasting it a second time ended her session (reported 2026-08-18).
+# 'cock' is deliberately NOT in this list: gauge cocks, try cocks, drain cocks
+# and pet cocks are standard boiler fittings and core 2nd Class vocabulary.
 PROFANITY_WORDS = [
-    'fuck', 'shit', 'ass', 'bitch', 'bastard', 'crap',
-    'dick', 'cock', 'pussy', 'cunt', 'whore', 'slut', 'retard'
+    'fuck', 'shit', 'bullshit', 'horseshit', 'ass', 'asshole', 'dumbass',
+    'jackass', 'bitch', 'bastard', 'crap', 'dick', 'pussy', 'cunt',
+    'whore', 'slut', 'retard',
 ]
+
+# Whole-word match, tolerating common suffixes (asses, bitching, shitty) but
+# never matching a profanity that sits inside a longer, innocent word.
+PROFANITY_RE = re.compile(
+    r'\b(?:'
+    + '|'.join(
+        # Allow the usual doubled final consonant (shit -> shitty, shitting).
+        f'{re.escape(w)}{re.escape(w[-1])}?(?:e?s|ed|ing|er|y|hole)?'
+        for w in PROFANITY_WORDS
+    )
+    + r')\b',
+    re.IGNORECASE,
+)
 
 # Max chat history entries to include in each prompt (20 = 10 exchanges rolling window)
 MAX_HISTORY_ENTRIES = 20
@@ -161,29 +185,27 @@ class TutorAgent:
         Check for profanity. First offence: warning. Second: stop.
         Returns a dict on offence, None if clean.
         """
-        user_lower = user_message.lower()
         profanity_count = state.get('profanity_count', 0)
 
-        for word in PROFANITY_WORDS:
-            if word in user_lower:
-                if profanity_count == 0:
-                    state['profanity_count'] = 1
-                    return {
-                        'response': (
-                            "Let's keep our conversation focused and professional — "
-                            "that's the kind of environment where the best learning happens. "
-                            "Ready to continue with the lesson?"
-                        ),
-                        'action': 'warning',
-                    }
-                else:
-                    return {
-                        'response': (
-                            "I need to end this session now due to continued inappropriate language. "
-                            "Come back when you're ready to focus on your studies — "
-                            "I'm here to help whenever you are."
-                        ),
-                        'action': 'stop',
-                    }
+        if PROFANITY_RE.search(user_message or ''):
+            if profanity_count == 0:
+                state['profanity_count'] = 1
+                return {
+                    'response': (
+                        "Let's keep our conversation focused and professional — "
+                        "that's the kind of environment where the best learning happens. "
+                        "Ready to continue with the lesson?"
+                    ),
+                    'action': 'warning',
+                }
+            else:
+                return {
+                    'response': (
+                        "I need to end this session now due to continued inappropriate language. "
+                        "Come back when you're ready to focus on your studies — "
+                        "I'm here to help whenever you are."
+                    ),
+                    'action': 'stop',
+                }
 
         return None

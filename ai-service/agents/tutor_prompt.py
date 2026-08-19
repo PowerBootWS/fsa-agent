@@ -68,7 +68,7 @@ def build(lesson_context, progress, state, first_name=None):
     ]
 
     if question_in_display:
-        sections.append(_build_display_panel_note(activity, awaiting_next_question))
+        sections.append(_build_display_panel_note(activity, awaiting_next_question, state))
 
     if activity == 'staged_problem':
         sections.append(_build_staged_problem_block(state))
@@ -231,20 +231,46 @@ Questions completed this session: {questions_done}
 {prior_session}{limit_note}{context_note}{feedback_note}{resume_note}{difficulty_note}"""
 
 
-def _build_display_panel_note(activity, awaiting_next_question):
+def _build_current_question_block(state):
+    """The exact question the student is looking at.
+
+    Without this the model knows only that 'a question' is on screen, so a
+    follow-up like "what equation do I use for this question" gets answered
+    against whatever was discussed earlier — a different problem.
+    """
+    text = (state or {}).get('current_question_text') or ''
+    if not text:
+        return ''
+    options = (state or {}).get('current_question_options') or []
+    block = f'\n\nTHE QUESTION ON SCREEN RIGHT NOW IS:\n"{text}"'
+    if options:
+        block += '\nIts answer options are:\n' + '\n'.join(f'  {o}' for o in options)
+    block += (
+        '\n- Every follow-up the student asks ("what equation do I use for this?", '
+        '"where do I start?", "I don\'t understand the question") refers to THIS question '
+        'and nothing earlier in the conversation. Answer against this question only.'
+        '\n- If the method for this question differs from the one you were just discussing, '
+        'use the method THIS question needs — do not carry the previous formula over.'
+        '\n- If the student pastes this question back to you, they are quoting the screen, '
+        'not changing the subject. Treat it as a request for help with it.'
+    )
+    return block
+
+
+def _build_display_panel_note(activity, awaiting_next_question, state=None):
     if awaiting_next_question:
         return """## DISPLAY PANEL
 The practice question and answer options are currently shown in the display panel ABOVE this chat window. The student can see them clearly.
 - Do NOT repeat or quote the question text or answer options in your response.
 - Give your feedback on their answer choice directly and concisely.
 - After feedback, invite them to try another question or move on — e.g. "Ready for another one, or want to talk through the concept?"
-- Do NOT write the word 'undefined', 'null', or 'None' in your response under any circumstances."""
+- Do NOT write the word 'undefined', 'null', or 'None' in your response under any circumstances.""" + _build_current_question_block(state)
     else:
         return """## DISPLAY PANEL
 A practice question is currently shown in the display panel ABOVE this chat window. The student can see the question and clickable answer options there.
 - Do NOT repeat, restate, or quote the question or its answer options in your response.
 - Briefly introduce that a question is ready for them (e.g. "I've put a question up for you — give it a go!") and wait for their answer.
-- Do NOT write the word 'undefined', 'null', or 'None' in your response under any circumstances."""
+- Do NOT write the word 'undefined', 'null', or 'None' in your response under any circumstances.""" + _build_current_question_block(state)
 
 
 def _build_staged_problem_block(state):
@@ -343,6 +369,14 @@ FEEDBACK:
   Do NOT give the answer away. Ask a guiding question that steers their thinking toward it.
 - Partially correct: Name what's right first, then gently guide toward what's missing.
   Example: "You've got the right idea with the pressure term — now think about what gets added to account for manufacturing tolerances."
+
+NUMERIC ANSWERS — CHECK YOURSELF BEFORE YOU CORRECT THE STUDENT:
+- Before you tell a student a calculated answer is not right, work the arithmetic out yourself, one operation at a time, and get an actual number.
+- Compare their number to yours. If they agree to sensible rounding (a trailing decimal, a half-unit), the student is CORRECT. Say so and move on.
+- You are NOT allowed to say "small decimal error", "close", "check your calculator", "just a bit higher" or anything similar unless you can state the number you believe is correct AND it genuinely differs from theirs.
+- If the number you compute turns out to equal the number the student gave, you were the one who was wrong. Confirm their answer plainly — "That's it, 1256.1 kJ" — and do not apologise at length or relitigate the steps.
+- NEVER repeat the same "try again" prompt after a student has given the same value twice. If they have answered identically twice, either confirm it or state your own number explicitly so they can see where the two differ.
+- Estimate before you judge: a rough sanity check (5 times 4 times 60 is about 1200, so 1256 is reasonable) beats a confident wrong correction. A student who is right and is told they are wrong loses trust in everything else you say.
 
 LANGUAGE AND FORMAT:
 - Keep conversational turns to 2-4 sentences. Explanations may be longer when genuinely needed.

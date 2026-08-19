@@ -45,6 +45,24 @@ def _detect_mode(lesson_id):
     return 'lesson'  # numeric id or UUID → lesson
 
 
+def _remember_current_question(state, question):
+    """Keep the text and options of the question now on display in session state.
+
+    The display panel renders the question client-side, so without this the
+    tutor's system prompt only ever knew that *a* question was showing, never
+    which one. Asking "what equation do I use for this question" made the model
+    guess from earlier chat and answer about a different problem entirely
+    (reported 2026-08-18).
+    """
+    state['current_question_text'] = (
+        question.get('question_text') or question.get('question') or ''
+    )
+    options = question.get('options') or []
+    state['current_question_options'] = [
+        f'{chr(65 + i)}. {opt}' for i, opt in enumerate(options)
+    ]
+
+
 class Orchestrator:
     def __init__(self):
         self.conversation_state = {}
@@ -215,6 +233,7 @@ class Orchestrator:
                             current_q = q
                             break
                 if current_q:
+                    _remember_current_question(state, current_q)
                     display_update = display.create_question_display(
                         current_q, max(0, state.get('questions_done', 1) - 1)
                     )
@@ -444,6 +463,8 @@ class Orchestrator:
                     state['activity'] = 'greeting'  # Return to greeting between questions
                     # Clear current question so resume doesn't re-display a stale question
                     state['current_question_id'] = None
+                    state['current_question_text'] = ''
+                    state['current_question_options'] = []
                     if intent == INTENT_SELECT_PRACTICE and not state.get('session_limit_reached'):
                         # They explicitly asked for another — load it now
                         state['activity'] = 'practice'
@@ -511,6 +532,7 @@ class Orchestrator:
         # Carry the correct option index alongside the question — the answer
         # evaluator needs it and has no other route back to the question row.
         state['current_question_correct_answer'] = question.get('correct_answer')
+        _remember_current_question(state, question)
         state['seen_question_ids'].append(question['id'])
 
         # Check if this is a multi-step problem
