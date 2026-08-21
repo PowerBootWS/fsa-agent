@@ -13,13 +13,24 @@ router.get('/:courseId/chapters', async (req, res) => {
   try {
     const { courseId } = req.params;
     const result = await pool.query(
-      `SELECT DISTINCT chapter_id
+      // GROUP BY, not SELECT DISTINCT: DISTINCT rejects an ORDER BY
+      // expression that isn't in the select list ("for SELECT DISTINCT,
+      // ORDER BY expressions must appear in select list"). GROUP BY gives
+      // the same de-duplication and allows sorting on a derived value.
+      `SELECT chapter_id
        FROM questions
        WHERE course_id = $1
          AND chapter_id IS NOT NULL
          AND options IS NOT NULL
          AND jsonb_array_length(options) > 0
-       ORDER BY chapter_id`,
+       GROUP BY chapter_id
+       -- chapter_id is '{COURSE}-{N}' (e.g. '4A-7'), so a plain text ORDER BY
+       -- gives 1, 10, 11 ... 2, 20 — barely noticeable at 8-15 chapters
+       -- (2nd/3rd Class) but wrong and obvious at 4A's 56 / 4B's 55.
+       -- Sort on the trailing integer instead. substring() yields NULL if a
+       -- chapter_id ever stops ending in digits, so the cast can't blow up;
+       -- those fall to the end and tie-break on the raw text.
+       ORDER BY (substring(chapter_id from '([0-9]+)$'))::int NULLS LAST, chapter_id`,
       [courseId]
     );
     res.json({ chapters: result.rows.map(r => r.chapter_id) });
