@@ -1327,7 +1327,19 @@ body {
 .exam-timer--over { color: #f87171; }
 
 /* Lobby (old CSS path — client-v1 compat) */
-.lobby-page { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; }
+/* The lobby is the only .app-fullpage child with no inner scroller of its own.
+   .app-fullpage is height:100vh/overflow:hidden for the exam phase, so without
+   this the lobby is clipped at one viewport with no way to scroll — 4th Class
+   (4A = 56 chapters) put the lower chapter-quiz buttons permanently out of
+   reach. Reported by a student 2026-08-20. */
+.lobby-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .lobby-title {
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 1.8rem;
