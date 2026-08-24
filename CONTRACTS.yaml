@@ -1,0 +1,55 @@
+# fsa-agent CONTRACTS.yaml
+# Written: 2026-08-24 (audit Step 7)
+name: fsa-agent
+publishes:
+  http:
+    - {path: /health, consumers: [fsa-overwatch]}
+    - {path: /internal/provision-user, consumers: [fsa-webhook-listener]}
+    - {path: /internal/deactivate-user, consumers: [fsa-webhook-listener]}
+    - {path: /internal/grant-purchase, consumers: [fsa-webhook-listener]}
+  db:
+    - {schema: public, consumers: [fsa-lesson-creator, fsa-crm, fsa-overwatch]}
+consumes:
+  - project: fsa-postgres
+    via: db
+    detail: public schema (owns it)
+    env_vars: [POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD]
+  - project: openrouter
+    via: http
+    detail: AI tutoring + resume tailoring
+    env_vars: [OPENROUTER_API_KEY, OPENROUTER_MODEL]
+  - project: ghl
+    via: http
+    detail: contact sync
+    env_vars: [GHL_API_KEY, GHL_LOCATION_ID]
+  - project: stripe
+    via: http
+    detail: subscription management
+    env_vars: [STRIPE_SECRET_KEY]
+  - project: gmail
+    via: http
+    detail: transactional email
+    env_vars: [SUPPORT_GMAIL_SA, EMAIL_FROM, EMAIL_MAILBOXES]
+  - project: fsa-lead-capture
+    via: http
+    detail: lead intake relay
+    env_vars: [LEAD_CAPTURE_URL, LEAD_CAPTURE_SHARED_SECRET]
+  - project: fsa-nurture
+    via: http
+    detail: enrol leads
+    env_vars: [NURTURE_URL, NURTURE_INTAKE_KEY]
+docker:
+  env_split:
+    shared: /home/debian/.env.shared
+    project: /home/debian/fsa-agent/.env
+    project_vars: [ADMIN_API_KEY, PARENT_DOMAIN, LEARN_DOMAIN, LEGACY_DOMAIN,
+                   PLATFORM_BASE_URL, PAPER_SWITCH_COOLDOWN_DAYS, QUIZ_PASSING_THRESHOLD,
+                   SAVED_JOB_ARCHIVE_DAYS, DEACTIVATION_REQUIRES_CONFIRMATION,
+                   DEACTIVATION_REVIEW_EMAIL, PRACTICE_EXAM_TOKEN_SECRET,
+                   LEAD_CAPTURE_URL, LEAD_CAPTURE_SHARED_SECRET,
+                   FSA_MEDIA_DIR, FSA_USER_UPLOADS_DIR, FSA_GENERATED_DOCS_DIR,
+                   STRIPE_TEST_SECRET_KEY, STRIPE_TEST_PRICE_SPARK_ID]
+  note: >
+    CLI commands still pass --env-file /home/debian/.env for compose ${VAR}
+    interpolation in environment: section. Retire in Step 8 once interpolations
+    are replaced with explicit values or removed.

@@ -32,12 +32,13 @@ fsa-agent/
 
 ## Deploy
 
-Always pass `--env-file /home/debian/.env` (the single shared env file). Build the React client first if `client-v2/` source changed.
+Container env comes from two files (`env_file:` in the compose): `/home/debian/.env.shared` (shared layer) and `fsa-agent/.env` (project-specific). The `--env-file /home/debian/.env` flag is still needed on CLI to resolve `${VAR}` substitutions in the compose `environment:` section until Step 8 retires the central file.
 
 ```bash
 # Node API + React client
 cd client-v2 && npm run build && cd .. && \
-docker compose --env-file /home/debian/.env build api && \
+GITHUB_TOKEN=$(gh auth token) \
+  docker compose --env-file /home/debian/.env build api && \
 docker compose --env-file /home/debian/.env up -d api
 
 # Python AI service (rarely changes)

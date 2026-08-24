@@ -2,7 +2,9 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: fsa-postgres
-    env_file: ../.env
+    env_file:
+      - /home/debian/.env.shared
+      - /home/debian/fsa-agent/.env
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -28,7 +30,9 @@ services:
       dockerfile: ./server/Dockerfile
       secrets:
         - github_token
-    env_file: ../.env
+    env_file:
+      - /home/debian/.env.shared
+      - /home/debian/fsa-agent/.env
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -73,7 +77,9 @@ services:
     build:
       context: ./ai-service
       dockerfile: Dockerfile
-    env_file: ../.env
+    env_file:
+      - /home/debian/.env.shared
+      - /home/debian/fsa-agent/.env
     environment:
       - FLASK_ENV=production
       - PORT=5000
