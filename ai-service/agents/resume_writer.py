@@ -6,7 +6,7 @@ stack) so usage/cost for this customer-facing, potentially high-volume feature s
 isolated from the Claude Code Max subscription's own limits — an owner-approved, deliberate
 exception (2026-07-08).
 
-Unlike checkpoint.py's fallback-on-error pattern (fine for a throwaway chat nudge),
+Unlike a fallback-on-error pattern (fine for a throwaway chat nudge),
 generation failures here propagate to the caller — this produces a paid deliverable the
 candidate downloads, so silently returning placeholder content on an API error would be
 worse than a visible failure.

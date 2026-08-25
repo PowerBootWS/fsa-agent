@@ -234,22 +234,22 @@ async function getLearnerSession(sessionId) {
   return result.rows[0] || null;
 }
 
-async function getCheckpointQuestion(lessonCode, excludeIds = []) {
-  const excludeClause = excludeIds.length > 0 ? 'AND id != ALL($2::int[])' : '';
-  const params = excludeIds.length > 0 ? [lessonCode, excludeIds] : [lessonCode];
-
+// Every standalone practice question for a lesson. The caller picks one:
+// first unasked, and once the pool is used up it recycles the least-recently
+// asked rather than returning nothing. Objectives carry only ~5 of these, so
+// the old exclude-and-LIMIT-1 query went permanently empty on a second pass
+// through a lesson.
+async function getCheckpointQuestionPool(lessonCode) {
   const result = await pool.query(
     `SELECT id, question_text, options, correct_answer, difficulty, question_type
      FROM questions
      WHERE lesson_code = $1
        AND question_type = 'objective_practice'
        AND standalone = true
-       ${excludeClause}
-     ORDER BY RANDOM()
-     LIMIT 1`,
-    params
+     ORDER BY id`,
+    [lessonCode]
   );
-  return result.rows[0] || null;
+  return result.rows;
 }
 
 async function getCourseOutline(courseId) {
@@ -332,7 +332,7 @@ module.exports = {
   upsertLearnerSession,
   updateLearnerSession,
   getLearnerSession,
-  getCheckpointQuestion,
+  getCheckpointQuestionPool,
   getCourseOutline,
   getCourseProgress,
   upsertCourseProgress,

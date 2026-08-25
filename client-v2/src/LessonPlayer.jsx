@@ -34,10 +34,31 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   const [sectionIndex, setSectionIndex] = useState(0);
   const [autoPlay, setAutoPlay] = useState(false);
   const [checkpoint, setCheckpoint] = useState(null);
-  const [completionTrigger, setCompletionTrigger] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const sectionsSeenSinceCheckpoint = useRef(0);
+
+  // One learner session per objective. This used to be created once, for the
+  // lesson the player opened on, and kept as the student navigated — so the
+  // asked-question log for lesson A accumulated question ids from B, C and D,
+  // and the checkpoint picker ran out of questions it had never actually
+  // shown for that lesson.
+  useEffect(() => {
+    if (!activeLessonCode || !learnerId) {
+      setSessionId(null);
+      return undefined;
+    }
+    let cancelled = false;
+    fetch('/api/v2/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ learner_id: learnerId, lesson_code: activeLessonCode }),
+    })
+      .then(res => res.json())
+      .then(data => { if (!cancelled) setSessionId(data.id || null); })
+      .catch(() => { if (!cancelled) setSessionId(null); });
+    return () => { cancelled = true; };
+  }, [activeLessonCode, learnerId]);
 
   // Write progress (fire and forget — loss on network error is acceptable)
   const writeProgress = useCallback((lessonCode, slideIndex) => {
@@ -102,19 +123,6 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
 
         if (!startCode) throw new Error('No lessons found for this course');
 
-        // Create learner session for checkpoint tracking
-        let sid = null;
-        if (learnerId) {
-          const sessionRes = await fetch('/api/v2/session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ learner_id: learnerId, lesson_code: startCode }),
-          });
-          const sessionData = await sessionRes.json();
-          sid = sessionData.id || null;
-        }
-        setSessionId(sid);
-
         // Fetch sections for starting objective
         const secRes = await fetch(`/api/v2/lesson/${startCode}`);
         const secData = await secRes.json();
@@ -146,7 +154,6 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
       setSectionIndex(clamped);
       setAutoPlay(false);
       setCheckpoint(null);
-      setCompletionTrigger(null);
       sectionsSeenSinceCheckpoint.current = 0;
       writeProgress(lessonCode, clamped);
     } catch (err) {
@@ -187,21 +194,19 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
     };
   }, [courseOutline, activeLessonCode]);
 
-  // Trigger AI checkpoint
-  const triggerCheckpoint = useCallback(async (coveredSections) => {
+  // Pull the next practice question for a lesson pause. Nothing is shown when
+  // the lesson has no question to give — the tutor stays quiet rather than
+  // announcing a question that isn't there.
+  const triggerCheckpoint = useCallback(async () => {
     if (!sessionId || !activeLessonCode) return;
     try {
       const res = await fetch('/api/v2/checkpoint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: sessionId,
-          lesson_code: activeLessonCode,
-          sections_covered: coveredSections.map(s => ({ title: s.title, body: s.body })),
-        }),
+        body: JSON.stringify({ session_id: sessionId, lesson_code: activeLessonCode }),
       });
       const data = await res.json();
-      setCheckpoint(data);
+      if (data?.question) setCheckpoint(data);
     } catch {
       // checkpoint failure is non-fatal
     }
@@ -211,7 +216,6 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
     // Last slide → show completion screen
     if (sectionIndex >= sections.length - 1) {
       setSectionIndex(sections.length);  // virtual "completion" index
-      setCompletionTrigger({ lessonCode: activeLessonCode, nextLessonCode });
       writeProgress(activeLessonCode, sections.length);
       return;
     }
@@ -219,7 +223,6 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
     setSectionIndex(next);
     setAutoPlay(true);
     setCheckpoint(null);
-    setCompletionTrigger(null);
     sectionsSeenSinceCheckpoint.current += 1;
     writeProgress(activeLessonCode, next);
 
@@ -235,8 +238,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
     const forceCheckpoint = nextSection?.checkpoint_after === true;
     const intervalCheckpoint = sectionsSeenSinceCheckpoint.current >= CHECKPOINT_INTERVAL;
     if (forceCheckpoint || intervalCheckpoint) {
-      const start = Math.max(0, next - CHECKPOINT_INTERVAL);
-      triggerCheckpoint(sections.slice(start, next));
+      triggerCheckpoint();
       sectionsSeenSinceCheckpoint.current = 0;
     }
   }
@@ -248,7 +250,6 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
     setSectionIndex(prev);
     setAutoPlay(false);
     setCheckpoint(null);
-    setCompletionTrigger(null);
     writeProgress(activeLessonCode, prev);
   }
 
@@ -309,7 +310,6 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
           learnerId={learnerId || 'anonymous'}
           sectionIndex={sectionIndex}
           checkpoint={checkpoint}
-          completionTrigger={completionTrigger}
           onAnswered={handleAnswered}
         />
       )}

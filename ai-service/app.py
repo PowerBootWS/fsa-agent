@@ -17,7 +17,6 @@ from agents.orchestrator import Orchestrator
 from agents.tutor import TutorAgent
 from agents.researcher import Researcher
 from agents.display import DisplayAgent
-from agents.checkpoint import generate_checkin
 from agents.resume_writer import generate_tailored_documents
 
 # Initialize agents
@@ -113,21 +112,6 @@ def demo_seed_exam():
         return jsonify({'error': 'Missing user or lessonId'}), 400
     result = orchestrator.seed_demo_exam(user, lesson_id, researcher)
     return jsonify(result)
-
-
-@app.route('/checkpoint', methods=['POST'])
-def checkpoint():
-    """Generate an adaptive check-in message for a lesson pause."""
-    data = request.json or {}
-    sections_covered = data.get('sections_covered', [])
-    correct_pct = float(data.get('correct_pct', 0.0))
-    question_count = int(data.get('question_count', 0))
-
-    if not sections_covered:
-        return jsonify({'error': 'sections_covered required'}), 400
-
-    message = generate_checkin(sections_covered, correct_pct, question_count)
-    return jsonify({'message': message})
 
 
 GENERATED_DOCS_DIR = os.getenv('GENERATED_DOCS_DIR', '/srv/fsa-generated-documents')

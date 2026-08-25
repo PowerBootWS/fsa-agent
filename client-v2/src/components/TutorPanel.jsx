@@ -85,10 +85,10 @@ function QuestionCard({ question, onAnswer }) {
  *   lessonCode     — string
  *   learnerId      — string
  *   sectionIndex   — current section index (triggers between-section messages)
- *   checkpoint     — { message, question } | null
+ *   checkpoint     — { question } | null
  *   onAnswered     — (entry) => void
  */
-export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, completionTrigger, onAnswered }) {
+export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, onAnswered }) {
   const [messages, setMessages] = useState([
     { type: 'proactive', text: "Welcome! I'm your AI tutor. Ask me anything as we go through this lesson." },
   ]);
@@ -109,29 +109,14 @@ export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, co
     setMessages([{ type: 'proactive', text: msg }]);
   }, [sectionIndex]);
 
-  // Checkpoint injection
+  // Checkpoint injection — the question card, on its own. It carries its own
+  // header and sub-label, so a written preamble introducing it was pure
+  // padding, and when no question came back the preamble was left announcing
+  // one that never appeared.
   useEffect(() => {
-    if (!checkpoint) return;
-    setMessages(prev => [
-      ...prev,
-      { type: 'proactive', text: checkpoint.message },
-      ...(checkpoint.question
-        ? [{ type: 'question', question: checkpoint.question }]
-        : []),
-    ]);
+    if (!checkpoint?.question) return;
+    setMessages(prev => [...prev, { type: 'question', question: checkpoint.question }]);
   }, [checkpoint]);
-
-  // Completion trigger — encourage practice before moving on
-  useEffect(() => {
-    if (!completionTrigger) return;
-    setMessages(prev => [
-      ...prev,
-      {
-        type: 'proactive',
-        text: "Nice work finishing that objective! Before moving on, it's worth trying a couple of practice questions to lock in what you just covered. Want to give it a go?",
-      },
-    ]);
-  }, [completionTrigger]);
 
   async function handleSend() {
     const text = input.trim();
