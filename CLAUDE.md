@@ -32,18 +32,18 @@ fsa-agent/
 
 ## Deploy
 
-Container env comes from two files (`env_file:` in the compose): `/home/debian/.env.shared` (shared layer) and `fsa-agent/.env` (project-specific). The `--env-file /home/debian/.env` flag is still needed on CLI to resolve `${VAR}` substitutions in the compose `environment:` section until Step 8 retires the central file.
+Container env comes from two files (`env_file:` in the compose): `/home/debian/.env.shared` (shared layer) and `fsa-agent/.env` (project-specific). **`--env-file` is no longer needed** (env-split Step 8, 2026-08-24) — the remaining `${VAR}` interpolations are volume paths that resolve from the auto-loaded `fsa-agent/.env`. **`/home/debian/.env` is retired (Step 10, mode `000`, deleted 2026-08-27); never source or pass it.**
 
 ```bash
 # Node API + React client
 cd client-v2 && npm run build && cd .. && \
 GITHUB_TOKEN=$(gh auth token) \
-  docker compose --env-file /home/debian/.env build api && \
-docker compose --env-file /home/debian/.env up -d api
+  docker compose build api && \
+docker compose up -d api
 
 # Python AI service (rarely changes)
-docker compose --env-file /home/debian/.env build ai-service && \
-docker compose --env-file /home/debian/.env up -d ai-service
+docker compose build ai-service && \
+docker compose up -d ai-service
 ```
 
 **Never test via `localhost`/container IP** — only the public URL via the Cloudflare Tunnel (→ `fsa-agent-api-1:3000`) reaches the right container.
@@ -54,4 +54,4 @@ docker compose --env-file /home/debian/.env up -d ai-service
 
 ## Environment
 
-Single shared `/home/debian/.env`. Key vars: `LEARN_DOMAIN`, `INTERNAL_SECRET` (webhook → provision/deactivate), `ADMIN_API_KEY`, `SUPPORT_GMAIL_SA`/`EMAIL_FROM` (all outbound mail — Gmail API, no SMTP), `PLATFORM_BASE_URL`, `PAPER_SWITCH_COOLDOWN_DAYS`, `QUIZ_PASSING_THRESHOLD`, `POSTGRES_*`, `PYTHON_SERVICE_URL`. See the wiki for the full table.
+Two layers: `/home/debian/.env.shared` + `fsa-agent/.env`. Key vars: `LEARN_DOMAIN`, `INTERNAL_SECRET` (webhook → provision/deactivate), `ADMIN_API_KEY`, `SUPPORT_GMAIL_SA`/`EMAIL_FROM` (all outbound mail — Gmail API, no SMTP), `PLATFORM_BASE_URL`, `PAPER_SWITCH_COOLDOWN_DAYS`, `QUIZ_PASSING_THRESHOLD`, `POSTGRES_*`, `PYTHON_SERVICE_URL`. See the wiki for the full table.

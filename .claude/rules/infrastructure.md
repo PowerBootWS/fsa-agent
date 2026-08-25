@@ -24,17 +24,18 @@ curl https://learn.fullsteamahead.ca/api/<route>
 ## Docker Compose
 
 - Both `api` and `ai-service` are built images (not bind-mounted volumes), so any code change requires a rebuild.
-- **Always pass `--env-file /home/debian/.env`** to every `docker compose` command (the single shared env file). The compose file uses `${POSTGRES_DB}` etc. in `environment:`, which overrides `env_file:` — without this flag those vars resolve to blank and DB connections fail.
+- **Do not pass `--env-file`.** Container env comes from `env_file:` in the compose: `/home/debian/.env.shared` then `/home/debian/fsa-agent/.env`. The old central `/home/debian/.env` is **retired** (env-split Step 10) — mode `000`, deleted 2026-08-27. Never source or pass it.
+- **Cloudflare Workers hold their own copies of shared credentials** as Cloudflare secrets and do **not** read either env file. Rotating a secret in `.env.shared` must be followed by a `wrangler secret put` pass over `fsa-lead-capture` and `fsa-stripe-coupon`, or they keep using the revoked value.
 - Python AI service:
   ```
-  docker compose --env-file /home/debian/.env build ai-service && \
-  docker compose --env-file /home/debian/.env up -d ai-service
+  docker compose build ai-service && \
+  docker compose up -d ai-service
   ```
 - Node API + React client (build **client-v2** first — `client/` is dead v1):
   ```
   cd client-v2 && npm run build && cd .. && \
-  docker compose --env-file /home/debian/.env build api && \
-  docker compose --env-file /home/debian/.env up -d api
+  docker compose build api && \
+  docker compose up -d api
   ```
 
 ## Database
