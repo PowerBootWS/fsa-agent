@@ -1,10 +1,13 @@
 import os
-from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
 
-load_dotenv("../../.env")
+# No dotenv load here on purpose. This only ever runs in the ai-service
+# container, where every var arrives from compose `env_file:`
+# (/home/debian/.env.shared + fsa-agent/.env) and `environment:`. The old
+# load_dotenv("../../.env") resolved to /.env inside the image and was a
+# silent no-op — removed in env-split Step 8 rather than repointed.
 
 app = Flask(__name__)
 CORS(app)

@@ -22,7 +22,14 @@ from dotenv import load_dotenv
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-load_dotenv(SCRIPT_DIR.parent.parent / ".env")
+# Split config (env-split Step 8). NOTE: .env.shared carries the *container*
+# Postgres coordinates (POSTGRES_HOST=postgres). This script runs on the host,
+# where that name does not resolve — export POSTGRES_HOST=localhost and
+# POSTGRES_PORT=5434 when running it, exactly as before this change.
+for _env in (Path("/home/debian/.env.shared"),
+             SCRIPT_DIR.parent / ".env"):
+    if _env.exists():
+        load_dotenv(_env, override=True)
 
 import db_inserter  # noqa: E402
 from latex_utils import sanitize_question  # noqa: E402

@@ -6,9 +6,6 @@ services:
       - /home/debian/.env.shared
       - /home/debian/fsa-agent/.env
     environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - TZ=America/Edmonton
       - PGTZ=America/Edmonton
     volumes:
@@ -36,28 +33,10 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - PARENT_DOMAIN=${PARENT_DOMAIN}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - PYTHON_SERVICE_URL=http://ai-service:5000
-      - GHL_API_KEY=${GHL_API_KEY}
-      - GHL_LOCATION_ID=${GHL_LOCATION_ID}
       - MEDIA_DIR=/srv/fsa-media
-      - LEARN_DOMAIN=${LEARN_DOMAIN}
-      - LEGACY_DOMAIN=${LEGACY_DOMAIN}
-      - INTERNAL_SECRET=${INTERNAL_SECRET}
-      - ADMIN_API_KEY=${ADMIN_API_KEY}
-      - SUPPORT_GMAIL_SA=${SUPPORT_GMAIL_SA}
-      - EMAIL_FROM=${EMAIL_FROM}
-      - PLATFORM_BASE_URL=${PLATFORM_BASE_URL}
-      - PAPER_SWITCH_COOLDOWN_DAYS=${PAPER_SWITCH_COOLDOWN_DAYS}
-      - SAVED_JOB_ARCHIVE_DAYS=${SAVED_JOB_ARCHIVE_DAYS}
-      - QUIZ_PASSING_THRESHOLD=${QUIZ_PASSING_THRESHOLD}
-      - DEACTIVATION_REQUIRES_CONFIRMATION=${DEACTIVATION_REQUIRES_CONFIRMATION}
-      - DEACTIVATION_REVIEW_EMAIL=${DEACTIVATION_REVIEW_EMAIL}
       - USER_UPLOADS_DIR=/srv/fsa-user-uploads
       - TZ=America/Edmonton
     volumes:
@@ -85,10 +64,6 @@ services:
       - PORT=5000
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OPENROUTER_MODEL=google/gemini-3-flash-preview
       - OPENROUTER_RESUME_MODEL=anthropic/claude-sonnet-5
       - USER_UPLOADS_DIR=/srv/fsa-user-uploads

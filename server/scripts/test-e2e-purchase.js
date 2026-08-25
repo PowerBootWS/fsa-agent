@@ -13,7 +13,12 @@
 // just silently never delivered). Runs against the live production app -- there is no
 // separate dev/staging instance for this feature.
 
-require('dotenv').config({ path: '/home/debian/.env' });
+// Split config (env-split Step 8): shared layer first, then this project's own
+// file, which wins. ADMIN_API_KEY and PLATFORM_BASE_URL both live in fsa-agent/.env.
+// `override: true` is needed because dotenv keeps the first value it sees otherwise.
+for (const path of ['/home/debian/.env.shared', '/home/debian/fsa-agent/.env']) {
+  require('dotenv').config({ path, override: true });
+}
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 
