@@ -200,7 +200,9 @@ def _build_session_state(activity, complexity_level, questions_done, session_lim
     if awaiting_next_question:
         feedback_note = (
             '\nFEEDBACK MODE: The student just answered the practice question shown above. '
-            'Give them your feedback on their answer. The question and options remain visible to the student. '
+            'Their answer has already been graded against the stored correct answer, and the verdict is '
+            'given to you below — take it as fact rather than working the answer out yourself. '
+            'Explain why the correct option is correct. The question and options remain visible to the student. '
             'After your feedback, invite them to try another question or move on — '
             'e.g. "Ready to try another one, or would you like to talk through the concept more?"'
         )
@@ -231,7 +233,7 @@ Questions completed this session: {questions_done}
 {prior_session}{limit_note}{context_note}{feedback_note}{resume_note}{difficulty_note}"""
 
 
-def _build_current_question_block(state):
+def _build_current_question_block(state, reveal_answer=False):
     """The exact question the student is looking at.
 
     Without this the model knows only that 'a question' is on screen, so a
@@ -254,7 +256,53 @@ def _build_current_question_block(state):
         '\n- If the student pastes this question back to you, they are quoting the screen, '
         'not changing the subject. Treat it as a request for help with it.'
     )
+    if reveal_answer:
+        block += _build_answer_ground_truth(state)
+
     return block
+
+
+def _build_answer_ground_truth(state):
+    """What the student was actually graded on — the verdict, not a re-derivation.
+
+    Practice questions are pre-generated multiple choice with a stored integer
+    `correct_answer`. `_evaluate_practice_answer` grades against it and the
+    client has already painted the right option green. Withholding that from
+    the tutor forced it to work the answer out again to write its feedback, and
+    an independently-derived verdict can contradict the highlight the student is
+    looking at. Given only once the question has been answered — while it is in
+    play the answer stays hidden.
+    """
+    verdict = (state or {}).get('last_answer_correct')
+    if verdict is None:
+        return ''
+
+    options = (state or {}).get('current_question_options') or []
+    index = (state or {}).get('current_question_correct_answer')
+    correct = ''
+    if isinstance(index, int) and 0 <= index < len(options):
+        correct = options[index]
+
+    given = (state or {}).get('last_answer_text') or ''
+    outcome = 'CORRECT' if verdict else 'INCORRECT'
+
+    block = (
+        f'\n\nTHE STUDENT HAS NOW ANSWERED, AND THEIR ANSWER HAS ALREADY BEEN GRADED.'
+        f'\n- They answered: {given}'
+        f'\n- That answer is {outcome}.'
+    )
+    if correct:
+        block += f'\n- THE CORRECT ANSWER IS {correct}'
+    block += (
+        '\n- This verdict is settled and the student can already see it on screen — the '
+        'correct option is highlighted for her. Do NOT re-derive it, do NOT recalculate it, '
+        'and do NOT reach a different conclusion. Your job is to explain WHY that option is '
+        'right, and where the reasoning behind a wrong pick went astray.'
+        '\n- Do not congratulate her on an answer she did not give, and do not tell her she '
+        'is wrong when the verdict above says she is right.'
+    )
+    return block
+
 
 
 def _build_display_panel_note(activity, awaiting_next_question, state=None):
@@ -264,7 +312,7 @@ The practice question and answer options are currently shown in the display pane
 - Do NOT repeat or quote the question text or answer options in your response.
 - Give your feedback on their answer choice directly and concisely.
 - After feedback, invite them to try another question or move on — e.g. "Ready for another one, or want to talk through the concept?"
-- Do NOT write the word 'undefined', 'null', or 'None' in your response under any circumstances.""" + _build_current_question_block(state)
+- Do NOT write the word 'undefined', 'null', or 'None' in your response under any circumstances.""" + _build_current_question_block(state, reveal_answer=True)
     else:
         return """## DISPLAY PANEL
 A practice question is currently shown in the display panel ABOVE this chat window. The student can see the question and clickable answer options there.
@@ -397,7 +445,7 @@ SCOPE — WHAT YOU MAY ANSWER:
 
 OFF-LIMITS:
 - Topics with no connection to Power Engineering, plant operation, or exam preparation — redirect warmly to the lesson.
-- Do not reveal or confirm the answer to the practice question currently in play, and do not use background material to shortcut a staged problem. Guide, don't give.
+- Never reveal or confirm the answer to a practice question that is STILL IN PLAY, and do not use background material to shortcut a staged problem. Guide, don't give. Once the student has answered, the question is no longer in play: a GRADED block appears above with the verdict and the correct option, the student can already see it highlighted on screen, and you should explain it plainly rather than withhold it.
 
 RESPONSE LENGTH:
 - Conversational reply: 2-4 sentences

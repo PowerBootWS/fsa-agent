@@ -641,6 +641,12 @@ class Orchestrator:
             # student then talks through it again.
             if is_correct:
                 state['attempts'][q_id]['correct'] = True
+            # Hand the graded verdict to the prompt. Without it the tutor wrote
+            # its feedback paragraph blind and had to re-derive the answer to
+            # have anything to say — on a calculation question that is live
+            # arithmetic against a question whose answer we already know.
+            state['last_answer_correct'] = is_correct
+            state['last_answer_text'] = message
 
         state['answers_evaluated'] = state.get('answers_evaluated', 0) + 1
 

@@ -190,5 +190,18 @@ def test_background_block_absent_when_nothing_retrieved():
 
 
 def test_answer_giveaway_guard_survives_the_loosening():
+    """Asserts the behaviour, not the sentence.
+
+    Originally pinned the literal wording of the OFF-LIMITS rule. That wording
+    was rewritten on 2026-08-26 when FEEDBACK MODE became ground-truth-driven —
+    the guard is now scoped to a question STILL IN PLAY, because once the
+    student has answered, the correct option is highlighted on her screen and
+    withholding it from the tutor only forced it to re-derive the answer. The
+    guard itself is unchanged in force: an unanswered question never has its
+    answer revealed. See tests/test_feedback_ground_truth.py for the other half.
+    """
     prompt = build_prompt({'activity': 'practice'})
-    assert 'Do not reveal or confirm the answer to the practice question' in prompt
+    lowered = prompt.lower()
+    assert 'reveal or confirm the answer' in lowered
+    assert 'still in play' in lowered
+    assert 'THE CORRECT ANSWER IS' not in prompt
