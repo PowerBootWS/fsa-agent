@@ -284,3 +284,32 @@ class TestPromptLatexExample:
 
         assert '\\frac' in prompt
         assert '\x0c' not in prompt, 'a form feed reached the prompt (\\f from \\frac)'
+
+
+class TestEmptyReply:
+    """Found by the 2026-08-26 model eval: v4-pro returned two completely blank
+    turns out of 24. A model can finish with `content: null` or an empty string
+    — more likely once tools are in play, because it has already "spoken" by
+    calling one — and the student was served an empty chat bubble.
+    """
+
+    def test_an_empty_final_message_is_retried_not_shown(self, monkeypatch):
+        agent, posts = _agent(
+            monkeypatch,
+            _final(''),
+            _final('Heat lost by the brass equals heat gained by the aluminium.'),
+        )
+        result = _respond(agent, 'what is the final temperature?')
+        assert result['response'] == 'Heat lost by the brass equals heat gained by the aluminium.'
+        assert len(posts) == 2
+
+    def test_a_null_content_message_is_retried(self, monkeypatch):
+        null_message = {'choices': [{'message': {'role': 'assistant', 'content': None}}]}
+        agent, _ = _agent(monkeypatch, null_message, _final('Here is the method.'))
+        assert _respond(agent, 'how do I start?')['response'] == 'Here is the method.'
+
+    def test_a_model_that_only_ever_returns_empty_still_says_something(self, monkeypatch):
+        agent, posts = _agent(monkeypatch, *[_final('') for _ in range(10)])
+        result = _respond(agent, 'what is the final temperature?')
+        assert result['response'].strip(), 'the student was served a blank turn'
+        assert len(posts) <= tutor_module.MAX_API_CALLS_PER_TURN

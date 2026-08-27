@@ -278,7 +278,20 @@ class TutorAgent:
 
             tool_calls = message.get('tool_calls') or []
             if not tool_calls:
-                return (message.get('content') or '').strip(), calculated
+                content = (message.get('content') or '').strip()
+                if content:
+                    return content, calculated
+                # A model can finish with empty or null content — more likely
+                # with tools in play, because calling one already felt like
+                # speaking. Retrying costs a call; serving a blank chat bubble
+                # costs the student the turn. Found by the 2026-08-26 eval,
+                # where v4-pro did this on 2 of 24 turns.
+                print('TutorAgent: empty completion, retrying within budget')
+                messages = messages + [{
+                    'role': 'user',
+                    'content': 'Please give your answer in words.',
+                }]
+                continue
 
             # Forcing applies to the first call only; once the model has the
             # number, let it write the reply instead of calculating forever.

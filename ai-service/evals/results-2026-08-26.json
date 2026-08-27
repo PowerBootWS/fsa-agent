@@ -1,0 +1,1695 @@
+{
+  "run_date": "2026-08-26",
+  "note": "Scored with the corrected scorers. The scores printed during the live run were lower and wrong: three scorer gaps (self-correction read as rejection, literal unit comparison, no contrastive rejection forms) each understated a model. Replies are verbatim from the run; only the scoring changed.",
+  "summary": {
+    "deepseek/deepseek-v4-flash": {
+      "passed": 20,
+      "total": 24,
+      "avg_api_calls": 2.29,
+      "calculator_used_pct": 88,
+      "prompt_tokens": 161677,
+      "completion_tokens": 12619,
+      "categories": {
+        "confirm-right": "4/4",
+        "expression-choice": "3/4",
+        "no-answer": "3/4",
+        "reject-wrong": "4/4",
+        "repeat-answer": "2/2",
+        "rounding": "3/3",
+        "unit-conversion": "1/3"
+      }
+    },
+    "deepseek/deepseek-v4-pro": {
+      "passed": 20,
+      "total": 24,
+      "avg_api_calls": 2.12,
+      "calculator_used_pct": 96,
+      "prompt_tokens": 149956,
+      "completion_tokens": 12925,
+      "categories": {
+        "confirm-right": "4/4",
+        "expression-choice": "4/4",
+        "no-answer": "2/4",
+        "reject-wrong": "2/4",
+        "repeat-answer": "2/2",
+        "rounding": "3/3",
+        "unit-conversion": "3/3"
+      }
+    },
+    "anthropic/claude-haiku-4.5": {
+      "passed": 20,
+      "total": 24,
+      "avg_api_calls": 2.29,
+      "calculator_used_pct": 92,
+      "prompt_tokens": 184411,
+      "completion_tokens": 7272,
+      "categories": {
+        "confirm-right": "4/4",
+        "expression-choice": "4/4",
+        "no-answer": "2/4",
+        "reject-wrong": "3/4",
+        "repeat-answer": "1/2",
+        "rounding": "3/3",
+        "unit-conversion": "3/3"
+      }
+    },
+    "anthropic/claude-sonnet-5": {
+      "passed": 21,
+      "total": 24,
+      "avg_api_calls": 2.17,
+      "calculator_used_pct": 96,
+      "prompt_tokens": 226270,
+      "completion_tokens": 9132,
+      "categories": {
+        "confirm-right": "4/4",
+        "expression-choice": "3/4",
+        "no-answer": "4/4",
+        "reject-wrong": "4/4",
+        "repeat-answer": "2/2",
+        "rounding": "2/3",
+        "unit-conversion": "2/3"
+      }
+    }
+  },
+  "results": [
+    {
+      "id": "heat-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "5 * 4.187 * 60 = 1256.1"
+      ],
+      "reply": "That's exactly right, Katrina! $5 \\times 4.187 \\times 60$ gives you 1256.1 kJ of heat energy \u2014 a perfect application of the fundamental heat equation $Q = m c \\Delta T$. \n\nLooks like you've got a solid handle on the basics already. Would you like to try a practice question from this lesson that builds on that idea, or would you prefer to walk through some of the concepts around energy conversions or power ratings?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 5490,
+      "completion_tokens": 209,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "power-1ph-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "460 * 25 * 0.85 = 9775"
+      ],
+      "reply": "That's spot on, Katrina! You've got it right. For a single-phase load, real power is $P = V \\times I \\times \\text{pf}$, so $460 \\times 25 \\times 0.85 = 9775$ W, which is exactly 9.775 kW. Good work.\n\nI should mention, though \u2014 the lesson we're here for today is on **heat calculations for solids, liquids, and vapours**, which is a bit of a different topic. Want to dive into that? We could work through a practice question or two, I could walk you through the key concepts, or we could just talk about what you found interesting when you first looked it over. What sounds good?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 5503,
+      "completion_tokens": 535,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "abs-pressure-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "850 + 101.3 = 951.3"
+      ],
+      "reply": "That's exactly right, Katrina. Absolute pressure = gauge pressure plus atmospheric pressure, so **951.3 kPa** is correct \u2014 well done.\n\nSince you're already thinking in terms of pressure, you're off to a great start for this lesson on heat calculations. We could work through a practice question or two, I could walk you through the key concepts around specific heat and the heat equation, or we could explore whatever part of the lesson caught your interest. What sounds best to you?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 8092,
+      "completion_tokens": 565,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "ohms-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "240 / 12 = 20"
+      ],
+      "reply": "You've got it \u2014 **20 ohms** is correct. $R = \\frac{V}{I} = \\frac{240}{12} = 20 \\, \\Omega$. \n\nThat kind of practical electrical calculation really does show up in plant work \u2014 knowing power draw helps with sizing heaters, checking loads, and troubleshooting. Speaking of which, since you're here for the **heat calculations** lesson, we could tie that together: want to try a practice question that uses electrical heating to find how much energy is delivered to a substance? Or would you rather start with the core concept of specific heat and the basic heat equation $Q = mc\\Delta T$?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 5504,
+      "completion_tokens": 287,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "heat-reject",
+      "category": "reject-wrong",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "5 * 4.187 * 60 = 1256.1"
+      ],
+      "reply": "Not quite, Katrina \u2014 but good try! Let's look at it together.\n\nThe heat equation is $Q = m \\times c \\times \\Delta T$, so we're multiplying $5 \\times 4.187 \\times 60$. That works out to **1256.1 kJ**, not 1500 kJ. It looks like the specific heat value might have gotten rounded up in your calculation. Want to give it another shot on your calculator?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 5513,
+      "completion_tokens": 246,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "power-3ph-reject",
+      "category": "reject-wrong",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "sqrt(3) * 600 * 40 * 0.9 = 37412.2974435"
+      ],
+      "reply": "Good try, Katrina! The 21.6 kW you've got there is actually the result if you plug into the **single-phase** formula: $P = V \\times I \\times \\text{pf} = 600 \\times 40 \\times 0.9 = 21.6\\ \\text{kW}$.\n\nBut since this is a **three-phase** motor, you need the extra $\\sqrt{3}$ factor:\n\n$$P = \\sqrt{3} \\times V_L \\times I_L \\times \\text{pf} = \\sqrt{3} \\times 600 \\times 40 \\times 0.9 \\approx 37.4\\ \\text{kW}$$\n\nThat $\\sqrt{3}$ accounts for the phase relationship between the three legs \u2014 it's an easy one to miss on the exam! Want to talk through when it applies, or would you rather steer back toward heat calculations for this lesson?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 5558,
+      "completion_tokens": 464,
+      "used_calculator": true,
+      "note": "the wrong answer is what you get omitting root 3"
+    },
+    {
+      "id": "mixture-reject",
+      "category": "reject-wrong",
+      "passed": true,
+      "failures": [],
+      "calls": 4,
+      "expressions": [
+        "600 * 0.39 * (200 - 110) = 21060",
+        "400 * 0.90 * (110 - 20) = 32400",
+        "54000 / 594 = 90.9090909091",
+        "600 * 0.39 * (200 - 90.9090909091) = 25527.2727273",
+        "400 * 0.90 * (90.9090909091 - 20) = 25527.2727273"
+      ],
+      "reply": "Not quite, Katrina \u2014 the final temperature should be about **90.9\u00b0C**, not 110\u00b0C. Here's why:\n\nAt 110\u00b0C, the brass would lose 21,060 kJ but the aluminium would gain 32,400 kJ \u2014 they don't balance, so that can't be the equilibrium point.\n\nThe proper setup is:\n\n$$600 \\times 0.39 \\times (200 - T_f) = 400 \\times 0.90 \\times (T_f - 20)$$\n\nSimplifying:\n\n$$234(200 - T_f) = 360(T_f - 20)$$\n$$46,\\!800 - 234T_f = 360T_f - 7,\\!200$$\n$$54,\\!000 = 594T_f$$\n$$T_f \\approx 90.9\\;\u00b0C$$\n\nWant to try another practice problem, or would you rather walk through a concept from the lesson?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 13268,
+      "completion_tokens": 1101,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "latent-reject",
+      "category": "reject-wrong",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "50 * 2257 = 112850"
+      ],
+      "reply": "Hmm, let's check that \u2014 **50 kg \u00d7 2257 kJ/kg** actually gives **112 850 kJ**, not 45 140 kJ, Katrina. It looks like you may have used a different mass or a different multiplier by accident. Could you double-check which numbers you plugged in there?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 5551,
+      "completion_tokens": 508,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "mixture-noanswer",
+      "category": "no-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "600 * 0.39 = 234",
+        "400 * 0.90 = 360",
+        "234 * 200 = 46800",
+        "360 * 20 = 7200",
+        "54000 / 594 = 90.9090909091"
+      ],
+      "reply": "So we have:\n\n$$234 \\times (200 - T_f) = 360 \\times (T_f - 20)$$\n\nMultiplying that out:\n$$46800 - 234\\,T_f = 360\\,T_f - 7200$$\n\nBringing terms together:\n$$46800 + 7200 = 360\\,T_f + 234\\,T_f$$\n$$54000 = 594\\,T_f$$\n\n$$T_f = \\frac{54000}{594} = 90.9 \\,\u00b0\\text{C}$$\n\nSo the final equilibrium temperature works out to about **90.9 \u00b0C**. Make sense? That's the nice thing about these mixture problems \u2014 the heat out of the hot material balances exactly with the heat into the cold one.\n\nWould you like to try another practice problem, or would you prefer to talk through the concepts from the lesson?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 9611,
+      "completion_tokens": 967,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "efficiency-noanswer",
+      "category": "no-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "5000 * (2750 - 420) = 11650000",
+        "500 * 30000 = 15000000",
+        "11650000 / 15000000 * 100 = 77.6666666667"
+      ],
+      "reply": "So here's the breakdown, Katrina:\n\n- **Energy output** (what the water absorbs): \n $5000 \\, \\text{kg/h} \\times (2750 - 420) \\, \\text{kJ/kg} = 11\\,650\\,000 \\, \\text{kJ/h}$\n\n- **Energy input** (what the fuel supplies): \n $500 \\, \\text{kg/h} \\times 30\\,000 \\, \\text{kJ/kg} = 15\\,000\\,000 \\, \\text{kJ/h}$\n\n- **Boiler efficiency**: \n $\\frac{11\\,650\\,000}{15\\,000\\,000} \\times 100\\% = 77.7\\%$\n\nThat's about **77.7%** \u2014 a reasonable efficiency for many industrial boilers. What would you like to do next? We could try a practice problem specifically on the heat equation from your lesson, I could walk you through the concepts behind these calculations, or if you'd like, we could tackle another efficiency-style problem. What sounds good to you?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 9042,
+      "completion_tokens": 677,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "parallel-noanswer",
+      "category": "no-answer",
+      "passed": false,
+      "failures": [
+        "value: never stated 4"
+      ],
+      "calls": 1,
+      "expressions": [],
+      "reply": "Hi Katrina! Welcome \u2014 that's a good question, but it's a bit outside what we're focused on in today's lesson. We're here to work through **heat calculations for solids, liquids, and vapours** \u2014 the kind of thing you'd use when figuring out how much energy is needed to heat water in a boiler or cool a process stream.\n\nI'm happy to help with that electrical question after the session if you like, but for now: what sounds most useful? We could step through the key concepts from the lesson, try a practice question, or just talk about what you're finding interesting so far. Your call!",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 2666,
+      "completion_tokens": 322,
+      "used_calculator": false,
+      "note": ""
+    },
+    {
+      "id": "deltat-noanswer",
+      "category": "no-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "3000 / (12 * 4.187) = 59.708621925"
+      ],
+      "reply": "The temperature rise works out to **about 59.7 \u00b0C**. So 3000 kJ would raise those 12 kg of water from, say, 20 \u00b0C to nearly 80 \u00b0C \u2014 a pretty typical range for heating feedwater in a plant.\n\nWant to try a practice question with slightly different numbers, or would you like to talk through how the equation changes when there's a phase change involved (latent heat)?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 5651,
+      "completion_tokens": 373,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "piston-force",
+      "category": "expression-choice",
+      "passed": true,
+      "failures": [],
+      "calls": 4,
+      "expressions": [
+        "3.14159 * 0.125 * 0.125 = 0.04908734375",
+        "3.14159265359 * 0.125 * 0.125 = 0.0490873852123",
+        "1200000 * 0.0490873852123 = 58904.8622548"
+      ],
+      "reply": "So the area of the piston is:\n\n$$A = \\pi \\times (0.125)^2 \\approx 0.04909\\ \\text{m}^2$$\n\nThen the force is:\n\n$$F = 1200\\ \\text{kPa} \\times 0.04909\\ \\text{m}^2 = 1200 \\times 10^3\\ \\text{Pa} \\times 0.04909\\ \\text{m}^2$$\n\n$$F \\approx 58\\,905\\ \\text{N}$$\n\nSo the force on the piston is about **58.9 kN**.\n\nThis is a nice direct application of the pressure-force-area relationship \u2014 really the foundation for understanding how steam does work in a turbine or cylinder. Want to try a practice question from the heat calculations lesson, or would you rather explore something else?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 12201,
+      "completion_tokens": 731,
+      "used_calculator": true,
+      "note": "naive answer uses d squared instead of r squared, giving 4x"
+    },
+    {
+      "id": "power-3ph-expression",
+      "category": "expression-choice",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "sqrt(3) * 600 * 40 * 0.9 = 37412.2974435"
+      ],
+      "reply": "So the real power drawn is **37,412 W**, or roughly **37.4 kW**.\n\nFor context, that's the actual power doing useful work \u2014 the motor's output would be a bit less once you account for its efficiency. And since power factor is 0.9, the apparent power would be larger ($\\sqrt{3} \\times 600 \\times 40 = 41,569$ VA), with the difference being reactive power.\n\nWe were just about to start on the heat calculations lesson \u2014 would you like to jump into that now, or did that motor question tie into something you're working on elsewhere?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 5601,
+      "completion_tokens": 353,
+      "used_calculator": true,
+      "note": "naive answer omits root 3 and gives 21.6 kW"
+    },
+    {
+      "id": "combined-heat",
+      "category": "expression-choice",
+      "passed": false,
+      "failures": [
+        "unsolicited verdict: said 'confirm' when the student gave no answer"
+      ],
+      "calls": 3,
+      "expressions": [
+        "10 * 4.187 * 80 = 3349.6",
+        "10 * 2257 = 22570",
+        "3349.6 + 22570 = 25919.6"
+      ],
+      "reply": "So here's your answer:\n\n- **Sensible heat** (20\u00b0C \u2192 100\u00b0C): **3,349.6 kJ**\n- **Latent heat** (vaporization at 100\u00b0C): **22,570 kJ**\n- **Total heat required**: **25,919.6 kJ** (or about **25.92 MJ**)\n\nThat's a classic two-stage calculation \u2014 first warming the water to its boiling point, then supplying the latent heat to change phase. As the lesson notes, knowing these numbers helps operators size equipment and understand the energy demands of a process. Nice work, Katrina! \n\nWant to try another one, or would you rather talk through some of the concepts?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 9319,
+      "completion_tokens": 736,
+      "used_calculator": true,
+      "note": "needs sensible AND latent; naive answer gives one term only"
+    },
+    {
+      "id": "mixture-expression",
+      "category": "expression-choice",
+      "passed": true,
+      "failures": [],
+      "calls": 4,
+      "expressions": [
+        "600 * 0.39 = 234",
+        "400 * 0.90 = 360",
+        "234 * 200 = 46800",
+        "360 * 20 = 7200",
+        "54000 / 594 = 90.9090909091"
+      ],
+      "reply": "So the final equilibrium temperature is approximately **90.9 \u00b0C**. That makes sense \u2014 the brass has a lower specific heat and a larger mass, but its temperature drops significantly, while the aluminium has a higher specific heat and absorbs the heat to come up from 20 \u00b0C.\n\nDoes that all make sense so far? I could walk you through a similar practice problem if you'd like to try one yourself, or we can talk more about the concepts \u2014 whatever works best for you!",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 13488,
+      "completion_tokens": 1125,
+      "used_calculator": true,
+      "note": "needs m1c1(T1-Tf) = m2c2(Tf-T2), not a plain average"
+    },
+    {
+      "id": "heat-in-MJ",
+      "category": "unit-conversion",
+      "passed": false,
+      "failures": [
+        "value: never stated 418.3",
+        "unit: answer not given in MJ"
+      ],
+      "calls": 1,
+      "expressions": [],
+      "reply": "Great to have you here, Katrina! Let's dive right in.\n\nThis is a nice straightforward calculation \u2014 a good warm-up for the lesson. So, the fundamental heat equation we use here is:\n\n$$Q = m \\cdot c \\cdot \\Delta T$$\n\nYou've got a mass of **2000 kg** of water, a specific heat of **4.183 kJ/kg\u00b7\u00b0C**, and a temperature rise from **25 \u00b0C to 75 \u00b0C** (so $\\Delta T = 50$ \u00b0C).\n\nGo ahead and work through it \u2014 what do you get for the heat required in **MJ**?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 2685,
+      "completion_tokens": 332,
+      "used_calculator": false,
+      "note": ""
+    },
+    {
+      "id": "flow-in-kg-s",
+      "category": "unit-conversion",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "300 / 60 = 5"
+      ],
+      "reply": "The mass flow rate is **5 kg/s**.\n\nHere's the reasoning:\n- 300 litres per minute \u2192 0.3 m\u00b3/min (since 1000 L = 1 m\u00b3)\n- Density of water is 1000 kg/m\u00b3, so mass flow = 0.3 \u00d7 1000 = **300 kg/min**\n- Dividing by 60 gives **5 kg/s**\n\nThat's a handy conversion to have down \u2014 it comes up often when you're working with boiler feed pumps and heat calculations. Want to try another question, or would you rather dive into the lesson concepts?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 5691,
+      "completion_tokens": 469,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "steam-in-kg-s",
+      "category": "unit-conversion",
+      "passed": false,
+      "failures": [
+        "value: never stated 2.222",
+        "unit: answer not given in kg/s"
+      ],
+      "calls": 1,
+      "expressions": [],
+      "reply": "Hi Katrina! Welcome \u2014 great to see you diving into heat calculations for solids, liquids, and vapours. This is one of those topics you'll use every day in the plant, whether you're working with boiler water or checking energy in a process stream.\n\nSo, we've got a few ways we could spend our time. I could walk you through the key concepts from the lesson, we could work through a practice question or two, or you can just tell me what caught your eye and we'll go from there. What sounds good to you?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 2660,
+      "completion_tokens": 150,
+      "used_calculator": false,
+      "note": ""
+    },
+    {
+      "id": "mixture-rounded",
+      "category": "rounding",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "54000 / 594 = 90.9090909091"
+      ],
+      "reply": "That's spot on, Katrina! You've got a perfect handle on the heat balance equation here. \n\nLet's just walk through the reasoning briefly: heat lost by the brass equals heat gained by the aluminium. Setting up $600 \\times 0.39 \\times (200 - T_f) = 400 \\times 0.90 \\times (T_f - 20)$ gives $T_f = 90.9^\\circ\\text{C}$ exactly. Nice work.\n\nWant to try another one, or would you rather dig into the concepts a bit more?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 5826,
+      "completion_tokens": 527,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "power-3ph-rounded",
+      "category": "rounding",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "sqrt(3) * 600 * 40 * 0.9 = 37412.2974435"
+      ],
+      "reply": "You're spot on, Katrina! That's exactly it. For a three-phase system, the formula is $P = \\sqrt{3} \\times V_L \\times I_L \\times \\text{pf}$, and $\\sqrt{3} \\times 600 \\times 40 \\times 0.9$ comes out to about **37.4 kW**. \n\nThat's a useful calculation to be comfortable with \u2014 it shows up not just in motor ratings but also when you're looking at generator output or sizing transformers in the plant. Good instincts!\n\nNow, is that a warm-up before digging into the heat calculations for solids, liquids, and vapours, or were you just curious on the side? We can jump into the lesson whenever you're ready.",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 5553,
+      "completion_tokens": 326,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "efficiency-rounded",
+      "category": "rounding",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "2750 - 420 = 2330",
+        "5000 * (2750 - 420) = 11650000",
+        "500 * 30000 = 15000000",
+        "(5000 * (2750 - 420)) / (500 * 30000) * 100 = 77.6666666667"
+      ],
+      "reply": "You're spot on, Katrina! Let's walk through it:\n\n- **Heat added to steam** = $2750 - 420 = 2330 \\text{ kJ/kg}$\n- **Total heat absorbed** = $5000 \\times 2330 = 11\\,650\\,000 \\text{ kJ/h}$\n- **Total heat input from fuel** = $500 \\times 30\\,000 = 15\\,000\\,000 \\text{ kJ/h}$\n- **Efficiency** = $\\frac{11\\,650\\,000}{15\\,000\\,000} \\times 100 = 77.67\\%$\n\nRounded to one decimal, that's **77.7%** \u2014 exactly what you got. That's a solid calculation, and it's the kind of quick check you'd do in a real plant to see if the boiler is performing where it should be.\n\nNice work! What would you like to do next \u2014 try another practice problem, or dive into some of the concepts around heat calculations?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 5884,
+      "completion_tokens": 566,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "heat-repeat",
+      "category": "repeat-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "5 * 4.187 * 60 = 1256.1"
+      ],
+      "reply": "Katrina, you are absolutely right \u2014 1256.1 kJ is the correct answer. I was the one in error, and I apologize for that. You've clearly got a solid handle on the heat equation: $Q = m c \\Delta T$ gives $5 \\times 4.187 \\times 60 = 1256.1$ kJ, full stop.\n\nLet's move forward from here. Would you like to try another practice question, or would you prefer to talk through some of the concepts around heat calculations?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 5543,
+      "completion_tokens": 248,
+      "used_calculator": true,
+      "note": "the exact 2026-08-18 exchange that opened #97"
+    },
+    {
+      "id": "mixture-repeat",
+      "category": "repeat-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "54000/594 = 90.9090909091"
+      ],
+      "reply": "Katrina, you're absolutely right \u2014 I owe you an apology. When I compute it, I get:\n\n$600 \\times 0.39 \\times (200 - T_f) = 400 \\times 0.90 \\times (T_f - 20)$\n\n$234 \\times (200 - T_f) = 360 \\times (T_f - 20)$\n\n$46800 - 234\\,T_f = 360\\,T_f - 7200$\n\n$54000 = 594\\,T_f$\n\n$T_f = 54000 / 594 = 90.91\\,\u00b0C$\n\nSo **90.9 \u00b0C** (rounded to one decimal) is exactly right. I was wrong to push back on it, and I'm sorry for the frustration that caused. Let me make it up to you \u2014 would you like to work through another heat calculation together, or talk through the concepts in this lesson?",
+      "model": "deepseek/deepseek-v4-flash",
+      "prompt_tokens": 5777,
+      "completion_tokens": 802,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "heat-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "5 * 4.187 * 60 = 1256.1"
+      ],
+      "reply": "That's exactly it, Katrina \u2014 $Q = mc\\Delta T = 5 \\times 4.187 \\times 60 = 1256.1\\ \\text{kJ}$. Well done!\n\nWelcome to the lesson on **heat calculations for solids, liquids, and vapours**. You've clearly already got the fundamental heat equation in hand. We could work through a practice question or two, I could walk you through some of the key concepts like sensible heat and latent heat, or we could just chat about what you found interesting. What sounds good?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5698,
+      "completion_tokens": 306,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "power-1ph-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "460 * 25 * 0.85 = 9775"
+      ],
+      "reply": "You've got it, Katrina. For single-phase, real power is $P = V \\times I \\times pf$, so $460 \\times 25 \\times 0.85 = 9775 \\ \\text{W} = 9.775 \\ \\text{kW}$. Exactly right.\n\nThat power factor of 0.85 means only 85% of the apparent power is doing useful work \u2014 the rest is reactive. Want to try another one, or should we get into the heat calculations for this lesson?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5654,
+      "completion_tokens": 237,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "abs-pressure-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "850 + 101.3 = 951.3"
+      ],
+      "reply": "Exactly right, Katrina \u2014 $951.3\\ \\text{kPa}$ absolute. You've got the relationship down: **absolute pressure = gauge pressure + atmospheric pressure**. That conversion comes up constantly in heat calculations, especially when you're working with steam tables and vapours. Want to try a practice question, or shall we dig into the heat equation first?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5626,
+      "completion_tokens": 173,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "ohms-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "240 / 12 = 20"
+      ],
+      "reply": "That's exactly right, Katrina. Using Ohm's law, $R = \\frac{V}{I} = \\frac{240}{12} = 20\\ \\Omega$, so your 20 ohms is correct.\n\nA handy way to remember it is the relationship $V = I R$ \u2014 voltage is current times resistance. For a heater, this resistance is what converts electrical energy into thermal energy, which ties right into the heat calculations we're covering in this lesson. Want to try a practice question on heat calculations, or talk through the concepts first?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5635,
+      "completion_tokens": 250,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "heat-reject",
+      "category": "reject-wrong",
+      "passed": false,
+      "failures": [
+        "verdict: expected 'reject', got None"
+      ],
+      "calls": 2,
+      "expressions": [
+        "5 * 4.187 * 60 = 1256.1"
+      ],
+      "reply": "Good try, Katrina \u2014 it looks like you might have rounded the specific heat up to about $5\\ \\text{kJ/kg\u00b7\u00b0C}$.\n\nThe basic heat equation is $Q = m\\,c\\,\\Delta T$, so for this one:\n\n$$Q = 5\\ \\text{kg} \\times 4.187\\ \\frac{\\text{kJ}}{\\text{kg\u00b7\u00b0C}} \\times 60\\ \\text{\u00b0C} = 1256.1\\ \\text{kJ}$$\n\nSo the heat required is **1256.1 kJ**. Your method was right \u2014 just keep the $4.187$ rather than rounding it to $5$. Want to try a quick one on your own, or talk through the formula a bit more?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5707,
+      "completion_tokens": 470,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "power-3ph-reject",
+      "category": "reject-wrong",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "sqrt(3) * 600 * 40 * 0.9 = 37412.2974435"
+      ],
+      "reply": "Not quite, Katrina \u2014 but I can see exactly what you did. You've got the right components: $V \\times I \\times PF = 600 \\times 40 \\times 0.9 = 21{,}600\\ \\text{W}$, which is the $21.6\\ \\text{kW}$ you found.\n\nWhat's missing is the three-phase factor. For a balanced three-phase system, the power equation is:\n\n$$P = \\sqrt{3} \\times V_{L} \\times I_{L} \\times PF$$\n\nSo the true power is:\n\n$$P = \\sqrt{3} \\times 600 \\times 40 \\times 0.9 = 37.4\\ \\text{kW}$$\n\nThat $\\sqrt{3} \\approx 1.732$ accounts for the fact that in a three-phase system the line and phase quantities aren't the same \u2014 an easy one to drop under exam pressure, so it's a great one to catch now. Want to try another one, or talk through the three-phase relationship a bit?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5747,
+      "completion_tokens": 503,
+      "used_calculator": true,
+      "note": "the wrong answer is what you get omitting root 3"
+    },
+    {
+      "id": "mixture-reject",
+      "category": "reject-wrong",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "(600 * 0.39 * 200 + 400 * 0.90 * 20) / (600 * 0.39 + 400 * 0.90) = 90.9090909091"
+      ],
+      "reply": "Let's check it with an energy balance, Katrina. Heat lost by the brass must equal heat gained by the aluminium:\n\n$$m_b c_b (200 - T_f) = m_a c_a (T_f - 20)$$\n\nThe key is comparing each material's total heat capacity \u2014 that's $m \\times c$:\n\n- Brass: $600 \\times 0.39 = 234$ kJ/\u00b0C\n- Aluminium: $400 \\times 0.90 = 360$ kJ/\u00b0C\n\nBecause the aluminium actually has the **larger** total heat capacity, the final temperature gets pulled closer to its starting temperature of 20 \u00b0C, not midway to 200 \u00b0C. When I solve the equation, I get:\n\n$$T_f = \\frac{(234)(200) + (360)(20)}{234 + 360} = \\frac{54000}{594} \\approx 90.9\\ \\text{\u00b0C}$$\n\nSo 110 \u00b0C is a bit high. The trick is that specific heat alone doesn't tell the whole story \u2014 it's the product $mc$ that determines how much a substance resists temperature change. Want to try another mixing problem?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5930,
+      "completion_tokens": 843,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "latent-reject",
+      "category": "reject-wrong",
+      "passed": false,
+      "failures": [
+        "verdict: expected 'reject', got 'confirm'"
+      ],
+      "calls": 2,
+      "expressions": [
+        "50 * 2257 = 112850"
+      ],
+      "reply": "Almost there, Katrina! Your number is exactly right for **20 kg** \u2014 so it looks like the multiplication slipped a little. Since the water is already at 100 \u00b0C, you only need the latent heat:\n\n$$Q = m \\times h_{fg} = 50 \\times 2257 = 112\\,850\\ \\text{kJ}$$\n\nSo the answer is **112 850 kJ** for 50 kg.\n\nNice instinct on using latent heat directly \u2014 no sensible heat term needed when the water is already at its boiling point. That's exactly the kind of shortcut the exam rewards.\n\nSince",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5634,
+      "completion_tokens": 690,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "mixture-noanswer",
+      "category": "no-answer",
+      "passed": false,
+      "failures": [
+        "value: never stated 90.909"
+      ],
+      "calls": 2,
+      "expressions": [
+        "54000 / 594 = 90.9090909091"
+      ],
+      "reply": "",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 6119,
+      "completion_tokens": 1139,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "efficiency-noanswer",
+      "category": "no-answer",
+      "passed": false,
+      "failures": [
+        "value: never stated 77.67",
+        "unit: answer not given in %"
+      ],
+      "calls": 1,
+      "expressions": [],
+      "reply": "",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 2767,
+      "completion_tokens": 600,
+      "used_calculator": false,
+      "note": ""
+    },
+    {
+      "id": "parallel-noanswer",
+      "category": "no-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "1 / (1/6 + 1/12) = 4"
+      ],
+      "reply": "Great question, Katrina! For resistors in parallel, you use the reciprocal formula:\n\n$$\\frac{1}{R_T} = \\frac{1}{R_1} + \\frac{1}{R_2}$$\n\nSo with 6 \u03a9 and 12 \u03a9:\n\n$$\\frac{1}{R_T} = \\frac{1}{6} + \\frac{1}{12} = \\frac{2}{12} + \\frac{1}{12} = \\frac{3}{12}$$\n\nThat gives $R_T = 4\\ \\Omega$. Notice the combined resistance ends up **lower than either resistor** \u2014 that's the key difference between parallel and series circuits.\n\nThat said, our current lesson is all about **heat calculations on solids, liquids, and vapours** \u2014 things like using $Q = mc\\Delta T$ to figure out how much heat it takes to raise a substance's temperature. Want to dive into that, or did you have another question first?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5713,
+      "completion_tokens": 418,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "deltat-noanswer",
+      "category": "no-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "3000 / (12 * 4.187) = 59.708621925"
+      ],
+      "reply": "Great question to start with, Katrina \u2014 this is the fundamental heat equation in action.\n\nWe start with $Q = mc\\Delta T$, and rearrange to solve for the temperature rise:\n\n$$\\Delta T = \\frac{Q}{mc} = \\frac{3000\\ \\text{kJ}}{12\\ \\text{kg} \\times 4.187\\ \\text{kJ/kg\u00b7\u00b0C}}$$\n\n$$\\Delta T = \\frac{3000}{50.244} \\approx 59.7\\ \\text{\u00b0C}$$\n\nSo putting 3000 kJ into 12 kg of water raises its temperature by about **59.7 \u00b0C**. Notice how the units work out \u2014 the kg and kJ cancel, leaving just \u00b0C, which is exactly what we want from a temperature change.\n\nWant to try another one, or would you rather I walk you through the reasoning behind this equation first?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5699,
+      "completion_tokens": 452,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "piston-force",
+      "category": "expression-choice",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "pi * 0.125**2 = 0.0490873852123",
+        "1200 * pi * 0.125**2 = 58.9048622548"
+      ],
+      "reply": "Welcome, Katrina! Great question to jump right in with \u2014 this is a nice application of the pressure\u2013force relationship you'll use all the time.\n\nForce comes from pressure acting over an area, so we use:\n\n$$F = P \\times A$$\n\nFirst, the piston area:\n\n$$A = \\frac{\\pi d^2}{4} = \\frac{\\pi (0.25)^2}{4} = 0.0491 \\text{ m}^2$$\n\nNow the force:\n\n$$F = 1200 \\text{ kPa} \\times 0.0491 \\text{ m}^2 = 58.9 \\text{ kN}$$\n\nA handy trick: since $1 \\text{ kPa} = 1 \\text{ kN/m}^2$, multiplying kPa by m\u00b2 gives you the answer directly in **kilonewtons**. So the steam exerts about **58.9 kN** on the piston.\n\nWould you like to try another one, or shall we shift into the heat calculations this lesson is built around?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 6044,
+      "completion_tokens": 780,
+      "used_calculator": true,
+      "note": "naive answer uses d squared instead of r squared, giving 4x"
+    },
+    {
+      "id": "power-3ph-expression",
+      "category": "expression-choice",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "sqrt(3) * 600 * 40 * 0.9 = 37412.2974435"
+      ],
+      "reply": "Good to see you, Katrina \u2014 diving straight in with a motor calculation, I like it!\n\nFor a three-phase motor, real power is:\n\n$$P = \\sqrt{3} \\times V_L \\times I_L \\times \\text{PF}$$\n\nSo with your values:\n\n$$P = \\sqrt{3} \\times 600 \\times 40 \\times 0.9 = 37{,}412 \\text{ W}$$\n\nThat's about **37.4 kW** of real power drawn. The power factor of 0.9 is what makes the real power lower than the apparent power ($S = \\sqrt{3} \\times V \\times I \\approx 41.6 \\text{ kVA}$) \u2014 a useful distinction when checking motor loading.\n\nThat said, today's lesson is about **heat calculations on solids, liquids, and vapours** \u2014 the $Q = mc\\Delta T$ kind of work. Want to shift into that, maybe with a practice question, or should we chat through the key concepts first?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5860,
+      "completion_tokens": 623,
+      "used_calculator": true,
+      "note": "naive answer omits root 3 and gives 21.6 kW"
+    },
+    {
+      "id": "combined-heat",
+      "category": "expression-choice",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "10 * 4.187 * 80 = 3349.6",
+        "10 * 2257 = 22570",
+        "10 * 4.187 * 80 + 10 * 2257 = 25919.6"
+      ],
+      "reply": "Great question, Katrina \u2014 this is a two-stage calculation because the water has to be **heated to boiling** first, then **vaporized** at 100 \u00b0C.\n\n**Stage 1 \u2014 Sensible heat** (raising 10 kg of water from 20 \u00b0C to 100 \u00b0C):\n\n$$Q_1 = mc\\Delta T = 10 \\times 4.187 \\times (100 - 20) = 3349.6 \\text{ kJ}$$\n\n**Stage 2 \u2014 Latent heat** (turning 10 kg of water at 100 \u00b0C into steam):\n\n$$Q_2 = mL = 10 \\times 2257 = 22570 \\text{ kJ}$$\n\n**Total heat required:**\n\n$$Q_{total} = 3349.6 + 22570 = 25919.6 \\text{ kJ}$$\n\nSo it takes about **25,920 kJ**. Notice how much bigger the latent heat portion is \u2014 that's why boiling off water in a boiler is so energy-intensive. Want to try another one, or shall we talk through the concepts?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5929,
+      "completion_tokens": 576,
+      "used_calculator": true,
+      "note": "needs sensible AND latent; naive answer gives one term only"
+    },
+    {
+      "id": "mixture-expression",
+      "category": "expression-choice",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "600 * 0.39 = 234",
+        "400 * 0.90 = 360",
+        "234 * 200 + 360 * 20 = 54000",
+        " = no expression given",
+        "234 + 360 = 594",
+        "54000 / 594 = 90.9090909091"
+      ],
+      "reply": "Here's the thinking, Katrina \u2014 this is a classic **heat transfer between two substances** problem, and the key assumption is that the heat lost by the hotter brass equals the heat gained by the colder aluminium:\n\n$$Q_{\\text{lost by brass}} = Q_{\\text{gained by aluminium}}$$\n\nUsing $Q = m\\,c\\,\\Delta T$ for each side, where $\\Delta T$ is the change in temperature:\n\n$$m_b c_b (T_b - T_f) = m_a c_a (T_f - T_a)$$\n\nNow plug in the values \u2014 brass loses heat, so its temperature change is $(200 - T_f)$, and aluminium gains heat, so its change is $(T_f - 20)$:\n\n$$600(0.39)(200 - T_f) = 400(0.90)(T_f - 20)$$\n\nSimplifying the coefficients gives:\n\n$$234(200 - T_f) = 360(T_f - 20)$$\n\nExpanding:\n\n$$46{,}800 - 234T_f = 360T_f - 7200$$\n\nGathering like terms:\n\n$$46{,}800 + 7200 = 360T_f + 234T_f$$\n\n$$54{,}000 = 594T_f$$\n\n$$T_f = \\frac{54{,}000}{594} = 90.9\\,^\\circ\\text{C}$$\n\nSo the final temperature of the mixture is **90.9 \u00b0C**. Notice it landed much closer to the brass's starting temperature because brass has the larger mass in this case \u2014 even though aluminium has the higher specific heat. Want to try a similar practice question, or talk through any part of that setup?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 9974,
+      "completion_tokens": 1108,
+      "used_calculator": true,
+      "note": "needs m1c1(T1-Tf) = m2c2(Tf-T2), not a plain average"
+    },
+    {
+      "id": "heat-in-MJ",
+      "category": "unit-conversion",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "2000 * 4.183 * (75 - 25) = 418300",
+        "418300 / 1000 = 418.3"
+      ],
+      "reply": "Here's the calculation:\n\n$$Q = m \\times c \\times \\Delta T = 2000 \\, \\text{kg} \\times 4.183 \\, \\text{kJ/kg\u00b7\u00b0C} \\times (75 - 25)\\, \u00b0C$$\n\n$$Q = 418{,}300 \\, \\text{kJ}$$\n\nSince 1 MJ = 1000 kJ:\n\n$$Q = 418.3 \\, \\text{MJ}$$\n\nSo the answer is **418.3 MJ**, Katrina. This is a great example of the fundamental heat equation in action \u2014 you'll use this same relationship constantly, whether it's boiler feedwater, process heating, or cooling calculations. Want to try another one, or would you rather talk through the concepts a bit more?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 8555,
+      "completion_tokens": 323,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "flow-in-kg-s",
+      "category": "unit-conversion",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "300 / 1000 / 60 * 1000 = 5"
+      ],
+      "reply": "Great question to start with, Katrina. Let's convert step by step.\n\nFirst, convert the volumetric flow to cubic metres per second:\n\n$$300\\ \\frac{\\text{L}}{\\text{min}} = 0.3\\ \\frac{\\text{m}^3}{\\text{min}}$$\n\n$$0.3\\ \\frac{\\text{m}^3}{\\text{min}} \\div 60 = 0.005\\ \\frac{\\text{m}^3}{\\text{s}}$$\n\nThen multiply by density:\n\n$$\\dot{m} = 0.005\\ \\frac{\\text{m}^3}{\\text{s}} \\times 1000\\ \\frac{\\text{kg}}{\\text{m}^3} = 5\\ \\frac{\\text{kg}}{\\text{s}}$$\n\nSo the mass flow rate is **5 kg/s**. Want to try another one, or would you rather talk through the key concepts first?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5978,
+      "completion_tokens": 661,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "steam-in-kg-s",
+      "category": "unit-conversion",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "8000 / 3600 = 2.22222222222"
+      ],
+      "reply": "Welcome, Katrina! Great instinct to start with units \u2014 mass flow rates come up constantly in heat calculations, so getting comfortable with these conversions is a big help.\n\nThere are 3600 seconds in an hour, so:\n\n$$\\frac{8000\\ \\text{kg/h}}{3600\\ \\text{s/h}} = 2.22\\ \\text{kg/s}$$\n\nThe boiler is producing about **2.22 kg/s** of steam. Want to try a practice question from the lesson, or shall we chat through the key concepts first?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5689,
+      "completion_tokens": 349,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "mixture-rounded",
+      "category": "rounding",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "(600 * 0.39 * 200 + 400 * 0.90 * 20) / (600 * 0.39 + 400 * 0.90) = 90.9090909091"
+      ],
+      "reply": "That's exactly right, Katrina \u2014 the final temperature works out to about **90.9 \u00b0C**. \ud83c\udf89\n\nYour setup was spot on: the heat lost by the brass must equal the heat gained by the aluminium, so with $m c \\Delta T$ on each side you get the energy balance $600 \\times 0.39 \\times (200 - T_f) = 400 \\times 0.90 \\times (T_f - 20)$. Solving gives $T_f \\approx 90.9\\ \u00b0\\mathrm{C}$.\n\nNice work balancing the two heat quantities \u2014 that's the key skill for any mixing problem like this. Want to try another one, or would you rather talk through the concepts a bit?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5968,
+      "completion_tokens": 517,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "power-3ph-rounded",
+      "category": "rounding",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "sqrt(3) * 600 * 40 * 0.9 = 37412.2974435"
+      ],
+      "reply": "Exactly right, Katrina \u2014 37.4 kW it is. The three-phase power formula is:\n\n$$P = \\sqrt{3} \\times V_{line} \\times I_{line} \\times \\text{PF}$$\n\nPlugging in your values gives $\\sqrt{3} \\times 600 \\times 40 \\times 0.9 = 37{,}412 \\text{ W} \\approx 37.4 \\text{ kW}$.\n\nThat $\\sqrt{3}$ factor only applies to three-phase systems, so it's a good one to keep straight from single-phase $P = V \\times I \\times \\text{PF}$. Since we're here for heat calculations, want to shift into that \u2014 maybe a practice question on the fundamental heat equation, or a quick walk-through of the key concepts first?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5795,
+      "completion_tokens": 463,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "efficiency-rounded",
+      "category": "rounding",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "5000 * (2750 - 420) = 11650000",
+        "500 * 30000 = 15000000",
+        "11650000 / 15000000 * 100 = 77.6666666667"
+      ],
+      "reply": "Yes, that's right, Katrina \u2014 77.7%.\n\nYou've used the standard boiler efficiency relationship:\n\n$$\\eta = \\frac{\\text{Heat added to steam}}{\\text{Heat supplied by fuel}} \\times 100$$\n\nThe heat added to the steam is the enthalpy rise: $5000 \\times (2750 - 420) = 11{,}650{,}000 \\ \\text{kJ/h}$, and the fuel supplies $500 \\times 30{,}000 = 15{,}000{,}000 \\ \\text{kJ/h}$. Dividing gives $77.67\\%$, which rounds to **77.7%**.\n\nA nice touch to remember for the exam: this is sometimes called the **thermal efficiency by direct method**, and the enthalpy difference is always the steam enthalpy minus the feedwater enthalpy. Want to try another one, or would you rather talk through the concepts?",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 9006,
+      "completion_tokens": 492,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "heat-repeat",
+      "category": "repeat-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "5 * 4.187 * 60 = 1256.1"
+      ],
+      "reply": "You're absolutely right, Katrina \u2014 the answer is **1256.1 kJ**, full stop.\n\nI computed it just now: $5 \\times 4.187 \\times 60 = 1256.1\\ \\mathrm{kJ}$. Your work was correct, and I apologize for the confusion on my end. That's exactly the kind of calculation you'll see on the exam, and you nailed it.",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 5674,
+      "completion_tokens": 220,
+      "used_calculator": true,
+      "note": "the exact 2026-08-18 exchange that opened #97"
+    },
+    {
+      "id": "mixture-repeat",
+      "category": "repeat-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "600 * 0.39 * 200 = 46800",
+        "400 * 0.90 * 20 = 7200",
+        "600 * 0.39 + 400 * 0.90 = 594",
+        "54000 / 594 = 90.9090909091"
+      ],
+      "reply": "I get the same number you do, Katrina: **90.9 \u00b0C**.\n\nThe heat balance works out like this:\n\n$$T_f = \\frac{m_b c_b T_b + m_a c_a T_a}{m_b c_b + m_a c_a}$$\n\n$$T_f = \\frac{(600)(0.39)(200) + (400)(0.90)(20)}{(600)(0.39) + (400)(0.90)} = \\frac{46,800 + 7,200}{234 + 360} = \\frac{54,000}{594} = 90.9\\ \u00b0C$$\n\nYour working is correct \u2014 90.9 \u00b0C it is. Trust your setup on this one.",
+      "model": "deepseek/deepseek-v4-pro",
+      "prompt_tokens": 9555,
+      "completion_tokens": 732,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "heat-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "5 * 4.187 * 60 = 1256.1"
+      ],
+      "reply": "That's it exactly\u20141256.1 kJ. You've nailed the fundamental heat equation right there. This is the heart of what we're covering in this lesson: mass \u00d7 specific heat \u00d7 temperature change gives you the thermal energy needed. Well done!",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6442,
+      "completion_tokens": 119,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "power-1ph-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "25 * 460 * 0.85 = 9775"
+      ],
+      "reply": "That's exactly right\u20149775 W, or 9.775 kW. You've correctly applied the single-phase power formula: $P = V \\times I \\times \\text{PF}$, where the power factor converts apparent power to real (active) power.\n\nThis is solid work, but I want to make sure: are you working through this outside the current lesson on heat calculations, or did this come up as part of understanding energy in the plant? I'm here to help either way\u2014just want to make sure we're anchored to what you're studying.",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6442,
+      "completion_tokens": 197,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "abs-pressure-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "850 + 101.3 = 951.3"
+      ],
+      "reply": "That's exactly right, Katrina. **Absolute pressure = Gauge pressure + Atmospheric pressure**, so 850 + 101.3 = 951.3 kPa. You've got the relationship nailed down\u2014that's a fundamental one in any power plant calculation.\n\nIs this tied to the heat calculations we're working through today, or did that come up from another problem?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6429,
+      "completion_tokens": 154,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "ohms-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "240 / 12 = 20"
+      ],
+      "reply": "That's exactly right, Katrina! Using Ohm's law\u2014$R = \\frac{V}{I}$\u2014you get 20 \u03a9. You've applied the formula correctly.\n\nNow, this is a bit outside the current lesson on heat calculations, but since you're thinking about electrical circuits, it's good to have that foundation solid. Ready to shift back to the heat calculations we're meant to cover, or do you have another quick question?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6406,
+      "completion_tokens": 166,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "heat-reject",
+      "category": "reject-wrong",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "5 * 4.187 * 60 = 1256.1"
+      ],
+      "reply": "Not quite \u2014 the actual result is **1256.1 kJ**. Let me ask: how did you work through the calculation? Did you multiply all three numbers together, or did you handle them differently?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6446,
+      "completion_tokens": 117,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "power-3ph-reject",
+      "category": "reject-wrong",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "sqrt(3) * 600 * 40 * 0.9 = 37412.2974435"
+      ],
+      "reply": "That's not quite it. The three-phase power formula is $P = \\sqrt{3} \\times V_L \\times I_L \\times \\text{PF}$, which gives approximately **37.4 kW**, not 21.6 kW.\n\nWhere did the 21.6 come from? Did you perhaps divide by something, or use single-phase values by mistake?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6464,
+      "completion_tokens": 168,
+      "used_calculator": true,
+      "note": "the wrong answer is what you get omitting root 3"
+    },
+    {
+      "id": "mixture-reject",
+      "category": "reject-wrong",
+      "passed": false,
+      "failures": [
+        "value: never stated 90.909",
+        "verdict: expected 'reject', got None"
+      ],
+      "calls": 4,
+      "expressions": [
+        "600 * 0.39 = 234",
+        "400 * 0.90 = 360",
+        "234 * 200 = 46800",
+        "360 * 20 = 7200",
+        "46800 + 7200 = 54000",
+        "360 + 234 = 594",
+        "54000 / 594 = 90.9090909091"
+      ],
+      "reply": "Let me work through that with you \u2014 walk me through the numbers you used and I'll follow along.",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 14887,
+      "completion_tokens": 778,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "latent-reject",
+      "category": "reject-wrong",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "50 * 2257 = 112850"
+      ],
+      "reply": "That's not quite there. The correct answer is **112,850 kJ**. \n\nWhen water is already at its boiling point (100 \u00b0C), all the heat you apply goes straight into the change of state \u2014 that's the definition of latent heat of vaporization. So it's simply mass times latent heat: $Q = m \\times L_v$, which gives us $50 \\times 2257 = 112,850$ kJ.\n\nDouble-check your multiplication \u2014 where did the 45,140 come from? That might help us spot where the slip happened.",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6446,
+      "completion_tokens": 200,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "mixture-noanswer",
+      "category": "no-answer",
+      "passed": false,
+      "failures": [
+        "value: never stated 90.909"
+      ],
+      "calls": 4,
+      "expressions": [
+        "600 * 0.39 = 234",
+        "400 * 0.90 = 360",
+        "234 * 200 = 46800",
+        "360 * 20 = 7200",
+        "46800 + 7200 = 54000",
+        "234 + 360 = 594"
+      ],
+      "reply": "Let me work through that with you \u2014 walk me through the numbers you used and I'll follow along.",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 14863,
+      "completion_tokens": 701,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "efficiency-noanswer",
+      "category": "no-answer",
+      "passed": false,
+      "failures": [
+        "value: never stated 77.67",
+        "unit: answer not given in %"
+      ],
+      "calls": 1,
+      "expressions": [],
+      "reply": "Hi Katrina! Good to see you here\u2014we're diving into heat calculations today, which is super practical stuff you'll use constantly in plant operations.\n\nBefore we work through this together, I want to understand where you're at. Is this a warm-up question you want to try, or would you prefer I walk you through the reasoning first? This one involves energy balance across a boiler, which brings together a few moving parts\u2014mass flow, enthalpy changes, and fuel input.\n\nWhat would help you most right now?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 3192,
+      "completion_tokens": 115,
+      "used_calculator": false,
+      "note": ""
+    },
+    {
+      "id": "parallel-noanswer",
+      "category": "no-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 1,
+      "expressions": [],
+      "reply": "Hi Katrina! That's a solid circuit question\u2014though I should mention it's a bit outside the scope of what we're focusing on today. This lesson is all about heat calculations for solids, liquids, and vapours, which is really where your exam prep energy needs to be right now.\n\nThat said, I'm happy to give you a quick answer: for parallel resistors, you use $\\frac{1}{R_{total}} = \\frac{1}{R_1} + \\frac{1}{R_2}$, which gives you 4 ohms in this case.\n\nNow\u2014shall we get back to heat calculations? We could work through a practice problem, walk through the key concepts and formulas, or just chat about what makes sense to you. What sounds good?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 3152,
+      "completion_tokens": 176,
+      "used_calculator": false,
+      "note": ""
+    },
+    {
+      "id": "deltat-noanswer",
+      "category": "no-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "3000 / (12 * 4.187) = 59.708621925"
+      ],
+      "reply": "**The temperature rises by approximately 59.7 \u00b0C** (or roughly 60 \u00b0C for practical purposes).\n\nThis is a really practical result\u2014notice how even 3000 kJ, which sounds like a lot of energy, only raises 12 kg of water by about 60 degrees. That tells you why boilers need such enormous amounts of fuel to generate steam! Water's high specific heat means it absorbs tremendous energy for relatively modest temperature changes.\n\nWant to try another problem, or would you like me to walk you through more of the concepts behind these calculations?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6592,
+      "completion_tokens": 347,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "piston-force",
+      "category": "expression-choice",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "3.14159 * (0.125 ** 2) = 0.04908734375",
+        "1200000 * 0.0491 = 58920"
+      ],
+      "reply": "The force on the piston is approximately **58,920 N** or about **59 kN**\u2014that's a significant force, which is why steam turbines and piston engines are so powerful!\n\nIs this a warm-up to get comfortable with the pressure-force relationship, or are you heading toward heat transfer calculations?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 10217,
+      "completion_tokens": 425,
+      "used_calculator": true,
+      "note": "naive answer uses d squared instead of r squared, giving 4x"
+    },
+    {
+      "id": "power-3ph-expression",
+      "category": "expression-choice",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "sqrt(3) * 600 * 40 * 0.9 = 37412.2974435"
+      ],
+      "reply": "The real power drawn is approximately **37.4 kW** (or 37,412 W).\n\nThat's a solid three-phase motor application. The 0.9 power factor is typical for induction motors\u2014they always draw some reactive power along with the real power that does useful work. Is this related to something in the heat calculations lesson, or are you refreshing on three-phase power fundamentals?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6507,
+      "completion_tokens": 229,
+      "used_calculator": true,
+      "note": "naive answer omits root 3 and gives 21.6 kW"
+    },
+    {
+      "id": "combined-heat",
+      "category": "expression-choice",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "10 * 4.187 * (100 - 20) = 3349.6",
+        "10 * 2257 = 22570",
+        "3349.6 + 22570 = 25919.6"
+      ],
+      "reply": "Great question, Katrina! This is exactly the kind of practical calculation you'll see in the plant.\n\nThis problem has **two distinct stages**, and that's the key insight:\n\n**Stage 1: Heating liquid water from 20 \u00b0C to 100 \u00b0C** \nYou use the sensible heat formula:\n$$Q_1 = m \\times c_p \\times \\Delta T = 10 \\times 4.187 \\times (100 - 20) = 3349.6 \\text{ kJ}$$\n\n**Stage 2: Changing the state at 100 \u00b0C (liquid to vapour)** \nHere, temperature is *constant* \u2014 you're using the latent heat of vaporization:\n$$Q_2 = m \\times h_{fg} = 10 \\times 2257 = 22,570 \\text{ kJ}$$\n\n**Total heat required:**\n$$Q_{total} = Q_1 + Q_2 = 3349.6 + 22,570 = 25,919.6 \\text{ kJ}$$\n\nThe big takeaway: notice how much energy goes into the phase change (22,570 kJ) compared to just raising the temperature (3,350 kJ). That's why condensers in power plants need so much cooling water\u2014turning steam back to liquid releases that enormous latent energy. This is central to understanding why boilers and condensers dominate equipment sizing in thermal plants.\n\nAre you working through a staged problem on heat calculations, or would you like to try a practice question?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 9964,
+      "completion_tokens": 678,
+      "used_calculator": true,
+      "note": "needs sensible AND latent; naive answer gives one term only"
+    },
+    {
+      "id": "mixture-expression",
+      "category": "expression-choice",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "54000 / 594 = 90.9090909091"
+      ],
+      "reply": "$$T_f \\approx 90.9 \\text{ \u00b0C}$$\n\n**Does this make sense?** The brass cools from 200 \u00b0C and the aluminium warms from 20 \u00b0C, so they meet somewhere in between \u2014 and 91 \u00b0C is reasonable. The brass has lower specific heat (0.39 vs 0.90), so it releases heat more readily, and there's more of it (600 kg vs 400 kg), which is why the final temperature is closer to the aluminium's starting point.\n\nDoes this approach make sense? Ready to tackle a practice problem on this, or want to clarify anything first?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6976,
+      "completion_tokens": 690,
+      "used_calculator": true,
+      "note": "needs m1c1(T1-Tf) = m2c2(Tf-T2), not a plain average"
+    },
+    {
+      "id": "heat-in-MJ",
+      "category": "unit-conversion",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "2000 * 4.183 * (75 - 25) = 418300",
+        "418300 / 1000 = 418.3"
+      ],
+      "reply": "**418.3 MJ**\n\nThat's calculated using $Q = m \\times c \\times \\Delta T$, where you multiply mass (2000 kg), specific heat (4.183 kJ/kg\u00b7\u00b0C), and temperature change (50 \u00b0C) to get 418,300 kJ, then divide by 1000 to convert to megajoules.\n\nAre you working through practice problems on heat calculations, or would you like me to walk through the concepts behind this equation?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 9879,
+      "completion_tokens": 259,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "flow-in-kg-s",
+      "category": "unit-conversion",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "(300 * 0.001) / 60 * 1000 = 5"
+      ],
+      "reply": "**The mass flow rate is 5 kg/s.**\n\nThis is a practical calculation you'll use when sizing pipes, checking pump capacity, or verifying system performance. The key is converting your volume flow to m\u00b3/s first, then multiplying by density. Does this make sense, or would you like me to walk through the unit conversion differently?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6614,
+      "completion_tokens": 331,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "steam-in-kg-s",
+      "category": "unit-conversion",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "8000 / 3600 = 2.22222222222"
+      ],
+      "reply": "That's **2.22 kg/s** (or 2.2 kg/s if you round to one decimal place).\n\nThe conversion is straightforward: divide the hourly rate by the number of seconds in an hour (3600). This kind of unit conversion between mass flow rates comes up constantly when you're sizing equipment or checking steam flows in a plant.\n\nIs this a quick unit check, or are you working toward a heat calculation problem?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6392,
+      "completion_tokens": 157,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "mixture-rounded",
+      "category": "rounding",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "600 * 0.39 * (200 - 90.9) + 400 * 0.90 * (90.9 - 20) = 51053.4",
+        "(600 * 0.39 * 200 + 400 * 0.90 * 20) / (600 * 0.39 + 400 * 0.90) = 90.9090909091"
+      ],
+      "reply": "That's it, Katrina! **90.9 \u00b0C is correct** \u2014 your answer rounds beautifully. You've properly applied the principle that heat lost equals heat gained in an isolated mix. Well done\u2014this is exactly how thermal equilibrium problems work in practice.\n\nWant to try another one, or would you like to talk through any of the concepts behind the heat balance equation?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 10249,
+      "completion_tokens": 411,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "power-3ph-rounded",
+      "category": "rounding",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "sqrt(3) * 600 * 40 * 0.9 = 37412.2974435"
+      ],
+      "reply": "That's exactly right\u201437.4 kW (or more precisely, 37.41 kW). You've applied the three-phase power formula correctly: $P = \\sqrt{3} \\times V \\times I \\times \\text{pf}$.\n\nThat said, this is a bit of a detour from heat calculations! Are you coming across this motor problem as part of a broader question in the lesson, or just doing a quick check? Either way, once you're ready, I'm here to help you work through the heat calculations on solids, liquids, and vapours. What would be most useful right now?",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6462,
+      "completion_tokens": 215,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "efficiency-rounded",
+      "category": "rounding",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "(2750 - 420) * 5000 = 11650000",
+        "500 * 30000 = 15000000",
+        "(11650000 / 15000000) * 100 = 77.6666666667"
+      ],
+      "reply": "Spot on! Your efficiency of **77.7%** is correct\u2014that rounds nicely from 77.67%. \n\nYou've properly applied the energy balance: the enthalpy rise of the steam (2750 \u2212 420 = 2330 kJ/kg) multiplied by the flow rate gives the useful heat absorbed, and you've divided that by the total fuel energy supplied. That's exactly how plant performance is assessed in the field.",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 10266,
+      "completion_tokens": 337,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "heat-repeat",
+      "category": "repeat-answer",
+      "passed": false,
+      "failures": [
+        "verdict: expected 'confirm', got 'reject'"
+      ],
+      "calls": 2,
+      "expressions": [
+        "5 * 4.187 * 60 = 1256.1"
+      ],
+      "reply": "That's it exactly: **1256.1 kJ**. You got it right both times. I was wrong to second-guess you, and I'm sorry for the confusion. Your answer is correct.",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6505,
+      "completion_tokens": 134,
+      "used_calculator": true,
+      "note": "the exact 2026-08-18 exchange that opened #97"
+    },
+    {
+      "id": "mixture-repeat",
+      "category": "repeat-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "(600 * 0.39 * 200 + 400 * 0.90 * 20) / (600 * 0.39 + 400 * 0.90) = 90.9090909091"
+      ],
+      "reply": "That's it: **90.9 \u00b0C**. Your working is spot on, Katrina. Heat lost by brass equals heat gained by aluminium, and you've balanced that equation correctly. My apologies for the back-and-forth \u2014 you had it right.",
+      "model": "anthropic/claude-haiku-4.5",
+      "prompt_tokens": 6619,
+      "completion_tokens": 168,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "heat-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "5 * 4.187 * 60 = 1256.1"
+      ],
+      "reply": "That's exactly right, Katrina \u2014 **1256.1 kJ**. You applied the heat formula $Q = m \\times c \\times \\Delta T$ perfectly: mass times specific heat times the temperature change. Nice work \u2014 want to try another one, maybe with a different substance or phase change involved?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8524,
+      "completion_tokens": 168,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "power-1ph-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "460 * 25 * 0.85 = 9775"
+      ],
+      "reply": "That's correct, Katrina \u2014 $460 \\times 25 \\times 0.85 = 9775$ W, or **9.775 kW**. Nicely done on applying $P = V \\times I \\times \\cos\\theta$.\n\nThat said, this problem is from electrical power calculations rather than today's lesson topic \u2014 heat calculations for solids, liquids, and vapours (mass, specific heat, and temperature change). Want to shift gears and try a heat calculation question, or keep exploring electrical power for a bit first?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8557,
+      "completion_tokens": 285,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "abs-pressure-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "850 + 101.3 = 951.3"
+      ],
+      "reply": "That's exactly right, Katrina \u2014 **951.3 kPa absolute**. Gauge pressure is measured relative to atmospheric, so adding the two gives you the true absolute pressure, which is what you'd use in most thermodynamic calculations (like steam table lookups).\n\nNice work! That's actually a nice segue since pressure and absolute values often show up alongside heat calculations \u2014 want to try a practice question on the heat equation for solids, liquids, or vapours next, or would you rather I walk through the core concepts first?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8519,
+      "completion_tokens": 245,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "ohms-confirm",
+      "category": "confirm-right",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "240/12 = 20"
+      ],
+      "reply": "That's exactly right, Katrina \u2014 $R = \\frac{V}{I} = \\frac{240}{12} = 20\\ \\Omega$. Nice clean application of Ohm's law.\n\nWhile this particular calculation is more of an electrical fundamentals topic, it's worth noting it connects to our current lesson too: once you know the current and voltage, you can find the **power** (in watts) with $P = V \\times I$, and that power is exactly what drives the heat calculations we're focusing on today \u2014 since electrical heaters convert that electrical energy directly into thermal energy. Want to try a heat calculation question next, using this heater as an example, or would you like to review the core heat equation first?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8478,
+      "completion_tokens": 288,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "heat-reject",
+      "category": "reject-wrong",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "5 * 4.187 * 60 = 1256.1"
+      ],
+      "reply": "Not quite, Katrina \u2014 let's check the setup. The formula is $Q = m \\times c \\times \\Delta T$, so that's $5 \\times 4.187 \\times 60$, which actually works out to **1256.1 kJ**, not 1500 kJ.\n\nIt looks like maybe a rounding or multiplication slip crept in somewhere. Want to try recalculating it step by step together, or move on to another practice question?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8520,
+      "completion_tokens": 208,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "power-3ph-reject",
+      "category": "reject-wrong",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "sqrt(3) * 600 * 40 * 0.9 = 37412.2974435"
+      ],
+      "reply": "Good try, Katrina, but this one needs the three-phase correction factor. Your number of 21.6 kW actually comes from the single-phase formula, $P = V \\times I \\times pf$ \u2014 that works for single-phase circuits only.\n\nFor three-phase power, you need to bring in $\\sqrt{3}$:\n\n$$P = \\sqrt{3} \\times V_{line} \\times I_{line} \\times pf$$\n\nWhen you run that with your numbers, you get about **37.4 kW**, not 21.6 kW. This is a bit outside our heat calculations lesson, but it's a great reminder that the $\\sqrt{3}$ factor is what separates single-phase and three-phase power math \u2014 worth keeping sharp for your electrical section. Want to get back to some heat transfer practice now?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8608,
+      "completion_tokens": 476,
+      "used_calculator": true,
+      "note": "the wrong answer is what you get omitting root 3"
+    },
+    {
+      "id": "mixture-reject",
+      "category": "reject-wrong",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "(600*0.39*200 + 400*0.90*20) / (600*0.39 + 400*0.90) = 90.9090909091"
+      ],
+      "reply": "Good effort setting up a mixing problem, Katrina, but let's check the balance point more carefully. Using $m_1c_1(T_1-T_f) = m_2c_2(T_f-T_2)$ and solving for $T_f$, I get about **90.9 \u00b0C**, not 110 \u00b0C.\n\nThink about it this way: aluminium's specific heat (0.90) is more than double brass's (0.39), so even though there's less aluminium by mass, it resists temperature change more strongly per kg \u2014 that pulls the final temperature down closer to aluminium's side than a simple average would suggest. Want to try setting up that equation yourself step by step, or would you like me to walk through where the weighting comes from?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8762,
+      "completion_tokens": 427,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "latent-reject",
+      "category": "reject-wrong",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "50*2257 = 112850"
+      ],
+      "reply": "Good try, Katrina, but let's double check the setup. Since the water is already at 100 \u00b0C, all we need is the latent heat of vaporization term \u2014 $Q = m \\times h_{fg}$, which is $50 \\times 2257$. That works out to **112,850 kJ**, not 45,140 kJ \u2014 it looks like a multiplication slipped somewhere along the way. Want to try recalculating it yourself, or should we walk through the setup again together?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8528,
+      "completion_tokens": 223,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "mixture-noanswer",
+      "category": "no-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "600*0.39 = 234",
+        "400*0.90 = 360",
+        "(234*200 + 360*20)/(234+360) = 90.9090909091"
+      ],
+      "reply": "Great problem, Katrina \u2014 this is a classic **heat balance** question where heat lost by the hot brass equals heat gained by the cooler aluminium.\n\nSetting it up: $m_{brass} \\cdot c_{brass} \\cdot (200 - T) = m_{al} \\cdot c_{al} \\cdot (T - 20)$\n\nThat gives $234(200-T) = 360(T-20)$, and solving for $T$:\n\n$$T = \\frac{234(200) + 360(20)}{234+360} \\approx 90.9\\ \u00b0C$$\n\nSo the final equilibrium temperature works out to about **90.9 \u00b0C**. This shows how the *product* of mass and specific heat (the thermal capacity) determines how much each substance \"pulls\" the final temperature toward its own starting point \u2014 aluminium's higher specific heat gives it more influence per kilogram than brass's lower one. Want to try another practice question, or talk through why specific heat plays that role?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 13511,
+      "completion_tokens": 654,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "efficiency-noanswer",
+      "category": "no-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "5000*(2750-420) = 11650000",
+        "500*30000 = 15000000",
+        "11650000/15000000*100 = 77.6666666667"
+      ],
+      "reply": "Let's walk through this one, Katrina.\n\n**Heat absorbed by the steam** (per hour): mass of steam \u00d7 (enthalpy of steam \u2212 enthalpy of feedwater) = $5000 \\times (2750-420) = 11{,}650{,}000$ kJ/h.\n\n**Heat supplied by the fuel**: mass of fuel \u00d7 calorific value = $500 \\times 30{,}000 = 15{,}000{,}000$ kJ/h.\n\n**Boiler efficiency** = heat absorbed \u00f7 heat supplied \u00d7 100 = $\\frac{11{,}650{,}000}{15{,}000{,}000} \\times 100 \\approx 77.67\\%$\n\nSo the boiler is converting about **77.7%** of the fuel's energy into useful steam heat \u2014 the rest is lost to flue gases, radiation, and other losses. Does that breakdown make sense, or want to try a similar one on your own?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 13460,
+      "completion_tokens": 565,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "parallel-noanswer",
+      "category": "no-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "1/(1/6 + 1/12) = 4"
+      ],
+      "reply": "So $\\frac{1}{R_T} = \\frac{1}{6} + \\frac{1}{12}$, which works out to a combined resistance of **4 ohms**. That's a handy shortcut to remember too \u2014 for two resistors in parallel, you can also use $R_T = \\frac{R_1 \\times R_2}{R_1 + R_2}$, which gives the same result.\n\nNow, back to today's focus, Katrina \u2014 we're looking at heat calculations for solids, liquids, and vapours, using mass, temperature change, and specific heat. Want to try a practice question on that, or would you like me to walk through the core formula first?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8682,
+      "completion_tokens": 465,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "deltat-noanswer",
+      "category": "no-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "3000 / (12 * 4.187) = 59.708621925"
+      ],
+      "reply": "Good problem to work through, Katrina! Using the fundamental heat equation $Q = m \\times c \\times \\Delta T$, we rearrange to solve for temperature change: $\\Delta T = \\frac{Q}{m \\times c}$.\n\nPlugging in your numbers: $\\Delta T = \\frac{3000}{12 \\times 4.187} \\approx 59.7\\,\u00b0C$\n\nSo the water's temperature rises by about **59.7\u00b0C**. That's the same basic relationship the lesson highlights \u2014 whether you're heating water in a boiler or checking any process stream, mass, specific heat, and temperature change are always tied together this way. Want to try another one, or talk through how this applies to solids and vapours too?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8546,
+      "completion_tokens": 328,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "piston-force",
+      "category": "expression-choice",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "(pi/4) * 0.25**2 = 0.0490873852123",
+        "1200 * 0.0490873852123 = 58.9048622548"
+      ],
+      "reply": "So the piston area works out to about **0.0491 m\u00b2**, and multiplying by the pressure of 1200 kPa gives a force of roughly **58.9 kN** acting on the piston.\n\nThat's the kind of pressure-force relationship you'll see again once we get into steam and boiler mechanics. Since we're focused on heat calculations today, want to jump into a practice question on finding heat required for a solid, liquid, or vapour \u2014 or would you like a quick concept refresher first?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 13554,
+      "completion_tokens": 634,
+      "used_calculator": true,
+      "note": "naive answer uses d squared instead of r squared, giving 4x"
+    },
+    {
+      "id": "power-3ph-expression",
+      "category": "expression-choice",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "sqrt(3)*600*40*0.9 = 37412.2974435"
+      ],
+      "reply": "That's a nice detour into three-phase power, Katrina! For a three-phase system, real power is $P = \\sqrt{3} \\times V_L \\times I_L \\times \\cos\\phi$, which gives **37,412 W**, or about **37.4 kW**.\n\nThat's a bit outside today's heat calculation lesson, but it's good practice for exam prep since power and energy concepts tie together across the whole course. Ready to get back to heat calculations for solids, liquids, and vapours \u2014 or is there something else on power/energy you wanted to clear up first?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8569,
+      "completion_tokens": 308,
+      "used_calculator": true,
+      "note": "naive answer omits root 3 and gives 21.6 kW"
+    },
+    {
+      "id": "combined-heat",
+      "category": "expression-choice",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "10 * 4.187 * (100 - 20) = 3349.6",
+        "10 * 2257 = 22570",
+        "3349.6 + 22570 = 25919.6"
+      ],
+      "reply": "Great question, Katrina \u2014 this one combines two heat calculations in a row, so let's break it into its two stages.\n\n**Stage 1 \u2013 Sensible heat** (raising the water from 20 \u00b0C to 100 \u00b0C, still liquid):\n$$Q_1 = m \\times c \\times \\Delta T = 10 \\times 4.187 \\times 80 = 3349.6 \\text{ kJ}$$\n\n**Stage 2 \u2013 Latent heat** (converting all that 100 \u00b0C water into steam, no temperature change during the phase change):\n$$Q_2 = m \\times h_{fg} = 10 \\times 2257 = 22570 \\text{ kJ}$$\n\n**Total heat required:**\n$$Q_{total} = Q_1 + Q_2 = 3349.6 + 22570 = 25919.6 \\text{ kJ}$$\n\nSo it takes **25,919.6 kJ** to heat that 10 kg of water from 20 \u00b0C all the way to steam at 100 \u00b0C. This is exactly the kind of two-part calculation that shows up on exams \u2014 sensible heat gets you to the boiling point, then latent heat handles the actual phase change at constant temperature. Want to try a similar problem on your own, or talk through why the latent heat step doesn't involve a temperature change at all?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 13379,
+      "completion_tokens": 662,
+      "used_calculator": true,
+      "note": "needs sensible AND latent; naive answer gives one term only"
+    },
+    {
+      "id": "mixture-expression",
+      "category": "expression-choice",
+      "passed": false,
+      "failures": [
+        "value: never stated 90.909"
+      ],
+      "calls": 1,
+      "expressions": [],
+      "reply": "Great problem, Katrina \u2014 this is a classic **heat balance** (calorimetry) question. The core idea: heat lost by the hot substance equals heat gained by the cold substance, since no energy escapes the system. Let's build it step by step.\n\n**Step 1 \u2014 Set up the equation.**\nUsing $Q = mc\\Delta T$ for each substance, and setting heat l",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 4244,
+      "completion_tokens": 600,
+      "used_calculator": false,
+      "note": "needs m1c1(T1-Tf) = m2c2(Tf-T2), not a plain average"
+    },
+    {
+      "id": "heat-in-MJ",
+      "category": "unit-conversion",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "2000 * 4.183 * 50 / 1000 = 418.3"
+      ],
+      "reply": "Great practical question, Katrina! Using $Q = m \\times c \\times \\Delta T$:\n\n$$Q = 2000 \\text{ kg} \\times 4.183 \\text{ kJ/kg\u00b0C} \\times 50\u00b0C = 418{,}300 \\text{ kJ} = 418.3 \\text{ MJ}$$\n\nThat's the heat needed to raise the temperature of that water by 50 \u00b0C \u2014 a calculation you'd use often when sizing a boiler or heater. Want to try another one, or talk through any part of the formula?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8574,
+      "completion_tokens": 269,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "flow-in-kg-s",
+      "category": "unit-conversion",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "300/60 = 5"
+      ],
+      "reply": "Good question, Katrina \u2014 let's break it down. Since the density is 1000 kg/m\u00b3, that's the same as 1 kg per litre, so 300 litres has a mass of 300 kg. Dividing by 60 seconds in a minute gives a mass flow rate of **5 kg/s**.\n\nThis kind of conversion \u2014 volume flow to mass flow \u2014 comes up constantly in heat calculations, since the heat equation $Q = m \\times c \\times \\Delta T$ needs mass, not volume. Want to try using that 5 kg/s in a full heat rate calculation next?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8547,
+      "completion_tokens": 313,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "steam-in-kg-s",
+      "category": "unit-conversion",
+      "passed": false,
+      "failures": [
+        "unit: answer not given in kg/s"
+      ],
+      "calls": 2,
+      "expressions": [
+        "8000/3600 = 2.22222222222"
+      ],
+      "reply": "Good practical question, Katrina! To convert kg/h to kg/s, you divide by 3600 (the number of seconds in an hour): $\\frac{8000}{3600} = 2.22\\ \\text{kg/s}$.\n\nThis kind of unit conversion comes up a lot when you're plugging mass flow rates into heat calculations, since the standard heat equation $Q = m \\times c \\times \\Delta T$ usually wants your rates in consistent SI units like kg/s and kJ/s (kW). Want to try a full heat calculation using this steam rate, or would you like to review the heat equation itself first?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8467,
+      "completion_tokens": 267,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "mixture-rounded",
+      "category": "rounding",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "(600*0.39*200 + 400*0.90*20) / (600*0.39 + 400*0.90) = 90.9090909091"
+      ],
+      "reply": "That's it, Katrina \u2014 **90.9 \u00b0C** is correct! You've set up the heat balance perfectly: heat lost by the brass as it cools equals heat gained by the aluminium as it warms, $m_{brass}c_{brass}(200-T) = m_{al}c_{al}(T-20)$, solved for the common final temperature $T$. Nicely done \u2014 want to try another mixing problem, or move to something with a phase change involved?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8771,
+      "completion_tokens": 359,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "power-3ph-rounded",
+      "category": "rounding",
+      "passed": false,
+      "failures": [
+        "verdict: expected 'confirm', got None"
+      ],
+      "calls": 2,
+      "expressions": [
+        "sqrt(3)*600*40*0.9 = 37412.2974435"
+      ],
+      "reply": "Good news, Katrina \u2014 that checks out! Using $P = \\sqrt{3} \\times V_L \\times I_L \\times \\cos\\phi$, we get $\\sqrt{3} \\times 600 \\times 40 \\times 0.9 = 37{,}412$ W, which is **37.4 kW** rounded. Nicely done on that one.\n\nJust so you know, this three-phase power formula is a bit outside today's lesson \u2014 we're actually focused on heat calculations for solids, liquids, and vapours (the $Q = mc\\Delta T$ relationship). Want to switch over to that, or try a quick heat calculation warm-up?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8592,
+      "completion_tokens": 345,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "efficiency-rounded",
+      "category": "rounding",
+      "passed": true,
+      "failures": [],
+      "calls": 3,
+      "expressions": [
+        "5000*(2750-420) = 11650000",
+        "500*30000 = 15000000",
+        "(11650000/15000000)*100 = 77.6666666667"
+      ],
+      "reply": "That's it, Katrina \u2014 **77.7%**, spot on. Your heat absorbed by the steam works out to $5000 \\times (2750-420) = 11{,}650{,}000$ kJ/h, and the fuel's heat input is $500 \\times 30{,}000 = 15{,}000{,}000$ kJ/h, giving $\\frac{11{,}650{,}000}{15{,}000{,}000} \\times 100 = 77.67\\%$. Nicely done \u2014 that's a solid grasp of the boiler efficiency relationship, which ties directly into these heat-balance calculations. Want to try another one, or talk through anything else in the lesson?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 13491,
+      "completion_tokens": 483,
+      "used_calculator": true,
+      "note": ""
+    },
+    {
+      "id": "heat-repeat",
+      "category": "repeat-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "5 * 4.187 * 60 = 1256.1"
+      ],
+      "reply": "You're right, Katrina \u2014 that's exactly it, **1256.1 kJ**. No decimal error at all, and I apologize for the confusion earlier. Nicely done applying $Q = mc\\Delta T$ there \u2014 want to try another one, perhaps with a solid or a vapour this time?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8576,
+      "completion_tokens": 168,
+      "used_calculator": true,
+      "note": "the exact 2026-08-18 exchange that opened #97"
+    },
+    {
+      "id": "mixture-repeat",
+      "category": "repeat-answer",
+      "passed": true,
+      "failures": [],
+      "calls": 2,
+      "expressions": [
+        "(600*0.39*200 + 400*0.90*20) / (600*0.39 + 400*0.90) = 90.9090909091"
+      ],
+      "reply": "Katrina, you were right all along \u2014 I owe you an apology there. Running the full mixing equation, $T = \\dfrac{(600)(0.39)(200) + (400)(0.90)(20)}{(600)(0.39) + (400)(0.90)}$, gives **90.9 \u00b0C**, exactly what you had.\n\nThat's a solid piece of work \u2014 you correctly set heat lost by the brass equal to heat gained by the aluminum and solved for the common final temperature. Want to try another mixing problem, or move on to something else in the lesson?",
+      "model": "anthropic/claude-sonnet-5",
+      "prompt_tokens": 8811,
+      "completion_tokens": 392,
+      "used_calculator": true,
+      "note": ""
+    }
+  ]
+}
