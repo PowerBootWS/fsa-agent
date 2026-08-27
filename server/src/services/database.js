@@ -153,6 +153,8 @@ async function getChapterWeights(userEmail, courseId) {
 
 // ── v2: Lesson Player ────────────────────────────────────────────────────────
 
+const { markSectionBoundaries } = require('./lessonSections');
+
 async function getV2Lesson(lessonCode) {
   const chunksResult = await pool.query(
     `SELECT
@@ -182,7 +184,11 @@ async function getV2Lesson(lessonCode) {
     lesson_code: lessonCode,
     title: metaResult.rows[0]?.title || lessonCode,
     summary: metaResult.rows[0]?.summary || null,
-    sections: chunksResult.rows,
+    // Checkpoints land at the end of a taught section rather than wherever a
+    // slide counter happens to fall (backlog #102). Derived on read because the
+    // player already honours `checkpoint_after` — no client change, which
+    // matters while client-v2 has no test runner (#68).
+    sections: markSectionBoundaries(chunksResult.rows),
   };
 }
 
@@ -234,22 +240,43 @@ async function getLearnerSession(sessionId) {
   return result.rows[0] || null;
 }
 
-// Every standalone practice question for a lesson. The caller picks one:
-// first unasked, and once the pool is used up it recycles the least-recently
-// asked rather than returning nothing. Objectives carry only ~5 of these, so
-// the old exclude-and-LIMIT-1 query went permanently empty on a second pass
-// through a lesson.
-async function getCheckpointQuestionPool(lessonCode) {
-  const result = await pool.query(
-    `SELECT id, question_text, options, correct_answer, difficulty, question_type
-     FROM questions
-     WHERE lesson_code = $1
-       AND question_type = 'objective_practice'
-       AND standalone = true
-     ORDER BY id`,
-    [lessonCode]
-  );
-  return result.rows;
+// Every standalone practice question for a lesson that the learner has been
+// taught enough to answer. The caller picks one: first unasked, and once the
+// pool is used up it recycles the least-recently asked rather than returning
+// nothing. Objectives carry only ~5 of these, so the old exclude-and-LIMIT-1
+// query went permanently empty on a second pass through a lesson.
+//
+// `lastSection` is the slide the learner has reached. Questions carry an
+// `earliest_slide` — the first slide at which they become answerable (backlog
+// #102) — and anything beyond that point is filtered out, because a checkpoint
+// four slides into a lesson used to be able to serve a calculation whose
+// formula appears ten slides later.
+//
+// NULL `earliest_slide` means "not placed", not "premature": the column fills
+// in gradually and an unplaced question must not become unreachable.
+const CHECKPOINT_POOL_SELECT = `
+  SELECT id, question_text, options, correct_answer, difficulty, question_type
+  FROM questions
+  WHERE lesson_code = $1
+    AND question_type = 'objective_practice'
+    AND standalone = true`;
+
+async function getCheckpointQuestionPool(lessonCode, lastSection = null) {
+  if (lastSection !== null && lastSection !== undefined) {
+    const filtered = await pool.query(
+      `${CHECKPOINT_POOL_SELECT}
+         AND (earliest_slide IS NULL OR earliest_slide <= $2)
+       ORDER BY id`,
+      [lessonCode, lastSection]
+    );
+    // Only narrow the pool if narrowing leaves something to ask. A checkpoint
+    // that renders no question is its own bad experience — that failure was
+    // fixed on 2026-08-25 and must not return in the name of better timing.
+    if (filtered.rows.length > 0) return filtered.rows;
+  }
+
+  const all = await pool.query(`${CHECKPOINT_POOL_SELECT} ORDER BY id`, [lessonCode]);
+  return all.rows;
 }
 
 async function getCourseOutline(courseId) {

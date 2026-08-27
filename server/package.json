@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "POSTGRES_HOST=localhost POSTGRES_PORT=5434 POSTGRES_DB=fsa_agent_test jest --runInBand",
+    "test": "POSTGRES_HOST=localhost POSTGRES_PORT=5434 POSTGRES_DB=fsa_agent_test PRACTICE_EXAM_TOKEN_SECRET=${PRACTICE_EXAM_TOKEN_SECRET:-test-only-secret} jest --runInBand",
     "test:e2e-purchase": "node scripts/test-e2e-purchase.js"
   },
   "dependencies": {

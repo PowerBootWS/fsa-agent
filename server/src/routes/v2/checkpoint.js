@@ -22,7 +22,12 @@ router.post('/', async (req, res) => {
     const session = await db.getLearnerSession(session_id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
 
-    const questions = await db.getCheckpointQuestionPool(lesson_code);
+    // The learner's progress is right here on the session and used to be
+    // thrown away: the pool was queried without it, so a checkpoint four
+    // slides in could offer a question whose formula appears ten slides later
+    // (backlog #102). `??` rather than `||` so slide 0 stays slide 0.
+    const lastSection = session.last_section ?? null;
+    const questions = await db.getCheckpointQuestionPool(lesson_code, lastSection);
     if (questions.length === 0) return res.json({ question: null });
 
     const askedIds = (session.checkpoint_log || [])
