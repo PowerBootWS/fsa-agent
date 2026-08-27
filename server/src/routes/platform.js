@@ -12,9 +12,12 @@ const credits = require('../services/credits');
 const DEACTIVATION_REQUIRES_CONFIRMATION =
   (process.env.DEACTIVATION_REQUIRES_CONFIRMATION || 'true').toLowerCase() !== 'false';
 const requireAuth = require('../middleware/requireAuth');
+const axios = require('axios');
 const ghl = require('../services/gohighlevel');
 
 const router = express.Router();
+
+const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:5000';
 
 const PAPER_SWITCH_COOLDOWN_DAYS = parseInt(process.env.PAPER_SWITCH_COOLDOWN_DAYS || '7', 10);
 
@@ -28,6 +31,55 @@ function requireInternalSecret(req, res, next) {
   }
   next();
 }
+
+// POST /api/platform/tutor-selftest — backlog #74.
+//
+// fsa-overwatch's fsa-agent check was a pure ping: /health 200 plus containers
+// running. It could not catch the AI service erroring on every question, which
+// is the failure that actually costs subscribers — a student asks something and
+// gets "Something went wrong on my end" while every dashboard stays green.
+//
+// This runs one real tutoring turn: Node API -> ai-service -> OpenRouter, the
+// path every tutor bug of the last fortnight lived on. Doing it here rather
+// than as a logged-in monitor student is deliberate: a monitor account would
+// need an ACTIVE subscription row, and reconcile_subscriptions force-
+// deactivates any platform account with no matching Stripe subscription, so
+// the monitor would need permanent exemptions in reconciliation, analytics and
+// progress — three places a real student could later slip through.
+//
+// A single turn persists nothing: ai-service saves progress every
+// PROGRESS_SAVE_INTERVAL (3) exchanges or when a question is answered, and this
+// is neither. No progress row, no transcript, no analytics.
+//
+// IT TAKES NO INPUT. Lesson, message and learner are fixed here, so this cannot
+// be steered at an arbitrary prompt — a monitoring endpoint that accepts one is
+// a billable-LLM hole behind a single shared secret.
+const SELFTEST_LESSON = '2A2-1-1';
+const SELFTEST_MESSAGE = 'In one sentence, what does specific heat mean?';
+const SELFTEST_LEARNER = 'overwatch-selftest@monitor.invalid';
+const SELFTEST_TIMEOUT_MS = 45000;
+
+router.post('/tutor-selftest', requireInternalSecret, async (req, res) => {
+  const started = Date.now();
+  try {
+    const response = await axios.post(
+      `${PYTHON_SERVICE_URL}/agent/chat`,
+      { user: SELFTEST_LEARNER, lessonId: SELFTEST_LESSON, message: SELFTEST_MESSAGE },
+      { timeout: SELFTEST_TIMEOUT_MS },
+    );
+    const data = response.data || {};
+    const reply = data.tutor_response || data.response || data.message || '';
+    // An empty reply is reported as-is rather than dressed up as a failure
+    // here: the caller decides what counts as healthy, and overwatch already
+    // knows the tutor's own failure strings.
+    return res.json({ ok: true, reply, ms: Date.now() - started, lesson: SELFTEST_LESSON });
+  } catch (err) {
+    // 500, never 502/504: Cloudflare replaces those bodies with HTML, which is
+    // how a dead practice-exam UI happened in #79.
+    console.error('tutor-selftest failed:', err.message);
+    return res.status(500).json({ ok: false, error: err.message, ms: Date.now() - started });
+  }
+});
 
 // POST /api/platform/provision-user
 router.post('/provision-user', requireInternalSecret, async (req, res) => {
