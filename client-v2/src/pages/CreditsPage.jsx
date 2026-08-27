@@ -1,6 +1,7 @@
 // fsa-agent/client-v2/src/pages/CreditsPage.jsx
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { getJson } from '../utils/api';
 import './CreditsPage.css';
 
 export default function CreditsPage() {
@@ -17,12 +18,10 @@ export default function CreditsPage() {
     let cancelled = false;
     async function load() {
       try {
-        const [balanceRes, packsRes] = await Promise.all([
-          fetch('/api/platform/credits', { credentials: 'include' }),
-          fetch('/api/platform/credits/packs', { credentials: 'include' }),
+        const [balanceData, packsData] = await Promise.all([
+          getJson('/api/platform/credits'),
+          getJson('/api/platform/credits/packs'),
         ]);
-        const balanceData = await balanceRes.json();
-        const packsData = await packsRes.json();
         if (cancelled) return;
         setBalance(balanceData.balance);
         setPacks(packsData.packs);
@@ -40,8 +39,7 @@ export default function CreditsPage() {
     if (purchaseStatus !== 'success') return;
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch('/api/platform/credits', { credentials: 'include' });
-        const data = await res.json();
+        const data = await getJson('/api/platform/credits');
         setBalance(data.balance);
       } catch {
         // Balance will still be correct on next normal page load; nothing to show the user here.

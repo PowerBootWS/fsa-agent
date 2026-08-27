@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getJson } from '../utils/api';
 
 const COUNT_OPTIONS = [
   { count: 25,  label: '25 Questions', sublabel: '~45 min' },
@@ -14,8 +15,7 @@ export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, on
   const [lastResults, setLastResults] = useState(null);
 
   useEffect(() => {
-    fetch(`/api/exam/${encodeURIComponent(courseId)}/chapters`)
-      .then(r => r.json())
+    getJson(`/api/exam/${encodeURIComponent(courseId)}/chapters`)
       .then(data => setChapters(data.chapters || []))
       .catch(() => setChapters([]))
       .finally(() => setChaptersLoading(false));

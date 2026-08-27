@@ -1,5 +1,6 @@
 // fsa-agent/client-v2/src/components/TutorPanel.jsx
 import { useState, useRef, useEffect } from 'react';
+import { postJson } from '../utils/api';
 import { KatexSpan } from './MathContent';
 import 'katex/dist/katex.min.css';
 
@@ -126,16 +127,11 @@ export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, on
     setLoading(true);
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user: learnerId,
-          lessonId: lessonCode,
-          message: text,
-        }),
+      const data = await postJson('/api/chat', {
+        user: learnerId,
+        lessonId: lessonCode,
+        message: text,
       });
-      const data = await res.json();
       const reply = data.tutor_response || data.response || data.message || 'Sorry, I could not respond right now.';
       setMessages(prev => [...prev, { type: 'tutor', text: reply }]);
     } catch {

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ContentPanel } from './components/ContentPanel';
 import { TutorPanel } from './components/TutorPanel';
 import { isFourthClassCode } from './utils/fourthClass';
+import { getJson, postJson } from './utils/api';
 
 const CHECKPOINT_INTERVAL = 4;
 
@@ -49,13 +50,8 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
       return undefined;
     }
     let cancelled = false;
-    fetch('/api/v2/session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ learner_id: learnerId, lesson_code: activeLessonCode }),
-    })
-      .then(res => res.json())
-      .then(data => { if (!cancelled) setSessionId(data.id || null); })
+    postJson('/api/v2/session', { learner_id: learnerId, lesson_code: activeLessonCode })
+      .then(data => { if (!cancelled) setSessionId(data?.id || null); })
       .catch(() => { if (!cancelled) setSessionId(null); });
     return () => { cancelled = true; };
   }, [activeLessonCode, learnerId]);
@@ -124,8 +120,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
         if (!startCode) throw new Error('No lessons found for this course');
 
         // Fetch sections for starting objective
-        const secRes = await fetch(`/api/v2/lesson/${startCode}`);
-        const secData = await secRes.json();
+        const secData = await getJson(`/api/v2/lesson/${startCode}`);
         if (secData.error) throw new Error(secData.error);
         const fetchedSections = secData.sections || [];
 
@@ -144,8 +139,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   // Navigate to a different objective
   const navigateTo = useCallback(async (lessonCode, slideIndex = 0) => {
     try {
-      const res = await fetch(`/api/v2/lesson/${lessonCode}`);
-      const data = await res.json();
+      const data = await getJson(`/api/v2/lesson/${lessonCode}`);
       if (data.error) throw new Error(data.error);
       const newSections = data.sections || [];
       const clamped = Math.max(0, Math.min(slideIndex, newSections.length - 1));
@@ -200,12 +194,9 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   const triggerCheckpoint = useCallback(async () => {
     if (!sessionId || !activeLessonCode) return;
     try {
-      const res = await fetch('/api/v2/checkpoint', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, lesson_code: activeLessonCode }),
+      const data = await postJson('/api/v2/checkpoint', {
+        session_id: sessionId, lesson_code: activeLessonCode,
       });
-      const data = await res.json();
       if (data?.question) setCheckpoint(data);
     } catch {
       // checkpoint failure is non-fatal

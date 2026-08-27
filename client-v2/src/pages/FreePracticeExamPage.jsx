@@ -13,6 +13,7 @@
 //             (locked chapter quizzes, enroll CTA, distractor coaching)
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { getJson } from '../utils/api';
 import { ExamRouter } from '../ExamRouter';
 
 const CLASS_OPTIONS = [
@@ -242,8 +243,7 @@ export default function FreePracticeExamPage() {
 
   function fetchPapersForClass(cls) {
     setPapersLoading(true);
-    return fetch(`/api/preview/papers?class=${encodeURIComponent(cls)}`)
-      .then(r => r.json())
+    return getJson(`/api/preview/papers?class=${encodeURIComponent(cls)}`)
       .then(data => {
         const list = data.papers || [];
         setPapers(list);

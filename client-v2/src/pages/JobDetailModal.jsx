@@ -1,5 +1,6 @@
 // fsa-agent/client-v2/src/pages/JobDetailModal.jsx
 import { useEffect, useRef, useState } from 'react';
+import { getJson } from '../utils/api';
 import './JobDetailModal.css';
 
 export default function JobDetailModal({ jobId, onClose, focusTailoring = false }) {
@@ -43,17 +44,14 @@ export default function JobDetailModal({ jobId, onClose, focusTailoring = false 
     let cancelled = false;
     async function loadTailoringContext() {
       try {
-        const [creditsRes, docsRes, historyRes] = await Promise.all([
-          fetch('/api/platform/credits', { credentials: 'include' }),
-          fetch('/api/platform/documents', { credentials: 'include' }),
-          fetch(`/api/platform/jobs/${jobId}/generated-documents`, { credentials: 'include' }),
+        const [creditsData, docsData, historyData] = await Promise.all([
+          getJson('/api/platform/credits'),
+          getJson('/api/platform/documents'),
+          getJson(`/api/platform/jobs/${jobId}/generated-documents`),
         ]);
-        const creditsData = await creditsRes.json();
-        const docsData = await docsRes.json();
-        const historyData = await historyRes.json();
         if (cancelled) return;
         setBalance(creditsData.balance);
-        setHasResume(docsData.documents.some((d) => d.doc_type === 'resume'));
+        setHasResume((docsData.documents || []).some((d) => d.doc_type === 'resume'));
         setHistory(historyData.documents || []);
       } catch {
         if (!cancelled) setBalance(null);

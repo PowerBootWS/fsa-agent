@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getJson } from '../utils/api';
 import './ProfilePage.css';
 
 // Job-only accounts (no active_paper, no class_code) have no lobby/course to go back
@@ -55,8 +56,7 @@ export default function ProfilePage() {
   }, [navigate]);
 
   useEffect(() => {
-    fetch('/api/platform/documents', { credentials: 'include' })
-      .then(res => res.json())
+    getJson('/api/platform/documents')
       .then(data => {
         const byType = {};
         (data.documents || []).forEach(d => { byType[d.doc_type] = d; });
@@ -81,7 +81,7 @@ export default function ProfilePage() {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || 'Upload failed.');
       }
-      const refreshed = await fetch('/api/platform/documents', { credentials: 'include' }).then(r => r.json());
+      const refreshed = await getJson('/api/platform/documents');
       const byType = {};
       (refreshed.documents || []).forEach(d => { byType[d.doc_type] = d; });
       setDocuments(byType);

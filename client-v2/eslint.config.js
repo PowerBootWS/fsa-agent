@@ -18,4 +18,13 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    // Test files run under vitest, not in a browser tab: they use describe/it/
+    // expect/vi, and they stub globals. Without this block every test file is
+    // a wall of no-undef and the real lint signal is lost in it.
+    files: ['**/*.test.{js,jsx}', 'src/test/**/*.{js,jsx}'],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node, ...globals.vitest },
+    },
+  },
 ])

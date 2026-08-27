@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { InlineLessonPlayer } from '../components/InlineLessonPlayer';
 import { ResultsPanel, QuizExamChatSection } from '../ExamRouter';
 import { isFourthClassCode } from '../utils/fourthClass';
+import { postJson } from '../utils/api';
 import './ExamResultsPage.css';
 
 // ── Grade helpers (used by the summary fallback view) ─────────────────────────
@@ -104,12 +105,9 @@ export default function ExamResultsPage() {
         return;
       }
       try {
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user: user.email, lessonId: courseId, message: 'hello' }),
+        const data = await postJson('/api/chat', {
+          user: user.email, lessonId: courseId, message: 'hello',
         });
-        const data = await res.json();
         const dc = data.display_update;
         // Only adopt a genuine results payload — never a freshly-started exam.
         if (!cancelled && dc?.type === 'exam_done') {
