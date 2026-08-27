@@ -81,10 +81,55 @@ router.post('/tutor-selftest', requireInternalSecret, async (req, res) => {
   }
 });
 
+// POST /api/platform/trial-backstop — backlog #77.
+// Body: { stripe_subscription_id, cancel_at }  (cancel_at: Unix seconds, ISO string, or null)
+//
+// Sets or clears the invited-trial backstop, and does NOTHING else.
+//
+// `subscriptions.cancel_at` is enforced by requireAuth on every authenticated
+// request (`AND (s.cancel_at IS NULL OR s.cancel_at > NOW())`), not by a
+// scheduled job — so setting it ends access the moment it passes, and clearing
+// it restores access immediately.
+//
+// Its own route rather than re-using the neighbours, deliberately:
+//   * provision-user creates users and sends magic links — re-calling it when a
+//     trial converts would email a paying customer a fresh login link.
+//   * deactivate-user changes `status`, and a converted trial must stay active.
+// Narrow surface, one column, easy to reason about at 2am.
+router.post('/trial-backstop', requireInternalSecret, async (req, res) => {
+  try {
+    const { stripe_subscription_id, cancel_at } = req.body;
+    if (!stripe_subscription_id) {
+      return res.status(400).json({ error: 'stripe_subscription_id is required' });
+    }
+
+    const cancelAt = cancel_at
+      ? new Date(typeof cancel_at === 'number' ? cancel_at * 1000 : cancel_at)
+      : null;
+
+    const result = await pool.query(
+      `UPDATE subscriptions SET cancel_at = $1 WHERE stripe_subscription_id = $2`,
+      [cancelAt, stripe_subscription_id]
+    );
+
+    const updated = result.rowCount || 0;
+    if (updated === 0) {
+      // Reported rather than swallowed: a caller that thinks it cleared a
+      // backstop which is still in place would leave a paying customer to be
+      // locked out silently.
+      console.warn(`trial-backstop: no subscription matched ${stripe_subscription_id}`);
+    }
+    return res.json({ ok: true, updated, cancel_at: cancelAt });
+  } catch (err) {
+    console.error('trial-backstop error:', err.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/platform/provision-user
 router.post('/provision-user', requireInternalSecret, async (req, res) => {
   try {
-    const { email, first_name, last_name, class_code, stripe_subscription_id, phone, address } = req.body;
+    const { email, first_name, last_name, class_code, stripe_subscription_id, phone, address, cancel_at } = req.body;
 
     if (!email || !first_name || !class_code) {
       return res.status(400).json({ error: 'email, first_name, and class_code are required' });
@@ -101,6 +146,20 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
       [normalizedEmail, first_name, last_name || null, phone || null, address || null]
     );
     const userIsNew = userInsert.rowCount > 0;
+
+    // Invited-trial backstop (#77). requireAuth enforces cancel_at on every
+    // authenticated request, so a value already in the past would lock the
+    // student out from their first click — ignore it rather than provision
+    // someone who cannot log in. A missing backstop is a resilience gap; a
+    // student who paid and cannot get in is an outage.
+    const parsedCancelAt = cancel_at
+      ? new Date(typeof cancel_at === 'number' ? cancel_at * 1000 : cancel_at)
+      : null;
+    const trialBackstop =
+      parsedCancelAt && parsedCancelAt.getTime() > Date.now() ? parsedCancelAt : null;
+    if (cancel_at && !trialBackstop) {
+      console.warn(`provision-user: ignoring a cancel_at that is not in the future (${cancel_at})`);
+    }
 
     const userResult = await pool.query(
       `SELECT id FROM platform_users WHERE email = $1`,
@@ -139,10 +198,10 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
     let subIsNew = false;
     if (!blocked) {
       const subInsert = await pool.query(
-        `INSERT INTO subscriptions (user_id, class_code, status, active_paper, stripe_subscription_id)
-         VALUES ($1, $2, 'active', NULL, $3)
+        `INSERT INTO subscriptions (user_id, class_code, status, active_paper, stripe_subscription_id, cancel_at)
+         VALUES ($1, $2, 'active', NULL, $3, $4)
          RETURNING id`,
-        [user.id, class_code, stripe_subscription_id || null]
+        [user.id, class_code, stripe_subscription_id || null, trialBackstop]
       );
       subIsNew = subInsert.rowCount > 0;
     }
