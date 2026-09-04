@@ -22,6 +22,7 @@ import JobsPage from './pages/JobsPage';
 import JobsCapturePage from './pages/JobsCapturePage';
 import CreditsPage from './pages/CreditsPage';
 import FreePracticeExamPage from './pages/FreePracticeExamPage';
+import AdminUsagePage from './pages/AdminUsagePage';
 import { LessonPlayer } from './LessonPlayer';
 import { ExamRouter } from './ExamRouter';
 import { isFourthClassCode } from './utils/fourthClass';
@@ -143,6 +144,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route path="/admin/usage" element={<AdminUsagePage />} />
       <Route path="/" element={<DefaultRedirect />} />
       <Route path="*" element={<DefaultRedirect />} />
     </Routes>
