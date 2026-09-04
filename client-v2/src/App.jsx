@@ -1,5 +1,8 @@
 // fsa-agent/client-v2/src/App.jsx
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import useScreenView from './hooks/useScreenView';
+import { startUsageFlushing } from './utils/usage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import SetupPage from './pages/SetupPage';
@@ -31,6 +34,9 @@ function LobbyRoute() {
 }
 
 export default function App() {
+  useScreenView();
+  useEffect(() => startUsageFlushing(), []);
+
   // Legacy iframe mode — fsachat.fullsteamahead.ca or localhost dev with lessonId param
   const isLegacyMode =
     window.location.hostname.includes('fsachat') ||
