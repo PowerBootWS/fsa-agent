@@ -9,6 +9,17 @@
 const { pool: defaultPool } = require('../services/database');
 
 async function pruneUsageEvents({ olderThanDays = 90, pool = defaultPool } = {}) {
+  // A non-positive or non-integer window turns the delete predicate inside
+  // out: `olderThanDays: -5` makes the cutoff `now() - interval '-5 days'`,
+  // i.e. `now() + 5 days` — true for essentially every row in the table, so
+  // one bad value silently wipes it. Reject before building any query, so
+  // every caller (not just the CLI below) inherits the protection rather
+  // than the hazard. Throw rather than clamp: a caller asking to delete
+  // with a nonsense window should fail loudly, not run with a guessed one.
+  if (!Number.isInteger(olderThanDays) || olderThanDays <= 0) {
+    throw new Error(`pruneUsageEvents: olderThanDays must be a positive integer, got: ${olderThanDays}`);
+  }
+
   const cutoff = `${olderThanDays} days`;
   const client = await pool.connect();
 
@@ -60,6 +71,17 @@ module.exports = { pruneUsageEvents };
 if (require.main === module) {
   const arg = process.argv.find((a) => a.startsWith('--days='));
   const olderThanDays = arg ? parseInt(arg.split('=')[1], 10) : 90;
+
+  // Validated here too, not just inside pruneUsageEvents: a bad CLI value
+  // should exit non-zero with a clear message before anything else runs,
+  // rather than surface as an unhandled promise rejection.
+  if (!Number.isInteger(olderThanDays) || olderThanDays <= 0) {
+    console.error(
+      `[usage] prune failed: --days must be a positive integer, got: ${arg ? arg.split('=')[1] : olderThanDays}`
+    );
+    process.exit(1);
+  }
+
   pruneUsageEvents({ olderThanDays })
     .then((r) => {
       console.log(`[usage] rolled up ${r.rolled_up} day-rows, deleted ${r.deleted} raw events`);

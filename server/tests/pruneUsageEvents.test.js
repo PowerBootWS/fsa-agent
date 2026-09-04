@@ -71,6 +71,24 @@ describe('pruneUsageEvents', () => {
     expect(rows[0].event_count).toBe(2);
   });
 
+  it('rejects a negative olderThanDays and deletes nothing', async () => {
+    await expect(pruneUsageEvents({ olderThanDays: -5, pool })).rejects.toThrow(/positive integer/);
+
+    const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM usage_events WHERE user_id = ANY($1)', [
+      [userId, otherId],
+    ]);
+    expect(rows[0].n).toBe(3); // both old rows and the recent row survive untouched
+  });
+
+  it('rejects a non-numeric olderThanDays and deletes nothing', async () => {
+    await expect(pruneUsageEvents({ olderThanDays: 'not-a-number', pool })).rejects.toThrow(/positive integer/);
+
+    const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM usage_events WHERE user_id = ANY($1)', [
+      [userId, otherId],
+    ]);
+    expect(rows[0].n).toBe(3);
+  });
+
   it('writes empty strings, not NULLs, into the rollup key columns', async () => {
     await pool.query(
       `INSERT INTO usage_events (user_id, event_type, action, occurred_at)
