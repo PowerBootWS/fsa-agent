@@ -1,4 +1,4 @@
-async function enroll({ email, firstName, sequence, source }) {
+async function enroll({ email, firstName, sequence, source, attrs, delayMinutes }) {
   const nurtureUrl = process.env.NURTURE_URL;
   const intakeKey = process.env.NURTURE_INTAKE_KEY;
 
@@ -13,7 +13,7 @@ async function enroll({ email, firstName, sequence, source }) {
       'Content-Type': 'application/json',
       'x-intake-key': intakeKey,
     },
-    body: JSON.stringify({ email, firstName, sequence, source }),
+    body: JSON.stringify({ email, firstName, sequence, source, attrs, delayMinutes }),
   });
 
   if (!res.ok) {

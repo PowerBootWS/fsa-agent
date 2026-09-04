@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { pool } = require('../services/database');
 const { sendMagicLink, sendPasswordReset } = require('../services/email');
+const nurture = require('../services/nurture');
 
 const router = express.Router();
 
@@ -351,6 +352,57 @@ router.post('/setup', async (req, res) => {
     );
 
     res.cookie(COOKIE_NAME, sessionToken, cookieOptions());
+
+    // ── Onboarding welcome (fsa-nurture 'onboarding', D0-D21) ──────────────
+    //
+    // Enrolled HERE, not at provision-user, and deliberately late. Three
+    // reasons, all learned the hard way on 2026-09-04:
+    //
+    // 1. The welcome carries a link to learn.fullsteamahead.ca. Sent at
+    //    checkout it arrives BELOW the setup link in the inbox, and a student
+    //    reading top-down taps it before they have a password — landing on a
+    //    login page they have no credentials for. A student hit the adjacent
+    //    version of this the same afternoon (re-tapping a spent setup link)
+    //    and contacted support; see the reason-codes fix in this same file.
+    // 2. A mail arriving in the same second as the setup link reads as
+    //    obviously automated, which is the opposite of what a note from Russ
+    //    is for.
+    // 3. Waiting until they are actually in leaves a window for a failed
+    //    signup to reach support and be resolved before an automated welcome
+    //    lands on top of it.
+    //
+    // NO PASSWORD MEANS NO WELCOME, by owner decision. A student who never
+    // completes setup never reaches this line and is never enrolled, which is
+    // correct: the email's whole content is how to use an account they cannot
+    // get into. They are a support case, not a welcome case. Rare in practice
+    // and deliberately not backstopped here.
+    //
+    // The 10-25 minute jitter is not politeness padding. A fixed offset is as
+    // machine-obvious as a zero one; the spread is what makes it read like a
+    // person got round to it.
+    //
+    // class_code gates it because the D0/D2/D5 steps branch on it, and because
+    // its absence means this is not a course student. It comes off the active
+    // subscription joined above, and is the only paper information available:
+    // active_paper is still NULL until they pick one.
+    //
+    // Fire-and-forget. A nurture outage must never fail account setup — the
+    // student is mid-signup and their password is already written.
+    if (row.class_code) {
+      const delayMinutes = 10 + Math.floor(Math.random() * 16); // 10-25
+      nurture
+        .enroll({
+          email: row.email,
+          firstName: row.first_name,
+          sequence: 'onboarding',
+          source: 'auth-setup',
+          attrs: { class_code: row.class_code },
+          delayMinutes,
+        })
+        .catch((err) =>
+          console.error(`auth/setup: onboarding enroll failed for ${row.email}:`, err.message)
+        );
+    }
 
     return res.json({
       ok: true,
