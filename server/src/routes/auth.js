@@ -246,13 +246,39 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+// Why a setup link didn't work, so the page can offer the right way forward
+// instead of a dead end. A magic-link token is a 128-bit UUID that only ever
+// reaches the student's own inbox, so telling its holder which of the three
+// states it is in reveals nothing they didn't already have — and the difference
+// matters enormously to them: "already_used" means they are done and just need
+// to sign in, "expired" means they need a reset link, only "invalid" is a
+// genuinely bad URL. Returns null when the token is good.
+//
+// Setup links are single-use, and re-tapping the button in the welcome email is
+// ordinary behaviour, so already_used is the common case, not the rare one.
+async function classifySetupToken(token) {
+  if (!token) return 'invalid';
+
+  const result = await pool.query(
+    `SELECT used_at, expires_at <= now() AS is_expired
+     FROM auth_tokens
+     WHERE token = $1 AND type = 'magic_link'`,
+    [token]
+  );
+
+  if (result.rows.length === 0) return 'invalid';
+  if (result.rows[0].used_at !== null) return 'already_used';
+  if (result.rows[0].is_expired) return 'expired';
+  return null;
+}
+
 // GET /api/auth/setup?token=...
 router.get('/setup', async (req, res) => {
   try {
     const { token } = req.query;
 
     if (!token) {
-      return res.status(400).json({ error: 'Invalid or expired link' });
+      return res.status(400).json({ error: 'Invalid or expired link', reason: 'invalid' });
     }
 
     const result = await pool.query(
@@ -267,7 +293,8 @@ router.get('/setup', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid or expired link' });
+      const reason = (await classifySetupToken(token)) || 'invalid';
+      return res.status(400).json({ error: 'Invalid or expired link', reason });
     }
 
     const { email, first_name } = result.rows[0];
@@ -301,7 +328,8 @@ router.post('/setup', async (req, res) => {
     );
 
     if (tokenResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid or expired link' });
+      const reason = (await classifySetupToken(token)) || 'invalid';
+      return res.status(400).json({ error: 'Invalid or expired link', reason });
     }
 
     const row = tokenResult.rows[0];

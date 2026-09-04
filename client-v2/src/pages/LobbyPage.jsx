@@ -76,6 +76,16 @@ export default function LobbyPage() {
     setError(null);
     try {
       const meRes = await fetch('/api/platform/me', { credentials: 'include' });
+      // ProtectedRoute admits anyone with an fsa_user in localStorage, but the
+      // session itself lives in the fsa_session cookie. When the two disagree —
+      // cookie dropped, expired, or displaced by a login on another device —
+      // the old behaviour parked the student on a bare "Failed to load your
+      // account" string with nothing to click. Send them to sign in instead.
+      if (meRes.status === 401) {
+        localStorage.removeItem('fsa_user');
+        navigate('/login', { replace: true });
+        return;
+      }
       if (!meRes.ok) throw new Error('Failed to load your account');
       const me = await meRes.json();
       setAccount(me);
@@ -131,7 +141,16 @@ export default function LobbyPage() {
   if (error) {
     return (
       <div className="lb-page">
-        <div className="lb-error-wrap">{error}</div>
+        <div className="lb-error-wrap">
+          <div>{error}</div>
+          <button
+            className="lb-btn-secondary"
+            style={{ marginTop: '16px' }}
+            onClick={fetchAccountAndData}
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }

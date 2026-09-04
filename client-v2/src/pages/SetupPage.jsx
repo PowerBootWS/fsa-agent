@@ -1,6 +1,36 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { isFourthClassCode } from '../utils/fourthClass';
+
+// What to say, and where to send them, for each way a setup link can fail.
+// A setup link is single-use, so a student who taps the button in the welcome
+// email a second time lands on 'already_used' having done nothing wrong — that
+// message must read as reassurance and hand them a sign-in button, never as an
+// error telling them to contact support.
+const LINK_FAILURES = {
+  already_used: {
+    tone: 'muted',
+    message: "You've already set your password on this account. Sign in and you're straight in.",
+    primary: { to: '/login', label: 'Sign In' },
+    secondary: { to: '/forgot-password', label: "Forgot your password?" },
+  },
+  expired: {
+    tone: 'error',
+    message: 'This setup link has expired. Send yourself a fresh link and you can set your password now.',
+    primary: { to: '/forgot-password', label: 'Email Me A New Link' },
+    secondary: { to: '/login', label: 'Already set a password? Sign in' },
+  },
+  invalid: {
+    tone: 'error',
+    message: "This setup link didn't work. If you've already set a password, sign in — otherwise send yourself a fresh link.",
+    primary: { to: '/login', label: 'Sign In' },
+    secondary: { to: '/forgot-password', label: 'Email Me A New Link' },
+  },
+};
+
+function linkFailure(reason) {
+  return LINK_FAILURES[reason] || LINK_FAILURES.invalid;
+}
 
 const styles = {
   page: {
@@ -95,6 +125,26 @@ const styles = {
     textAlign: 'center',
     marginTop: '16px',
   },
+  primaryLink: {
+    display: 'block',
+    background: '#E8720C',
+    color: '#fff',
+    borderRadius: '4px',
+    fontSize: '15px',
+    fontWeight: '600',
+    padding: '12px 24px',
+    marginTop: '20px',
+    textAlign: 'center',
+    textDecoration: 'none',
+  },
+  backLink: {
+    display: 'block',
+    textAlign: 'center',
+    marginTop: '16px',
+    color: '#a8b4c0',
+    fontSize: '13px',
+    textDecoration: 'none',
+  },
 };
 
 export default function SetupPage() {
@@ -103,6 +153,7 @@ export default function SetupPage() {
   const token = searchParams.get('token') || '';
 
   const [tokenValid, setTokenValid] = useState(null); // null = loading, true/false
+  const [failReason, setFailReason] = useState('invalid');
   const [firstName, setFirstName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -111,6 +162,7 @@ export default function SetupPage() {
 
   useEffect(() => {
     if (!token) {
+      setFailReason('invalid');
       setTokenValid(false);
       return;
     }
@@ -121,10 +173,14 @@ export default function SetupPage() {
           setTokenValid(true);
           setFirstName(data.first_name || '');
         } else {
+          setFailReason(data.reason || 'invalid');
           setTokenValid(false);
         }
       })
-      .catch(() => setTokenValid(false));
+      .catch(() => {
+        setFailReason('invalid');
+        setTokenValid(false);
+      });
   }, [token]);
 
   async function handleSubmit(e) {
@@ -147,6 +203,14 @@ export default function SetupPage() {
       });
       const data = await res.json();
       if (!res.ok) {
+        // The token can be spent between loading this form and submitting it —
+        // a second tab, or the same link opened twice. Show the same guidance
+        // panel as a bad link rather than a bare error above a dead form.
+        if (data.reason) {
+          setFailReason(data.reason);
+          setTokenValid(false);
+          return;
+        }
         setError(data.error || 'Setup failed. Please try again.');
         return;
       }
@@ -177,11 +241,22 @@ export default function SetupPage() {
           <div style={styles.muted}>Validating your link…</div>
         )}
 
-        {tokenValid === false && (
-          <div style={styles.error}>
-            This setup link is invalid or has expired. Please contact support.
-          </div>
-        )}
+        {tokenValid === false && (() => {
+          const fail = linkFailure(failReason);
+          return (
+            <>
+              <div style={fail.tone === 'muted' ? styles.muted : styles.error}>
+                {fail.message}
+              </div>
+              <Link to={fail.primary.to} style={styles.primaryLink}>
+                {fail.primary.label}
+              </Link>
+              <Link to={fail.secondary.to} style={styles.backLink}>
+                {fail.secondary.label}
+              </Link>
+            </>
+          );
+        })()}
 
         {tokenValid === true && (
           <>
