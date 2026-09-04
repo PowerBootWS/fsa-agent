@@ -1,0 +1,21 @@
+{
+  "screens": [
+    "/select-paper",
+    "/lobby",
+    "/jobs",
+    "/chapters",
+    "/lesson/:lessonCode",
+    "/practice-exam",
+    "/exam/results",
+    "/profile",
+    "/credits"
+  ],
+  "actions": [
+    "tutor_chat_opened",
+    "lesson_audio_played",
+    "results_lesson_expanded",
+    "paper_switched",
+    "tailoring_started",
+    "job_detail_opened"
+  ]
+}
