@@ -59,6 +59,22 @@ app.use(cors(corsOptions));
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 300, // limit each IP to 300 API requests per windowMs
+  // /api/events has its own, separately-tuned limiter mounted ahead of this
+  // one. Without this skip, telemetry would eat the product's budget.
+  skip: (req) => req.path === '/events',
+});
+
+// Usage beacons flush every ~10s per open tab, so they must not share the
+// 300-per-15-min budget the product's own API calls draw on — a student with
+// two tabs open could otherwise rate-limit themselves out of the app with
+// telemetry. Two changes make that safe, and BOTH are required:
+//   1. the global limiter skips /api/events (see its `skip` above), and
+//   2. this dedicated limiter is mounted FIRST, so a flood of beacons is
+//      capped here rather than reaching the router.
+// Same class of ordering concern as the requireLearnHost fix of 2026-08-16.
+const eventsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
 });
 
 // Parse cookies
@@ -107,6 +123,7 @@ const previewRouter = require('./routes/preview');
 // is an unbounded log-growth vector. Rate-limiting first means a flood is
 // capped before the host guard ever runs, so it can only ever log ~300
 // warnings per IP per window.
+app.use('/api/events', eventsLimiter);
 app.use('/api', limiter);
 const requireLearnHost = require('./middleware/requireLearnHost');
 app.use('/api', requireLearnHost);
@@ -119,6 +136,11 @@ app.use('/api/chat', requireAuth, requireActiveSubscription, chatRouter);
 // client/, client-v2/ or ai-service/ calls this route, so there is no legacy
 // caller to preserve. Entitlement gate matches /api/lesson and /api/chat.
 app.use('/api/progress', requireAuth, requireActiveSubscription, progressRouter);
+// Behind requireAuth but NOT requireActiveSubscription: how a lapsed
+// subscriber behaves in the weeks before they leave is exactly the thing
+// worth being able to see (backlog #113).
+const eventsRouter = require('./routes/events');
+app.use('/api/events', requireAuth, eventsRouter);
 // /api/chat-history (server/src/routes/chat-history.js) and /api/responses
 // (server/src/routes/responses.js, both POST / and GET
 // /chapter-weights/:user/:courseId) were deleted outright (backlog #88,
