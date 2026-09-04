@@ -38,9 +38,11 @@ describe('AdminUsagePage', () => {
     await waitFor(() => expect(screen.getByText(/could not load usage/i)).toBeInTheDocument());
   });
 
-  it('shows an empty state rather than a blank page when there is no data', async () => {
+  it('shows an empty state for events but still renders the Activity figures', async () => {
     getJson.mockResolvedValue({ ...PAYLOAD, screens: [], features: [], active_learners: [] });
     renderPage();
-    expect(await screen.findByText(/no usage recorded/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no screen or feature events recorded/i)).toBeInTheDocument();
+    expect(screen.getByText(/120/)).toBeInTheDocument();
+    expect(screen.getByText(/15/)).toBeInTheDocument();
   });
 });

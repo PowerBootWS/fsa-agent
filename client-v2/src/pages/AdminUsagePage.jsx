@@ -41,7 +41,10 @@ export default function AdminUsagePage() {
   if (!data) return <div className="admin-usage">Loading usage…</div>;
 
   const { screens = [], features = [], active_learners: learners = [], activity = {} } = data;
-  const empty = screens.length === 0 && features.length === 0 && learners.length === 0;
+  // Scoped to the event-derived sections only (screen_view/feature_use
+  // beacons + the daily rollup) — Activity below comes from tables that hold
+  // years of data and must never be hidden behind this.
+  const eventsEmpty = screens.length === 0 && features.length === 0 && learners.length === 0;
 
   return (
     <div className="admin-usage">
@@ -65,23 +68,23 @@ export default function AdminUsagePage() {
         From fsa-postgres. The LMS is deliberately not GA4-instrumented — see backlog #113.
       </p>
 
-      {empty ? (
-        <p className="admin-usage-empty">No usage recorded in this window.</p>
+      <section>
+        <h2>Activity</h2>
+        <ul className="admin-usage-stats">
+          <li><strong>{activity.questions_answered}</strong> questions answered</li>
+          <li><strong>{pct(activity.questions_correct, activity.questions_answered)}</strong> accuracy</li>
+          <li><strong>{activity.lessons_touched}</strong> lessons touched</li>
+          <li><strong>{activity.exams_attempted}</strong> exams attempted</li>
+          <li><strong>{activity.jobs_saved}</strong> jobs saved</li>
+          <li><strong>{activity.tutor_conversations_started}</strong> tutor conversations started</li>
+          <li><strong>{activity.subscribers_active}</strong> active subscribers</li>
+        </ul>
+      </section>
+
+      {eventsEmpty ? (
+        <p className="admin-usage-empty">No screen or feature events recorded in this window</p>
       ) : (
         <>
-          <section>
-            <h2>Activity</h2>
-            <ul className="admin-usage-stats">
-              <li><strong>{activity.questions_answered}</strong> questions answered</li>
-              <li><strong>{pct(activity.questions_correct, activity.questions_answered)}</strong> accuracy</li>
-              <li><strong>{activity.lessons_touched}</strong> lessons touched</li>
-              <li><strong>{activity.exams_attempted}</strong> exams attempted</li>
-              <li><strong>{activity.jobs_saved}</strong> jobs saved</li>
-              <li><strong>{activity.tutor_conversations_started}</strong> tutor conversations started</li>
-              <li><strong>{activity.subscribers_active}</strong> active subscribers</li>
-            </ul>
-          </section>
-
           <section>
             <h2>Screens</h2>
             <table>

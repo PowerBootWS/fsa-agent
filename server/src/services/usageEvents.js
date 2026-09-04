@@ -10,8 +10,22 @@ const TAXONOMY = require('../config/usageTaxonomy.json');
 const MAX_BATCH = 50;
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_SKEW_MS = 5 * 60 * 1000;
-const MAX_PROPS_BYTES = 2000;
+const MAX_PROPS_BYTES = 512;
 const MAX_SESSION_ID_LEN = 64;
+
+// The only prop keys any client call site actually sends (verified against
+// track() call sites across client-v2/src). A key allowlist is the real
+// guard here — a size cap alone still lets an authenticated student write
+// ~1.9GB/day of arbitrary text across 200 batches/15min, retained 90 days,
+// on disk shared with ~20 other businesses' containers.
+const ALLOWED_PROP_KEYS = new Set([
+  'lessonCode',
+  'lesson_code',
+  'lesson_id',
+  'chapter_id',
+  'paper',
+  'job_id',
+]);
 
 // occurred_at is client-supplied. A device with a wrong clock would otherwise
 // land events in the wrong day and quietly bend every report built on them.
@@ -25,12 +39,25 @@ function clampOccurredAt(at, receivedAt) {
 
 function safeProps(props) {
   if (!props || typeof props !== 'object' || Array.isArray(props)) return {};
+
+  const filtered = {};
+  for (const key of Object.keys(props)) {
+    if (!ALLOWED_PROP_KEYS.has(key)) continue;
+    const value = props[key];
+    // Values are route params or ids — primitives only. An object, array or
+    // function for an allowlisted key is dropped rather than stored.
+    if (value !== null && (typeof value === 'object' || typeof value === 'function')) continue;
+    filtered[key] = value;
+  }
+
   try {
-    if (Buffer.byteLength(JSON.stringify(props), 'utf8') > MAX_PROPS_BYTES) return {};
+    // Backstop, not the primary guard — the allowlist above already rejects
+    // arbitrary shape; this just caps how much text an allowlisted key can carry.
+    if (Buffer.byteLength(JSON.stringify(filtered), 'utf8') > MAX_PROPS_BYTES) return {};
   } catch {
     return {}; // circular or otherwise unserialisable
   }
-  return props;
+  return filtered;
 }
 
 function safeSessionId(id) {

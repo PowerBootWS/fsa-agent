@@ -52,18 +52,28 @@ describe('POST /api/events', () => {
       .send({
         events: [
           { type: 'screen_view', screen: '/lobby', session_id: 's1', at: new Date().toISOString() },
-          { type: 'feature_use', action: 'paper_switched', session_id: 's1', at: new Date().toISOString() },
+          {
+            type: 'feature_use',
+            action: 'paper_switched',
+            props: { paper: '2A1' },
+            session_id: 's1',
+            at: new Date().toISOString(),
+          },
         ],
       });
     expect(res.status).toBe(204);
 
     const { rows } = await pool.query(
-      'SELECT event_type, screen, action, client_session_id FROM usage_events WHERE user_id = $1 ORDER BY id',
+      'SELECT event_type, screen, action, props, client_session_id FROM usage_events WHERE user_id = $1 ORDER BY id',
       [userId]
     );
     expect(rows).toHaveLength(2);
     expect(rows[0]).toMatchObject({ event_type: 'screen_view', screen: '/lobby', action: null, client_session_id: 's1' });
     expect(rows[1]).toMatchObject({ event_type: 'feature_use', action: 'paper_switched', screen: null });
+    // The object->jsonb path is otherwise only exercised with {} — a
+    // serialisation regression here would make every insert fail while the
+    // route still swallows the error and answers 204 (backlog #113 review).
+    expect(rows[1].props).toEqual({ paper: '2A1' });
   });
 
   it('ignores a client-supplied user_id and uses the session owner', async () => {

@@ -27,7 +27,7 @@ describe('clampOccurredAt', () => {
 describe('validateBatch', () => {
   it('accepts an allowlisted screen_view and normalises it', () => {
     const { rows, dropped } = validateBatch(
-      [{ type: 'screen_view', screen: '/lobby', props: { a: 1 }, session_id: 'sess-1', at: NOW.toISOString() }],
+      [{ type: 'screen_view', screen: '/lobby', props: { lesson_id: 'FSA-2A1-1' }, session_id: 'sess-1', at: NOW.toISOString() }],
       NOW
     );
     expect(dropped).toBe(0);
@@ -36,7 +36,7 @@ describe('validateBatch', () => {
       event_type: 'screen_view',
       screen: '/lobby',
       action: null,
-      props: { a: 1 },
+      props: { lesson_id: 'FSA-2A1-1' },
       client_session_id: 'sess-1',
     });
   });
@@ -88,6 +88,30 @@ describe('validateBatch', () => {
     );
     expect(rows[0].props).toEqual({});
     expect(rows[1].props).toEqual({});
+  });
+
+  it('strips a non-allowlisted prop key while keeping allowlisted siblings', () => {
+    const { rows } = validateBatch(
+      [{ type: 'screen_view', screen: '/lobby', props: { lesson_id: 'FSA-2A1-1', evil: 'x'.repeat(50) }, at: NOW.toISOString() }],
+      NOW
+    );
+    expect(rows[0].props).toEqual({ lesson_id: 'FSA-2A1-1' });
+  });
+
+  it('drops a non-primitive value for an allowlisted key', () => {
+    const { rows } = validateBatch(
+      [{ type: 'screen_view', screen: '/lobby', props: { lesson_id: { nested: true }, paper: '2A1' }, at: NOW.toISOString() }],
+      NOW
+    );
+    expect(rows[0].props).toEqual({ paper: '2A1' });
+  });
+
+  it('still applies the 512-byte backstop to allowlisted keys', () => {
+    const { rows } = validateBatch(
+      [{ type: 'screen_view', screen: '/lobby', props: { lesson_code: 'x'.repeat(600) }, at: NOW.toISOString() }],
+      NOW
+    );
+    expect(rows[0].props).toEqual({});
   });
 
   it('rejects an over-long session id rather than storing it', () => {
