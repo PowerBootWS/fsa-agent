@@ -1,5 +1,6 @@
 const express = require('express');
 const { Pool } = require('pg');
+const requireAdminUser = require('../middleware/requireAdminUser');
 
 const router = express.Router();
 
@@ -136,6 +137,65 @@ router.post('/credits/test-checkout', requireAdminKey, async (req, res) => {
   } catch (err) {
     console.error('POST /api/admin/credits/test-checkout error:', err);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/usage?days=N — first-party platform usage (backlog #113).
+//
+// Gated by requireAdminUser (session identity + ADMIN_EMAILS), not by the
+// x-admin-api-key used by the two routes above: this one is called from a
+// browser page, and pasting an API key into a browser is not a design.
+router.get('/usage', requireAdminUser, async (req, res) => {
+  const parsed = parseInt(req.query.days, 10);
+  const days = Number.isFinite(parsed) && parsed > 0 && parsed <= 365 ? parsed : 30;
+  const since = `${days} days`;
+
+  try {
+    const [screens, features, learners, activity] = await Promise.all([
+      pool.query(
+        `SELECT screen, COUNT(*)::int AS views, COUNT(DISTINCT user_id)::int AS viewers
+           FROM usage_events
+          WHERE event_type = 'screen_view' AND occurred_at >= now() - $1::interval
+          GROUP BY screen ORDER BY views DESC`,
+        [since]
+      ),
+      pool.query(
+        `SELECT action, COUNT(*)::int AS uses, COUNT(DISTINCT user_id)::int AS users
+           FROM usage_events
+          WHERE event_type = 'feature_use' AND occurred_at >= now() - $1::interval
+          GROUP BY action ORDER BY uses DESC`,
+        [since]
+      ),
+      pool.query(
+        `SELECT occurred_at::date AS day, COUNT(DISTINCT user_id)::int AS learners
+           FROM usage_events
+          WHERE occurred_at >= now() - $1::interval
+          GROUP BY 1 ORDER BY 1`,
+        [since]
+      ),
+      pool.query(
+        `SELECT
+           (SELECT COUNT(*)::int FROM question_responses WHERE answered_at >= now() - $1::interval) AS questions_answered,
+           (SELECT COUNT(*)::int FROM question_responses WHERE answered_at >= now() - $1::interval AND correct) AS questions_correct,
+           (SELECT COUNT(*)::int FROM user_progress WHERE last_accessed >= now() - $1::interval) AS lessons_touched,
+           (SELECT COUNT(*)::int FROM practice_exam_attempts WHERE created_at >= now() - $1::interval) AS exams_attempted,
+           (SELECT COUNT(*)::int FROM saved_jobs WHERE saved_at >= now() - $1::interval) AS jobs_saved,
+           (SELECT COUNT(*)::int FROM chat_history WHERE created_at >= now() - $1::interval) AS tutor_turns,
+           (SELECT COUNT(*)::int FROM subscriptions WHERE status = 'active') AS subscribers_active`,
+        [since]
+      ),
+    ]);
+
+    res.json({
+      window_days: days,
+      active_learners: learners.rows,
+      screens: screens.rows,
+      features: features.rows,
+      activity: activity.rows[0],
+    });
+  } catch (error) {
+    console.error('Error building usage report:', error);
+    res.status(500).json({ error: 'Failed to build usage report' });
   }
 });
 
