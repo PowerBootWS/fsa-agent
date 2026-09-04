@@ -1,5 +1,6 @@
 const express = require('express');
 const { Pool } = require('pg');
+const requireAuth = require('../middleware/requireAuth');
 const requireAdminUser = require('../middleware/requireAdminUser');
 
 const router = express.Router();
@@ -142,10 +143,13 @@ router.post('/credits/test-checkout', requireAdminKey, async (req, res) => {
 
 // GET /api/admin/usage?days=N — first-party platform usage (backlog #113).
 //
-// Gated by requireAdminUser (session identity + ADMIN_EMAILS), not by the
-// x-admin-api-key used by the two routes above: this one is called from a
-// browser page, and pasting an API key into a browser is not a design.
-router.get('/usage', requireAdminUser, async (req, res) => {
+// Gated by requireAuth (session cookie) + requireAdminUser (ADMIN_EMAILS
+// allowlist), not by the x-admin-api-key used by the two routes above: this
+// one is called from a browser page, and pasting an API key into a browser
+// is not a design. Both are route-scoped, not router.use(...) — the two
+// existing x-admin-api-key routes are deliberately called without a session
+// cookie, and forcing session auth onto them would break them.
+router.get('/usage', requireAuth, requireAdminUser, async (req, res) => {
   const parsed = parseInt(req.query.days, 10);
   const days = Number.isFinite(parsed) && parsed > 0 && parsed <= 365 ? parsed : 30;
   const since = `${days} days`;
@@ -180,7 +184,15 @@ router.get('/usage', requireAdminUser, async (req, res) => {
            (SELECT COUNT(*)::int FROM user_progress WHERE last_accessed >= now() - $1::interval) AS lessons_touched,
            (SELECT COUNT(*)::int FROM practice_exam_attempts WHERE created_at >= now() - $1::interval) AS exams_attempted,
            (SELECT COUNT(*)::int FROM saved_jobs WHERE saved_at >= now() - $1::interval) AS jobs_saved,
-           (SELECT COUNT(*)::int FROM chat_history WHERE created_at >= now() - $1::interval) AS tutor_turns,
+           -- chat_history is one row per (user_email, lesson_id), upserted via
+           -- ON CONFLICT ... DO UPDATE SET messages = ...; created_at is set once,
+           -- at first insert, and never touched again. This counts distinct tutor
+           -- conversations STARTED in the window, not messages/turns exchanged --
+           -- a long-running conversation from before the window contributes 0
+           -- here even if the student sent 40 messages in it this week. Counting
+           -- real turns needs an updated_at column on chat_history (follow-up,
+           -- out of scope here).
+           (SELECT COUNT(*)::int FROM chat_history WHERE created_at >= now() - $1::interval) AS tutor_conversations_started,
            (SELECT COUNT(*)::int FROM subscriptions WHERE status = 'active') AS subscribers_active`,
         [since]
       ),
