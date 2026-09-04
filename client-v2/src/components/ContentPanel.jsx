@@ -4,6 +4,7 @@ import { KatexSpan } from './MathContent';
 import 'katex/dist/katex.min.css';
 import { useAudio } from '../hooks/useAudio';
 import { useNarrationSync } from '../hooks/useNarrationSync';
+import { track } from '../utils/usage';
 import { NavigationHeader } from './NavigationHeader';
 import { ObjectiveComplete } from './ObjectiveComplete';
 
@@ -151,7 +152,19 @@ export function ContentPanel({
 
           <div className="audio-controls">
             {section?.audio_url && (
-              <button onClick={playing ? pause : play}>
+              <button onClick={() => {
+                if (playing) {
+                  pause();
+                  return;
+                }
+                // currentTimeMs is 0 only when this slide's audio hasn't
+                // started yet — a nonzero value means the button is resuming
+                // a paused position, which is not a "played" event.
+                if (currentTimeMs === 0) {
+                  track('feature_use', { action: 'lesson_audio_played', props: { lesson_code: activeLessonCode } });
+                }
+                play();
+              }}>
                 {playing ? '⏸ Pause' : '▶ Play'}
               </button>
             )}

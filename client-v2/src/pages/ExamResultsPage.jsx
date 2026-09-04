@@ -4,6 +4,7 @@ import { InlineLessonPlayer } from '../components/InlineLessonPlayer';
 import { ResultsPanel, QuizExamChatSection } from '../ExamRouter';
 import { isFourthClassCode } from '../utils/fourthClass';
 import { postJson } from '../utils/api';
+import { track } from '../utils/usage';
 import './ExamResultsPage.css';
 
 // ── Grade helpers (used by the summary fallback view) ─────────────────────────
@@ -41,7 +42,12 @@ function WeaknessCard({ chapter, openId, setOpenId }) {
         <GradeBadge grade={grade} />
       </div>
       <button
-        onClick={() => setOpenId(isOpen ? null : chapter.chapter_id)}
+        onClick={() => {
+          if (!isOpen) {
+            track('feature_use', { action: 'results_lesson_expanded', props: { chapter_id: chapter.chapter_id } });
+          }
+          setOpenId(isOpen ? null : chapter.chapter_id);
+        }}
         className="er-weakness-btn"
       >
         {isOpen ? '▲ Hide lesson' : '▶ Watch a lesson on this'}

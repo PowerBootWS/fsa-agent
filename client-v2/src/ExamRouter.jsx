@@ -10,6 +10,7 @@ import { DistractorCoaching } from './components/DistractorCoaching.jsx';
 import { MathContent } from './components/MathContent.jsx';
 import { CountdownTimer } from './components/CountdownTimer.jsx';
 import { isFourthClassCode } from './utils/fourthClass';
+import { track } from './utils/usage';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -687,7 +688,12 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
           entirely for 4th Class (no AI tutor chat for that offering). */}
       {!isFourthClass && (
         <button
-          onClick={() => setChatOpen(o => !o)}
+          onClick={() => {
+            if (!chatOpen) {
+              track('feature_use', { action: 'tutor_chat_opened', props: { lesson_id: lessonId } });
+            }
+            setChatOpen(o => !o);
+          }}
           className={isExam && isDone && !chatOpen ? 'tutor-fab tutor-fab--pulse' : 'tutor-fab'}
           style={{
             position: 'fixed', bottom: '24px', right: '24px',

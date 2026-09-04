@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { track } from '../utils/usage';
 import './SelectPaperPage.css';
 
 export default function SelectPaperPage() {
@@ -46,6 +47,7 @@ export default function SelectPaperPage() {
       // Update localStorage with new active_paper
       const stored = JSON.parse(localStorage.getItem('fsa_user') || '{}');
       localStorage.setItem('fsa_user', JSON.stringify({ ...stored, active_paper: paper }));
+      track('feature_use', { action: 'paper_switched', props: { paper } });
       navigate('/lobby', { replace: true });
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');

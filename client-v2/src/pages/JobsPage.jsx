@@ -1,6 +1,7 @@
 // fsa-agent/client-v2/src/pages/JobsPage.jsx
 import { useEffect, useState } from 'react';
 import JobDetailModal from './JobDetailModal';
+import { track } from '../utils/usage';
 import './JobsPage.css';
 
 const STATUS_LABELS = { saved: 'Saved', applied: 'Applied', interviewing: 'Interviewing', archived: 'Archived' };
@@ -175,7 +176,11 @@ export default function JobsPage() {
                 ))}
                 <button
                   className="jb-link"
-                  onClick={() => { setDetailJobId(job.id); setFocusTailoringModal(false); }}
+                  onClick={() => {
+                    track('feature_use', { action: 'job_detail_opened', props: { job_id: job.id } });
+                    setDetailJobId(job.id);
+                    setFocusTailoringModal(false);
+                  }}
                 >
                   View Details
                 </button>

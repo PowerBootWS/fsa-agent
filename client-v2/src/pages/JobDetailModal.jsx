@@ -1,6 +1,7 @@
 // fsa-agent/client-v2/src/pages/JobDetailModal.jsx
 import { useEffect, useRef, useState } from 'react';
 import { getJson } from '../utils/api';
+import { track } from '../utils/usage';
 import './JobDetailModal.css';
 
 export default function JobDetailModal({ jobId, onClose, focusTailoring = false }) {
@@ -72,6 +73,7 @@ export default function JobDetailModal({ jobId, onClose, focusTailoring = false 
 
   async function handleGenerate() {
     const docTypes = Object.entries(selectedTypes).filter(([, v]) => v).map(([k]) => k);
+    track('feature_use', { action: 'tailoring_started', props: { job_id: jobId } });
     setGenerating(true);
     setTailorError('');
     setTailorResult(null);
