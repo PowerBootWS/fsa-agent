@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool, getCourseOutline } = require('../services/database');
 const { sendMagicLink, sendDeactivationReview } = require('../services/email');
+const nurture = require('../services/nurture');
 const { CREDIT_PACKS, PACK_ORDER } = require('../config/creditPacks');
 const { PAPERS_BY_CLASS, FOURTH_CLASS_CODES } = require('../config/papersForClass');
 const credits = require('../services/credits');
@@ -216,6 +217,34 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
         [user.id, token]
       );
       await sendMagicLink(normalizedEmail, first_name, token);
+
+      // Customer onboarding sequence (fsa-nurture 'onboarding', D0-D21). This
+      // sits inside the userIsNew || subIsNew gate on purpose: that gate is
+      // already the authoritative "this is a genuinely new enrollment, not
+      // Stripe re-delivering the same checkout event" test, so the sequence
+      // inherits the magic link's duplicate protection rather than growing a
+      // second, subtly different one.
+      //
+      // class_code is passed as an attribute because the D0/D2/D5 steps branch
+      // on it, and it is the only paper information that exists at this point:
+      // subscriptions.active_paper is still NULL here, since students pick a
+      // paper after their first login. So the welcome is specific to the
+      // certification level, not the individual paper.
+      //
+      // Fire-and-forget, matching the /api/jobs/save call site. A nurture
+      // outage must never fail provisioning: a student who paid has to get
+      // their access whether or not the welcome email goes out.
+      nurture
+        .enroll({
+          email: normalizedEmail,
+          firstName: first_name,
+          sequence: 'onboarding',
+          source: 'provision-user',
+          attrs: { class_code },
+        })
+        .catch((err) =>
+          console.error(`provision-user: onboarding enroll failed for ${normalizedEmail}:`, err.message)
+        );
     } else {
       console.log(`provision-user: idempotent re-delivery for ${normalizedEmail}, skipping magic link`);
     }
