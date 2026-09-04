@@ -74,6 +74,14 @@ describe('flush', () => {
     await expect(flush()).resolves.toBeUndefined();
   });
 
+  it('never throws when queued props contain a circular reference', async () => {
+    const circular = {};
+    circular.self = circular;
+    track('screen_view', { screen: '/lobby', props: circular });
+    await expect(flush()).resolves.toBeUndefined();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it('uses sendBeacon when asked for one', async () => {
     const sendBeacon = vi.fn(() => true);
     navigator.sendBeacon = sendBeacon;

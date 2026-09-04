@@ -62,7 +62,18 @@ export async function flush({ beacon = false } = {}) {
   if (queue.length === 0) return;
   const batch = queue.slice(0, MAX_BATCH);
   queue = queue.slice(MAX_BATCH);
-  const payload = JSON.stringify({ events: batch });
+
+  // JSON.stringify throws synchronously on circular references or BigInts.
+  // The batch is already dequeued above, so on failure we drop it and return
+  // rather than let that throw escape as a rejected promise — flush() must
+  // always resolve (this call site in startUsageFlushing() below calls
+  // flush() bare, with no .catch).
+  let payload;
+  try {
+    payload = JSON.stringify({ events: batch });
+  } catch {
+    return;
+  }
 
   // Transport split, deliberate. The timer flush goes through api.js per
   // backlog #68 ("one way to call the API"). The unload flush cannot: api.js
@@ -95,9 +106,16 @@ export async function flush({ beacon = false } = {}) {
 }
 
 export function startUsageFlushing() {
-  timer = setInterval(() => {
+  // Capture this call's own interval id in a local const, and close over
+  // that (not the module-level `timer`) in the returned teardown. main.jsx
+  // renders under StrictMode and Task 5 mounts this from a React effect, so
+  // double-invocation is routine — a teardown that reads the shared module
+  // variable would tear down whichever interval happened to run last, not
+  // necessarily its own, leaking the other one.
+  const intervalId = setInterval(() => {
     flush();
   }, FLUSH_MS);
+  timer = intervalId;
 
   const onHide = () => {
     if (document.visibilityState === 'hidden') flush({ beacon: true });
@@ -108,8 +126,7 @@ export function startUsageFlushing() {
   window.addEventListener('pagehide', onPageHide);
 
   return () => {
-    clearInterval(timer);
-    timer = null;
+    clearInterval(intervalId);
     document.removeEventListener('visibilitychange', onHide);
     window.removeEventListener('pagehide', onPageHide);
   };
