@@ -164,7 +164,11 @@ export default function JobsPage() {
               </div>
               <button
                 className="jb-btn-tailor"
-                onClick={() => { setDetailJobId(job.id); setFocusTailoringModal(true); }}
+                onClick={() => {
+                  track('feature_use', { action: 'job_detail_opened', props: { job_id: job.id } });
+                  setDetailJobId(job.id);
+                  setFocusTailoringModal(true);
+                }}
               >
                 Customize Your Resume and Cover Letter for This Job
               </button>

@@ -199,7 +199,12 @@ export default function ExamResultsPage() {
             Class (see isFourthClass above). */}
         {!isFourthClass && (
           <button
-            onClick={() => setChatOpen(o => !o)}
+            onClick={() => {
+              if (!chatOpen) {
+                track('feature_use', { action: 'tutor_chat_opened', props: { lesson_id: courseId } });
+              }
+              setChatOpen(o => !o);
+            }}
             className={(!chatOpen ? 'tutor-fab tutor-fab--pulse' : 'tutor-fab') + ' er-fab'}
             title="Ask the AI Tutor"
           >
