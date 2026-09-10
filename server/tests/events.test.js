@@ -133,3 +133,57 @@ describe('POST /api/events', () => {
     expect(drift).toBeLessThan(2000); // clamped to received_at, not stored as 2030
   });
 });
+
+// --- affiliate invite wiring ------------------------------------------------
+// The threshold logic itself is covered in affiliateInvite.test.js. What this
+// pins is that the beacon route still calls it at all, and that it calls it
+// after the insert — the check counts the rows the batch just wrote, so
+// hoisting it above the insert would make a student's qualifying batch look
+// like it fell one short.
+describe('POST /api/events — affiliate invite hook', () => {
+  const affiliateInvite = require('../src/services/affiliateInvite');
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('offers the batch to the invite check', async () => {
+    const spy = jest.spyOn(affiliateInvite, 'maybeInvite').mockResolvedValue(false);
+
+    await request(buildTestApp({ id: userId, email: 'usage-events-test@test.example', subscription_id: 7 }))
+      .post('/api/events')
+      .send({ events: [{ type: 'screen_view', screen: '/lobby' }] });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][1]).toEqual(expect.objectContaining({ id: userId }));
+  });
+
+  it('sees the rows the batch just wrote', async () => {
+    // The call is fire-and-forget, so the response can land before the check
+    // has run. Hold the promise the route kicked off and await that, rather
+    // than racing it.
+    let checked;
+    jest.spyOn(affiliateInvite, 'maybeInvite').mockImplementation((p, u) => {
+      checked = p
+        .query('SELECT count(*)::int AS n FROM usage_events WHERE user_id = $1', [u.id])
+        .then(({ rows }) => rows[0].n);
+      return checked.then(() => false);
+    });
+
+    await request(buildTestApp({ id: userId, subscription_id: 7 }))
+      .post('/api/events')
+      .send({ events: [{ type: 'screen_view', screen: '/lobby' }, { type: 'screen_view', screen: '/jobs' }] });
+
+    await expect(checked).resolves.toBe(2);
+  });
+
+  it('still answers 204 when the invite check blows up', async () => {
+    jest.spyOn(affiliateInvite, 'maybeInvite').mockRejectedValue(new Error('boom'));
+
+    const res = await request(buildTestApp({ id: userId, subscription_id: 7 }))
+      .post('/api/events')
+      .send({ events: [{ type: 'screen_view', screen: '/lobby' }] });
+
+    expect(res.status).toBe(204);
+  });
+});

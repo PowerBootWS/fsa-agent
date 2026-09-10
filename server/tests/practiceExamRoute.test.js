@@ -6,6 +6,13 @@ const { pool } = require('./testPool');
 const practiceExamRouter = require('../src/routes/practiceExam');
 
 jest.mock('../src/services/email');
+// Mocked for the same reason email is: without it, /verify-code posts a real
+// fixture into the live nurture engine whenever NURTURE_URL is set in the
+// shell. That is not hypothetical — pxroute-fourth-a, pxroute-fourth-b,
+// pxroute-fresh and pxroute-resend @example.com are all sitting in production
+// nurture.contacts right now, enrolled by an earlier run of this very file
+// through the fire-and-forget lead-capture call in /request-code.
+jest.mock('../src/services/nurture', () => ({ enroll: jest.fn().mockResolvedValue({}) }));
 
 function buildTestApp() {
   const app = express();
@@ -29,10 +36,6 @@ async function insertAttempt({ email, classCode, paperCode, completedAt = null }
 describe('POST /api/practice-exam/request-code — 4th class + cross-class exclusivity', () => {
   afterEach(async () => {
     await pool.query(`DELETE FROM practice_exam_attempts WHERE email LIKE $1`, [FIXTURE_EMAIL_LIKE]);
-  });
-
-  afterAll(async () => {
-    await pool.end();
   });
 
   it('accepts fourth_a/4A and creates an attempt row', async () => {
@@ -109,4 +112,70 @@ describe('POST /api/practice-exam/request-code — 4th class + cross-class exclu
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ success: true });
   });
+});
+
+// --- the verify gate -------------------------------------------------------
+// Nurture enrolment used to happen in the Cloudflare Worker at request-code
+// time, which meant any address typed into the form got the full D0-D14 run,
+// one of those emails from russ@, whether or not the person typing owned it.
+// 4 of the first 36 attempts never verified and were mailed three times each.
+const nurture = require('../src/services/nurture');
+
+describe('nurture enrolment waits for a verified code', () => {
+  afterEach(async () => {
+    await pool.query(`DELETE FROM practice_exam_attempts WHERE email LIKE $1`, [FIXTURE_EMAIL_LIKE]);
+    jest.clearAllMocks();
+  });
+
+  it('does NOT enrol on request-code', async () => {
+    await request(buildTestApp())
+      .post('/api/practice-exam/request-code')
+      .send({ firstName: 'Jordan', email: 'pxroute-gate-a@example.com', classCode: 'third', paperCode: '3A1' });
+
+    expect(nurture.enroll).not.toHaveBeenCalled();
+  });
+
+  it('enrols on a successful verify-code', async () => {
+    await insertAttempt({ email: 'pxroute-gate-b@example.com', classCode: 'third', paperCode: '3B1' });
+
+    const res = await request(buildTestApp())
+      .post('/api/practice-exam/verify-code')
+      .send({ email: 'pxroute-gate-b@example.com', paperCode: '3B1', code: '000000' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(nurture.enroll).toHaveBeenCalledWith(expect.objectContaining({
+      email: 'pxroute-gate-b@example.com',
+      sequence: 'practice_exam',
+    }));
+  });
+
+  it('does NOT enrol when the code is wrong', async () => {
+    await insertAttempt({ email: 'pxroute-gate-c@example.com', classCode: 'third', paperCode: '3B1' });
+
+    const res = await request(buildTestApp())
+      .post('/api/practice-exam/verify-code')
+      .send({ email: 'pxroute-gate-c@example.com', paperCode: '3B1', code: '999999' });
+
+    expect(res.status).toBe(400);
+    expect(nurture.enroll).not.toHaveBeenCalled();
+  });
+
+  it('a nurture outage still lets the verified lead into their exam', async () => {
+    await insertAttempt({ email: 'pxroute-gate-d@example.com', classCode: 'third', paperCode: '3B1' });
+    nurture.enroll.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
+
+    const res = await request(buildTestApp())
+      .post('/api/practice-exam/verify-code')
+      .send({ email: 'pxroute-gate-d@example.com', paperCode: '3B1', code: '000000' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBeTruthy();
+  });
+});
+
+// File-level, not inside a describe: this used to sit in the first describe's
+// afterAll, which closed the pool before any later block could query.
+afterAll(async () => {
+  await pool.end();
 });

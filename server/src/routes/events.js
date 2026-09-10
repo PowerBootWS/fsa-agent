@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../services/database');
 const { MAX_BATCH, validateBatch } = require('../services/usageEvents');
+const affiliateInvite = require('../services/affiliateInvite');
 
 const COLUMNS = ['user_id', 'event_type', 'screen', 'action', 'props', 'client_session_id', 'occurred_at'];
 
@@ -46,6 +47,18 @@ router.post('/', async (req, res) => {
       // a 5xx here would only turn a database blip into a beacon flood.
       console.error('[usage] insert failed:', err);
     }
+
+    // Fire-and-forget: a student who has now come back enough times to have
+    // really used the platform gets the affiliate invite. Reads the rows we
+    // just wrote, so it has to run after the insert. maybeInvite() swallows
+    // its own errors for the same reason the insert does — the beacon
+    // endpoint answers 204 either way.
+    // maybeInvite() swallows its own errors, but the .catch() is not
+    // redundant: without it an unexpected synchronous throw or a future
+    // refactor that stops catching becomes an unhandled rejection on a route
+    // that has already answered, and Node can take the process down for it.
+    affiliateInvite.maybeInvite(pool, req.user)
+      .catch(err => console.error('[usage] affiliate invite check failed:', err.message));
   }
 
   res.status(204).end();

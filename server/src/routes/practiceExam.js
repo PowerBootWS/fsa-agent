@@ -8,6 +8,7 @@ const { PAPERS_BY_CLASS } = require('../config/papersForClass');
 const practiceExamTokens = require('../services/practiceExamTokens');
 const { createRateLimiter } = require('../utils/rateLimit');
 const { sendPracticeExamCode } = require('../services/email');
+const nurture = require('../services/nurture');
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:5000';
 
@@ -212,6 +213,28 @@ router.post('/verify-code', async (req, res) => {
     });
 
     res.json({ success: true, token, firstName: row.first_name });
+
+    // Nurture enrolment happens HERE, not at request-code time, because until
+    // this point nobody has proved they control the address. The Worker used
+    // to enrol on the request, which meant any address typed into the form
+    // got the full D0-D14 run — including a send from russ@ — whether or not
+    // it belonged to the person typing it. 4 of the first 36 attempts never
+    // verified and were mailed three times each anyway.
+    //
+    // The GHL upsert and the affiliate attribution deliberately stay at
+    // request time in the Worker: attribution reads the referral cookie,
+    // which only exists in the browser at that moment.
+    //
+    // Fire-and-forget, and after res.json() — a nurture outage must not cost
+    // a verified lead their exam.
+    nurture.enroll({
+      email: cleanEmail,
+      firstName: row.first_name,
+      sequence: 'practice_exam',
+      source: 'practice-exam-verified',
+    }).catch(err => {
+      console.error('practice-exam nurture intake failed for', cleanEmail, '-', err.message);
+    });
   } catch (err) {
     console.error('practice-exam/verify-code error:', err.message);
     res.status(500).json({ error: 'Failed to verify code' });
