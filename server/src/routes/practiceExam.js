@@ -227,11 +227,19 @@ router.post('/verify-code', async (req, res) => {
     //
     // Fire-and-forget, and after res.json() — a nurture outage must not cost
     // a verified lead their exam.
+    // delayMinutes holds D0 back until the sitting is over. Verification is
+    // the moment the exam STARTS, so without it the first email lands within
+    // ~2 minutes, mid-exam. A 100-question run is a 3-hour clock (25 is 45
+    // minutes, 50 is 90), and real completions run 12 min to 2h23 with a
+    // 54-minute median, so 4 hours clears the longest possible sitting and
+    // still arrives the same day. An abandoned attempt gets it 4 hours in,
+    // which is the right side of the trade.
     nurture.enroll({
       email: cleanEmail,
       firstName: row.first_name,
       sequence: 'practice_exam',
       source: 'practice-exam-verified',
+      delayMinutes: 240,
     }).catch(err => {
       console.error('practice-exam nurture intake failed for', cleanEmail, '-', err.message);
     });

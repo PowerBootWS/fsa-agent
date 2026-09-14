@@ -147,6 +147,10 @@ describe('nurture enrolment waits for a verified code', () => {
     expect(nurture.enroll).toHaveBeenCalledWith(expect.objectContaining({
       email: 'pxroute-gate-b@example.com',
       sequence: 'practice_exam',
+      // Verification is the START of the exam, so D0 must be held back past
+      // the longest sitting (100 questions on a 3-hour clock) instead of
+      // landing mid-exam on the next 2-minute nurture tick.
+      delayMinutes: 240,
     }));
   });
 
