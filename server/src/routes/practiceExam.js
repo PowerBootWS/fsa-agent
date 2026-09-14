@@ -240,6 +240,17 @@ router.post('/verify-code', async (req, res) => {
       sequence: 'practice_exam',
       source: 'practice-exam-verified',
       delayMinutes: 240,
+      // The paper they actually sat, so practice_exam steps can branch on it.
+      // Deliberately NOT written as `class_code`/`class`: /intake's setAttribute
+      // overwrites, and those two keys are owned by other sequences -
+      // `class_code` drives onboarding's D0/D2/D5 arms off the Stripe checkout,
+      // `class` drives exam's D8/D14/D17 off a link click. A paying 2nd Class
+      // student sitting a free 4A practice exam during their first week would
+      // otherwise silently flip their own welcome emails to the 4th Class arm.
+      attrs: {
+        practice_class: row.class_code,
+        practice_paper: paperCode.toLowerCase(),
+      },
     }).catch(err => {
       console.error('practice-exam nurture intake failed for', cleanEmail, '-', err.message);
     });

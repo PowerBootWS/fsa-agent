@@ -151,6 +151,9 @@ describe('nurture enrolment waits for a verified code', () => {
       // the longest sitting (100 questions on a 3-hour clock) instead of
       // landing mid-exam on the next 2-minute nurture tick.
       delayMinutes: 240,
+      // Namespaced on purpose: `class_code` and `class` belong to the
+      // onboarding and exam sequences, and /intake's setAttribute overwrites.
+      attrs: { practice_class: 'third', practice_paper: '3b1' },
     }));
   });
 
