@@ -129,7 +129,7 @@ router.post('/trial-backstop', requireInternalSecret, async (req, res) => {
 // POST /api/platform/provision-user
 router.post('/provision-user', requireInternalSecret, async (req, res) => {
   try {
-    const { email, first_name, last_name, class_code, stripe_subscription_id, phone, address, cancel_at } = req.body;
+    const { email, first_name, last_name, class_code, stripe_subscription_id, phone, address, cancel_at, billing_interval } = req.body;
 
     if (!email || !first_name || !class_code) {
       return res.status(400).json({ error: 'email, first_name, and class_code are required' });
@@ -186,29 +186,63 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
     //   (duplicate/idempotent-retry) -- but NOT by the other fourth_x code, since
     //   a student can now own both papers at once.
     const existingActive = await pool.query(
-      `SELECT class_code FROM subscriptions WHERE user_id = $1 AND status = 'active'`,
+      `SELECT id, class_code, active_paper, stripe_subscription_id
+         FROM subscriptions WHERE user_id = $1 AND status = 'active'`,
       [user.id]
     );
-    const existingCodes = existingActive.rows.map(r => r.class_code);
     const isFourthClassPurchase = FOURTH_CLASS_CODES.includes(class_code);
+
+    // Monthly -> annual upgrade on the same ticket, the one case where an existing
+    // active row must NOT block the purchase. Without this the buy falls into the
+    // `blocked` branch below and the route answers 200 having created nothing: the
+    // student pays for a full year and gets no row, no access change, no email and
+    // no error logged anywhere. Only an annual purchase of the EXACT same class_code
+    // replaces -- buying a 2nd Class annual while holding an active 3rd Class is
+    // still a cross-tier purchase and stays blocked, as before.
+    //
+    // 4th Class is excluded: fourth_a/fourth_b are annual by definition, so treating
+    // "annual" as an upgrade signal there would silently replace a paper a student
+    // just re-bought instead of refusing the duplicate.
+    const replaced = (billing_interval === 'year' && !isFourthClassPurchase)
+      ? existingActive.rows.find(r => r.class_code === class_code) || null
+      : null;
+    if (replaced) {
+      await pool.query(
+        `UPDATE subscriptions SET status = 'inactive', deactivated_at = now() WHERE id = $1`,
+        [replaced.id]
+      );
+      console.log(`provision-user: ${normalizedEmail} upgraded ${class_code} to annual — deactivated replaced row ${replaced.id}`);
+    }
+
+    const blockingCodes = existingActive.rows
+      .filter(r => !replaced || r.id !== replaced.id)
+      .map(r => r.class_code);
     const blocked = isFourthClassPurchase
-      ? existingCodes.includes(class_code) || existingCodes.some(c => !FOURTH_CLASS_CODES.includes(c))
-      : existingCodes.length > 0;
+      ? blockingCodes.includes(class_code) || blockingCodes.some(c => !FOURTH_CLASS_CODES.includes(c))
+      : blockingCodes.length > 0;
 
     let subIsNew = false;
     if (!blocked) {
       const subInsert = await pool.query(
         `INSERT INTO subscriptions (user_id, class_code, status, active_paper, stripe_subscription_id, cancel_at)
-         VALUES ($1, $2, 'active', NULL, $3, $4)
+         VALUES ($1, $2, 'active', $3, $4, $5)
          RETURNING id`,
-        [user.id, class_code, stripe_subscription_id || null, trialBackstop]
+        // An upgrade carries the paper the student is already on across to the new row.
+        // Dropping it would dump a paying student back on the paper picker for no reason
+        // they could see, right after they paid for a year.
+        [user.id, class_code, replaced ? replaced.active_paper : null, stripe_subscription_id || null, trialBackstop]
       );
       subIsNew = subInsert.rowCount > 0;
     }
 
     // Only send magic link when something was actually new — prevents duplicate emails
     // on Stripe's at-least-once re-delivery of the same checkout event.
-    if (userIsNew || subIsNew) {
+    if (replaced) {
+      // An upgrading student already has an account and an unbroken session. Mailing a
+      // fresh login link to a paying customer on a billing change is the same mistake
+      // the trial-conversion path documents above.
+      console.log(`provision-user: annual upgrade for ${normalizedEmail}, skipping magic link`);
+    } else if (userIsNew || subIsNew) {
       const token = crypto.randomUUID();
       await pool.query(
         `INSERT INTO auth_tokens (user_id, token, type, expires_at)
@@ -220,7 +254,13 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
       console.log(`provision-user: idempotent re-delivery for ${normalizedEmail}, skipping magic link`);
     }
 
-    return res.json({ ok: true, user_id: user.id });
+    // replaced_subscription_id tells the webhook listener which Stripe subscription to
+    // stop billing. Null on every other path.
+    return res.json({
+      ok: true,
+      user_id: user.id,
+      replaced_subscription_id: replaced ? replaced.stripe_subscription_id : null,
+    });
   } catch (err) {
     console.error('POST /api/platform/provision-user error:', err);
     return res.status(500).json({ error: 'Internal server error' });

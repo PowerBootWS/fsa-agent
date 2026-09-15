@@ -98,8 +98,15 @@ describe('POST /api/platform/provision-user with a trial backstop', () => {
     // provision-user blocks a new row when the user already has an active
     // subscription, so the existing-active lookup must come back empty or the
     // INSERT under test never runs.
+    // Keyed on the WHERE clause, not the selected columns: the column list has
+    // already grown once (the annual upgrade path needs the row's id, paper and
+    // Stripe id), and matching it made this stub silently stop applying — the
+    // lookup then returned a fake active row, the INSERT under test never ran,
+    // and the failure surfaced as "subscriptionInsert is not a function".
     mockQuery.mockImplementation((sql) => {
-      if (/SELECT class_code FROM subscriptions/i.test(sql)) return Promise.resolve({ rows: [], rowCount: 0 });
+      if (/FROM subscriptions WHERE user_id = \$1 AND status = 'active'/i.test(sql)) {
+        return Promise.resolve({ rows: [], rowCount: 0 });
+      }
       return Promise.resolve({ rows: [{ id: 1 }], rowCount: 1 });
     });
   });
