@@ -42,6 +42,19 @@ export default function SelectPaperPage() {
       });
       const data = await res.json();
       if (!res.ok) {
+        // The cooldown is the one failure a student can actually hit, and the
+        // server already tells us how long is left. Surfacing the raw
+        // `data.error` here printed the bare string "Paper switch cooldown",
+        // which names the rule without saying what it means, how long it
+        // lasts, or whether the paper they were on is still there.
+        if (res.status === 429) {
+          const days = Number(data.days_remaining);
+          throw new Error(
+            Number.isFinite(days) && days > 0
+              ? `You've switched papers recently, so you can switch again in ${days} ${days === 1 ? 'day' : 'days'}. Your current paper stays open until then, and nothing is lost either way.`
+              : 'You\'ve switched papers recently. Your current paper stays open in the meantime, and you can switch again shortly.'
+          );
+        }
         throw new Error(data.error || 'Failed to select paper');
       }
       // Update localStorage with new active_paper
