@@ -221,9 +221,11 @@ router.post('/verify-code', async (req, res) => {
     // it belonged to the person typing it. 4 of the first 36 attempts never
     // verified and were mailed three times each anyway.
     //
-    // The GHL upsert and the affiliate attribution deliberately stay at
-    // request time in the Worker: attribution reads the referral cookie,
-    // which only exists in the browser at that moment.
+    // The affiliate attribution deliberately stays at request time in the
+    // Worker: it reads the referral cookie, which only exists in the browser
+    // at that moment. (A GHL contact upsert used to run alongside it there;
+    // backlog #121 is removing GHL contact writes across every FSA system, so
+    // do not assume one still happens — this repo performs none.)
     //
     // Fire-and-forget, and after res.json() — a nurture outage must not cost
     // a verified lead their exam.

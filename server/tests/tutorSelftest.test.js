@@ -17,7 +17,6 @@ const request = require('supertest');
 const axios = require('axios');
 
 jest.mock('axios');
-jest.mock('../src/services/gohighlevel', () => ({}));
 
 const platformRouter = require('../src/routes/platform');
 

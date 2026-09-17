@@ -16,7 +16,6 @@ jest.mock('../src/services/database', () => ({
   pool: { query: (...args) => mockQuery(...args) },
   getCourseOutline: jest.fn(),
 }));
-jest.mock('../src/services/gohighlevel', () => ({}));
 jest.mock('axios');
 
 const platformRouter = require('../src/routes/platform');

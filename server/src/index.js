@@ -112,7 +112,6 @@ const validateRouter = require('./routes/validate');
 const lessonRouter = require('./routes/lesson');
 const chatRouter = require('./routes/chat');
 const progressRouter = require('./routes/progress');
-const enrollRouter = require('./routes/enroll');
 const demoRouter = require('./routes/demo');
 const previewRouter = require('./routes/preview');
 
@@ -154,7 +153,11 @@ app.use('/api/events', requireAuth, eventsRouter);
 // found zero callers — see server/tests/idorRoutes.test.js for the same
 // search recorded as a comment. Deleted rather than authenticated, matching
 // the lesson-preview precedent from earlier today (mediaAuth.test.js).
-app.use('/api/enroll', enrollRouter);
+// POST /api/enroll (server/src/routes/enroll.js) was deleted 2026-09-16
+// (backlog #121): it upserted a GoHighLevel contact with caller-supplied tags
+// and was built for the retired GHL-LMS era ("called from your CRM
+// automation"). `grep -rn "/api/enroll"` across every FSA repo found no caller
+// outside the retired client/ (v1) front end.
 app.use('/api/demo', demoRouter);
 
 const diagnosticRouter = require('./routes/diagnostic');
@@ -162,6 +165,9 @@ app.use('/api/diagnostic', diagnosticRouter);
 
 const examRouter = require('./routes/exam');
 app.use('/api/exam', examRouter);
+// Still mounted after backlog #121 stripped the GHL routes out of preview.js:
+// GET /api/preview/papers is live and feeds the free-practice-exam paper
+// picker in client-v2. See routes/preview.js for the two deleted routes.
 app.use('/api/preview', previewRouter);
 
 const practiceExamRouter = require('./routes/practiceExam');

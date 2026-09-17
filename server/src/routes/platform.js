@@ -13,7 +13,6 @@ const DEACTIVATION_REQUIRES_CONFIRMATION =
   (process.env.DEACTIVATION_REQUIRES_CONFIRMATION || 'true').toLowerCase() !== 'false';
 const requireAuth = require('../middleware/requireAuth');
 const axios = require('axios');
-const ghl = require('../services/gohighlevel');
 
 const router = express.Router();
 
@@ -894,18 +893,16 @@ router.patch('/profile', requireAuth, async (req, res) => {
       [cleanFirst, cleanLast, cleanPhone, cleanAddress, userId]
     );
 
-    // Keep the GoHighLevel contact current so marketing/onboarding/win-back
-    // workflows have the latest contact info. GHL is a secondary sink — Postgres
-    // is the system of record — so a GHL failure must not fail the save.
-    ghl.upsertContact({
-      email: req.user.email,
-      firstName: cleanFirst,
-      lastName: cleanLast,
-      phone: cleanPhone,
-      address: cleanAddress,
-    }).catch(err => {
-      console.error('GHL contact sync failed for', req.user.email, '-', err.message);
-    });
+    // A fire-and-forget ghl.upsertContact() used to run here, mirroring the
+    // saved profile into GoHighLevel. Removed 2026-09-16 (backlog #121,
+    // owner-approved): GHL runs no sequence against known contacts any more —
+    // known contacts nurture exclusively through fsa-nurture — so the contact
+    // it maintained drove nothing. Postgres is the system of record for
+    // student profiles, and the copy in GHL had no business purpose to
+    // justify keeping a second, silently-diverging store of student names,
+    // phone numbers and mailing addresses in a third-party system. GHL's
+    // remaining role is cold outbound (people not yet in FSA) and social
+    // posting, neither of which reads this data.
 
     return res.json({ ok: true });
   } catch (err) {

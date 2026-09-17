@@ -18,10 +18,9 @@ consumes:
     via: http
     detail: AI tutoring + resume tailoring
     env_vars: [OPENROUTER_API_KEY, OPENROUTER_MODEL]
-  - project: ghl
-    via: http
-    detail: contact sync
-    env_vars: [GHL_API_KEY, GHL_LOCATION_ID]
+# GoHighLevel was consumed here (contact sync, GHL_API_KEY / GHL_LOCATION_ID)
+# until 2026-09-16. Backlog #121 removed every GHL contact write from this
+# service; it now talks to GHL not at all.
   - project: stripe
     via: http
     detail: subscription management
