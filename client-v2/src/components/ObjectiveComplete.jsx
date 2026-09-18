@@ -45,7 +45,7 @@ export function ObjectiveComplete({
       {showQuiz && (
         <div className="objective-complete-quiz">
           <p className="objective-complete-quiz-text">
-            You've completed the objective. Give the chapter test a try.
+            You've completed the objective. Give the chapter quiz a try.
           </p>
           <button className="obj-complete-continue-btn" onClick={startQuiz}>
             Start Chapter {currentChapterNum} Quiz →
