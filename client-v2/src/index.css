@@ -578,6 +578,47 @@ body {
   cursor: default;
 }
 
+.nav-obj-tick {
+  color: var(--green-light);
+  font-weight: 700;
+}
+
+.nav-obj-pill.active .nav-obj-tick {
+  color: var(--white);
+}
+
+/* ── Objective completion toggle ───────────────────── */
+
+.nav-complete-row {
+  display: flex;
+  justify-content: flex-end;
+  padding-bottom: 8px;
+}
+
+.nav-complete-btn {
+  background: none;
+  border: 1px solid var(--plate-edge);
+  border-radius: 20px;
+  color: var(--gray-mid);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  padding: 4px 14px;
+  white-space: nowrap;
+  transition: background 0.2s var(--ease), border-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.nav-complete-btn:hover {
+  border-color: var(--green-light);
+  color: var(--green-light);
+}
+
+.nav-complete-btn.done {
+  border-color: var(--green-light);
+  color: var(--green-light);
+  background: rgba(82,168,130,0.12);
+}
+
 /* ── Objective Complete ────────────────────────────── */
 
 .objective-complete {

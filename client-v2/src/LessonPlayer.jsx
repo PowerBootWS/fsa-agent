@@ -35,6 +35,10 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   const [sectionIndex, setSectionIndex] = useState(0);
   const [autoPlay, setAutoPlay] = useState(false);
   const [checkpoint, setCheckpoint] = useState(null);
+  // lesson_codes this student has marked (or been credited) complete. Free
+  // navigation (2026-06-16) means this gates nothing — it is progress tracking
+  // only, so it lives here as display state rather than in the outline.
+  const [completedCodes, setCompletedCodes] = useState(() => new Set());
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const sectionsSeenSinceCheckpoint = useRef(0);
@@ -92,6 +96,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
         // Merge lock/completion state from gated structure into outline
         if (structure?.chapters) {
           const lockMap = new Map(structure.chapters.map(ch => [ch.chapter_num, ch]));
+          const done = new Set();
           for (const ch of outline.chapters || []) {
             const s = lockMap.get(ch.chapter_num);
             if (!s) continue;
@@ -100,8 +105,10 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
             for (const obj of ch.objectives || []) {
               const so = objMap.get(obj.lesson_code);
               if (so) { obj.locked = so.locked; obj.completed = so.completed; }
+              if (so?.completed) done.add(obj.lesson_code);
             }
           }
+          setCompletedCodes(done);
         }
 
         setCourseOutline(outline);
@@ -188,6 +195,22 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
     };
   }, [courseOutline, activeLessonCode]);
 
+  // Set or clear the student's completion mark on an objective. Optimistic:
+  // the pill ticks on click and rolls back if the write fails, because this is
+  // a tracking mark with nothing gated behind it — a spinner would cost more
+  // than the rare failure does.
+  const setComplete = useCallback((lessonCode, completed) => {
+    if (!lessonCode) return;
+    const apply = (add) => setCompletedCodes(prev => {
+      const next = new Set(prev);
+      if (add) next.add(lessonCode); else next.delete(lessonCode);
+      return next;
+    });
+    apply(completed);
+    postJson('/api/platform/objective-complete', { lesson_code: lessonCode, completed })
+      .catch(() => apply(!completed));
+  }, []);
+
   // Pull the next practice question for a lesson pause. Nothing is shown when
   // the lesson has no question to give — the tutor stays quiet rather than
   // announcing a question that isn't there.
@@ -208,6 +231,10 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
     if (sectionIndex >= sections.length - 1) {
       setSectionIndex(sections.length);  // virtual "completion" index
       writeProgress(activeLessonCode, sections.length);
+      // Reaching the end of the slides marks the objective. The header toggle
+      // covers everything else — a student who already knows the material and
+      // skips ahead, or who wants to undo this.
+      if (!completedCodes.has(activeLessonCode)) setComplete(activeLessonCode, true);
       return;
     }
     const next = sectionIndex + 1;
@@ -294,6 +321,8 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
         nextChapter={nextChapter}
         nextLessonCode={nextLessonCode}
         isComplete={isComplete}
+        completedCodes={completedCodes}
+        onToggleComplete={setComplete}
       />
       {!hideTutor && (
         <TutorPanel

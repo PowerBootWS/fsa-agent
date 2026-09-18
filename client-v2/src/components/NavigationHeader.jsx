@@ -7,6 +7,8 @@ export function NavigationHeader({
   onNavigate,
   prevChapter,
   nextChapter,
+  completedCodes,
+  onToggleComplete,
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -16,6 +18,7 @@ export function NavigationHeader({
   const currentChapter = courseOutline?.chapters?.find(
     c => c.chapter_num === currentChapterNum
   ) || null;
+  const isObjectiveComplete = !!completedCodes?.has(activeLessonCode);
 
   useEffect(() => {
     function handleClick(e) {
@@ -105,10 +108,32 @@ export function NavigationHeader({
               title={obj.locked ? 'Complete previous objective to unlock' : obj.title}
             >
               {obj.locked ? '🔒' : `Obj ${obj.objective_num}`}
+              {!obj.locked && completedCodes?.has(obj.lesson_code) && (
+                <span className="nav-obj-tick" aria-label="completed"> ✓</span>
+              )}
             </button>
           );
         })}
       </div>
+
+      {/* Its own row, not inside .nav-objective-row — that row scrolls
+          horizontally once a chapter has more objectives than fit, and a
+          control the student needs on every slide must not scroll away. */}
+      {onToggleComplete && activeLessonCode && (
+        <div className="nav-complete-row">
+          <button
+            type="button"
+            className={`nav-complete-btn${isObjectiveComplete ? ' done' : ''}`}
+            aria-pressed={isObjectiveComplete}
+            onClick={() => onToggleComplete(activeLessonCode, !isObjectiveComplete)}
+            title={isObjectiveComplete
+              ? 'Marked complete — click to undo'
+              : 'Mark this objective complete'}
+          >
+            {isObjectiveComplete ? '✓ Completed' : '○ Mark complete'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -86,6 +86,8 @@ export function ContentPanel({
   nextChapter,
   nextLessonCode,
   isComplete,
+  completedCodes,
+  onToggleComplete,
   hideNarration = false,
 }) {
   const [sectionStartTime, setSectionStartTime] = useState(() => Date.now());
@@ -124,6 +126,8 @@ export function ContentPanel({
           onNavigate={onNavigate}
           prevChapter={prevChapter}
           nextChapter={nextChapter}
+          completedCodes={completedCodes}
+          onToggleComplete={onToggleComplete}
         />
       )}
 

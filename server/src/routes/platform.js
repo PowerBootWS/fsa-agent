@@ -781,6 +781,58 @@ router.get('/course-structure/:paperCode', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/platform/objective-complete
+// Body: { lesson_code, completed } → { lesson_code, completed }
+//
+// The two-way writer of user_progress.completed. Both other writers are
+// one-way by design — ai-service/agents/researcher.py#save_progress and
+// services/database.js#updateUserProgress each COALESCE the incoming value, so
+// a later tutor session can't un-complete an objective it isn't scoring. That
+// is right for an inferred signal and wrong for a deliberate one: free
+// navigation (2026-06-16) lets a student pick their own order and come back to
+// a topic, so a checkbox they can tick but never untick is a trap.
+//
+// Writes lesson_code as well as lesson_id. GET /course-structure reads
+// completion with `WHERE lesson_code LIKE $2 AND completed = true`, so a row
+// carrying only the numeric id marks nothing the student can actually see.
+router.post('/objective-complete', requireAuth, async (req, res) => {
+  try {
+    const { email } = req.user;
+    const { lesson_code, completed } = req.body || {};
+
+    if (!lesson_code || typeof lesson_code !== 'string') {
+      return res.status(400).json({ error: 'lesson_code is required' });
+    }
+    // Absent means "mark it" — this route's only job is the student's own tick.
+    const isComplete = completed !== false;
+
+    const lesson = await pool.query(
+      'SELECT id FROM lessons WHERE lesson_code = $1',
+      [lesson_code]
+    );
+    if (lesson.rows.length === 0) {
+      return res.status(404).json({ error: 'Lesson not found' });
+    }
+
+    // Touches completed and lesson_code only: the tutor owns score, struggles,
+    // attempts, outcome and session_notes on this same row.
+    await pool.query(
+      `INSERT INTO user_progress (user_email, lesson_id, lesson_code, completed, last_accessed)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (user_email, lesson_id) DO UPDATE SET
+         lesson_code   = COALESCE(user_progress.lesson_code, EXCLUDED.lesson_code),
+         completed     = EXCLUDED.completed,
+         last_accessed = NOW()`,
+      [email, lesson.rows[0].id, lesson_code, isComplete]
+    );
+
+    return res.json({ lesson_code, completed: isComplete });
+  } catch (err) {
+    console.error('POST /api/platform/objective-complete error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/platform/check-access
 // Query params: type ('lesson'|'chapter_quiz'), lesson_code or chapter_id
 // Returns: { allowed: boolean, reason: string|null, required_lesson_code?: string, required_chapter_id?: string }
