@@ -35,6 +35,8 @@ export default function LobbyPage() {
   const navigate = useNavigate();
   const [account, setAccount] = useState(null);
   const [data, setData] = useState(null);
+  // Chapter list (titles + quiz scores) for the Chapter Quizzes section.
+  const [chapters, setChapters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [examCount, setExamCount] = useState(50);
@@ -103,6 +105,12 @@ export default function LobbyPage() {
         }
         const d = await res.json();
         setData(d);
+        // Non-fatal: without it the Chapter Quizzes section falls back to
+        // numbered chapters from stats.total_chapters.
+        fetch(`/api/platform/course-structure/${encodeURIComponent(me.active_paper)}`, { credentials: 'include' })
+          .then(r => (r.ok ? r.json() : { chapters: [] }))
+          .then(cs => setChapters(cs.chapters || []))
+          .catch(() => setChapters([]));
       }
     } catch (err) {
       setError(err.message || 'Something went wrong. Please refresh.');
@@ -122,11 +130,8 @@ export default function LobbyPage() {
     }
   }
 
-  function handleReattemptLowest() {
-    if (!data?.chapter_quizzes?.length) return;
-    const sorted = [...data.chapter_quizzes].sort((a, b) => a.score - b.score);
-    const lowest = sorted[0];
-    navigate(`/lesson/${lowest.chapter_id}?mode=quiz`);
+  function handleStartQuiz(chapterId) {
+    navigate(`/practice-exam?paper=${encodeURIComponent(data.paper)}&quiz=${encodeURIComponent(chapterId)}`);
   }
 
   function handleStartExam() {
@@ -189,10 +194,13 @@ export default function LobbyPage() {
 
   const { progress, stats, chapter_quizzes, next_quiz_chapter_id, last_exam, paper } = data;
 
-  // Lowest-score quiz (for reattempt button)
-  const lowestQuiz = chapter_quizzes.length > 0
-    ? [...chapter_quizzes].sort((a, b) => a.score - b.score)[0]
-    : null;
+  // One row per chapter. Prefer course-structure (has titles); fall back to
+  // bare chapter numbers so the list still renders if that fetch failed.
+  const quizByChapter = Object.fromEntries(chapter_quizzes.map(q => [q.chapter_id, q]));
+  const quizRows = (chapters.length > 0
+    ? chapters.map(c => ({ chapter_id: c.chapter_id, num: c.chapter_num, title: c.label || c.title }))
+    : Array.from({ length: stats.total_chapters }, (_, i) => ({ chapter_id: `${paper}-${i + 1}`, num: i + 1, title: null }))
+  ).map(r => ({ ...r, quiz: quizByChapter[r.chapter_id] || null }));
 
   return (
     <div className="lb-page">
@@ -223,7 +231,8 @@ export default function LobbyPage() {
           </div>
         )}
 
-        {/* ── Big Course Card ── */}
+        {/* ── Step 1: Lessons ── */}
+        <h2 className="lb-step-heading"><span className="lb-step-num">1</span> Lessons</h2>
         <div className="lb-course-card">
           <div className="lb-course-card-top">
             <div>
@@ -291,99 +300,51 @@ export default function LobbyPage() {
           </div>
         </div>
 
-        {/* ── 4 Tiles ── */}
+        {/* ── Step 2: Chapter Quizzes ── */}
+        <h2 className="lb-step-heading"><span className="lb-step-num">2</span> Chapter Quizzes</h2>
+        <div className="lb-tile lb-quiz-section">
+          <p className="lb-quiz-intro">
+            Finished a chapter? Test yourself on it. Each quiz is 15 questions from
+            that chapter; 75% is a pass. Take them in any order and retake them as often as you like.
+          </p>
+          <ul className="lb-chq-list">
+            {quizRows.map(r => {
+              const isNext = r.chapter_id === next_quiz_chapter_id;
+              return (
+                <li key={r.chapter_id} className={`lb-chq-row${isNext ? ' lb-chq-row--next' : ''}`}>
+                  <div className="lb-chq-name">
+                    <span className="lb-chq-num">Chapter {r.num}</span>
+                    {r.title && <span className="lb-chq-title">{r.title}</span>}
+                  </div>
+                  <div className="lb-chq-right">
+                    {r.quiz ? (
+                      <>
+                        <span className="lb-score-text">{r.quiz.score}%</span>
+                        <span className={r.quiz.passed ? 'lb-badge-pass' : 'lb-badge-fail'}>
+                          {r.quiz.passed ? 'Pass' : 'Not yet'}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="lb-chq-untaken">Not taken</span>
+                    )}
+                    <button
+                      className={isNext ? 'lb-btn-primary lb-chq-btn' : 'lb-btn-secondary lb-chq-btn'}
+                      onClick={() => handleStartQuiz(r.chapter_id)}
+                    >
+                      {r.quiz ? 'Retake' : 'Start Quiz'}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        {/* ── Step 3: Practice Exams ── */}
+        <h2 className="lb-step-heading"><span className="lb-step-num">3</span> Practice Exams</h2>
         {/* className (not inline) so the CSS media query can collapse to one
             column on phones — inline styles can't carry @media. */}
         <div className="lobby-tile-grid">
-          {/* Tile 1 — Chapter Quizzes */}
-          <div className="lb-tile">
-            <h3 className="lb-tile-title">Chapter Quizzes</h3>
-            {next_quiz_chapter_id ? (
-              <div>
-                <div className="lb-next-quiz-id">
-                  Next: {next_quiz_chapter_id}
-                </div>
-                <div className="lb-quiz-pass-count">
-                  {stats.quizzes_passed} of {stats.total_chapters} chapters with passing score
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="lb-quiz-passed-all">All quizzes passed! 🎉</div>
-                <div className="lb-quiz-pass-count">
-                  {stats.quizzes_passed} of {stats.total_chapters} chapters completed
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Tile 2 — Quiz Results */}
-          <div className="lb-tile">
-            <h3 className="lb-tile-title">Quiz Results</h3>
-            {chapter_quizzes.length === 0 ? (
-              <p className="lb-muted">No quizzes attempted yet</p>
-            ) : (
-              <>
-                <ul className="lb-quiz-list">
-                  {chapter_quizzes.map(q => (
-                    <li key={q.chapter_id} className="lb-quiz-row">
-                      <span className="lb-quiz-chapter-id">{q.chapter_id}</span>
-                      <div className="lb-quiz-row-right">
-                        <span className="lb-score-text">{q.score}%</span>
-                        <span className={q.passed ? 'lb-badge-pass' : 'lb-badge-fail'}>
-                          {q.passed ? 'Pass' : 'Fail'}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                {lowestQuiz && (
-                  <div className="lb-lowest-row">
-                    <span className="lb-lowest-label">Lowest:</span>
-                    <span className="lb-lowest-value">
-                      {lowestQuiz.chapter_id} ({lowestQuiz.score}%)
-                    </span>
-                    <button className="lb-reattempt-btn" onClick={handleReattemptLowest}>
-                      Reattempt
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Tile 3 — Last Exam Attempt */}
-          <div className="lb-tile">
-            <h3 className="lb-tile-title">Last Practice Exam</h3>
-            {!last_exam ? (
-              <p className="lb-muted">No practice exam attempted yet</p>
-            ) : (
-              <>
-                <div className="lb-big-score">{last_exam.score}%</div>
-                <div className="lb-exam-date">{formatDate(last_exam.date)}</div>
-                <div>
-                  {last_exam.chapters.slice(0, 3).map(ch => (
-                    <div key={ch.chapter_id} className="lb-chapter-score-row">
-                      <span>{ch.chapter_id}</span>
-                      <span className="lb-chapter-score-value">{ch.score}%</span>
-                    </div>
-                  ))}
-                  {last_exam.chapters.length > 3 && (
-                    <div className="lb-more-chapters">
-                      +{last_exam.chapters.length - 3} more chapters
-                    </div>
-                  )}
-                </div>
-                <button
-                  className="lb-btn-link"
-                  onClick={() => navigate('/exam/results')}
-                >
-                  Full breakdown ↓
-                </button>
-              </>
-            )}
-          </div>
-
           {/* Tile 4 — Practice Exam Launcher */}
           <div className="lb-tile">
             <h3 className="lb-tile-title">Practice Exam</h3>
@@ -430,6 +391,38 @@ export default function LobbyPage() {
               </button>
             )}
           </div>
+          {/* Tile 3 — Last Exam Attempt */}
+          <div className="lb-tile">
+            <h3 className="lb-tile-title">Last Practice Exam</h3>
+            {!last_exam ? (
+              <p className="lb-muted">No practice exam attempted yet</p>
+            ) : (
+              <>
+                <div className="lb-big-score">{last_exam.score}%</div>
+                <div className="lb-exam-date">{formatDate(last_exam.date)}</div>
+                <div>
+                  {last_exam.chapters.slice(0, 3).map(ch => (
+                    <div key={ch.chapter_id} className="lb-chapter-score-row">
+                      <span>{ch.chapter_id}</span>
+                      <span className="lb-chapter-score-value">{ch.score}%</span>
+                    </div>
+                  ))}
+                  {last_exam.chapters.length > 3 && (
+                    <div className="lb-more-chapters">
+                      +{last_exam.chapters.length - 3} more chapters
+                    </div>
+                  )}
+                </div>
+                <button
+                  className="lb-btn-link"
+                  onClick={() => navigate('/exam/results')}
+                >
+                  Full breakdown ↓
+                </button>
+              </>
+            )}
+          </div>
+
         </div>
 
       </div>

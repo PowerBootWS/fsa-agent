@@ -652,3 +652,85 @@
   font-weight: 700;
   transform: translateY(1px);
 }
+
+/* Step headings: Lessons → Chapter Quizzes → Practice Exams */
+.lb-step-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #F4F5F7;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 8px 0 12px 0;
+}
+.lb-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #E8720C;
+  color: #0D1117;
+  font-size: 16px;
+}
+
+/* Chapter Quizzes list */
+.lb-quiz-section {
+  margin-bottom: 32px;
+}
+.lb-quiz-intro {
+  color: #a8b4c0;
+  font-size: 14px;
+  margin: 0 0 16px 0;
+}
+.lb-chq-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lb-chq-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 10px;
+  border-top: 1px solid #252F42;
+  flex-wrap: wrap;
+}
+.lb-chq-row--next {
+  background: rgba(232,114,12,0.08);
+  border-left: 3px solid #E8720C;
+}
+.lb-chq-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.lb-chq-num {
+  color: #F4F5F7;
+  font-weight: 600;
+  font-size: 15px;
+}
+.lb-chq-title {
+  color: #a8b4c0;
+  font-size: 13px;
+}
+.lb-chq-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.lb-chq-untaken {
+  color: #94a3b8;
+  font-size: 13px;
+}
+.lb-chq-btn {
+  min-width: 110px;
+}

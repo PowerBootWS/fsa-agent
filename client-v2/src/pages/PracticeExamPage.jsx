@@ -7,6 +7,9 @@ export default function PracticeExamPage() {
   const paper = params.get('paper') || '';
   const countParam = params.get('count');
   const timed = params.get('timed') === 'true';
+  // ?quiz=<chapterId> (e.g. 2B3-4) → straight into that chapter quiz; the
+  // platform lobby's Chapter Quizzes list links here.
+  const quizChapter = params.get('quiz') || null;
 
   const user = JSON.parse(localStorage.getItem('fsa_user') || '{}');
 
@@ -22,7 +25,8 @@ export default function PracticeExamPage() {
       courseId={paper}
       learnerId={user.email}
       classCode={user.class_code}
-      initialConfig={initialConfig}
+      initialConfig={quizChapter ? null : initialConfig}
+      initialChapterId={quizChapter}
       onExit={() => navigate('/lobby')}
       onComplete={(debrief) =>
         navigate(`/exam/results?paper=${encodeURIComponent(paper)}`, { state: { debrief } })

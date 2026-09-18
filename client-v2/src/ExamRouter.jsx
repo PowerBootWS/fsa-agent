@@ -748,11 +748,13 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
 // PracticeExamRouter — orchestrates lobby → exam → results flow
 // ---------------------------------------------------------------------------
 
-function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setChatState, startPhase, initialConfig, onExit, onComplete, leadMagnetToken, onExamDone, leadMagnetMode }) {
+function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setChatState, startPhase, initialConfig, initialChapterId, onExit, onComplete, leadMagnetToken, onExamDone, leadMagnetMode }) {
   const [phase, setPhase] = useState(startPhase || 'lobby');
   const [examConfig, setExamConfig] = useState(initialConfig || null);
-  const [activeChapterId, setActiveChapterId] = useState(null);
-  const [returnPhase, setReturnPhase] = useState('lobby');
+  const [activeChapterId, setActiveChapterId] = useState(initialChapterId || null);
+  // 'exit' = the quiz was launched straight from the platform lobby, so Back
+  // leaves this page (onExit) rather than landing on the combined picker.
+  const [returnPhase, setReturnPhase] = useState(initialChapterId ? 'exit' : 'lobby');
   const [reviewDebrief, setReviewDebrief] = useState(null);
 
   const handleStartExam = (config) => {
@@ -769,6 +771,15 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
   };
 
   const handleBack = () => {
+    if (returnPhase === 'exit' && onExit) {
+      onExit();
+      return;
+    }
+    if (returnPhase === 'exit') {
+      setPhase('lobby');
+      setActiveChapterId(null);
+      return;
+    }
     setPhase(returnPhase);
     setActiveChapterId(null);
     if (returnPhase === 'lobby') {
@@ -849,7 +860,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
               and 'results' together since handleBack() returns to either one
               correctly and "Back to Exam Results" reads fine for both. */}
           <button className="quizexam-back-btn" onClick={handleBack}>
-            {returnPhase === 'lobby' ? '← Back to Lobby' : '← Back to Exam Results'}
+            {returnPhase === 'lobby' || returnPhase === 'exit' ? '← Back to Lobby' : '← Back to Exam Results'}
           </button>
         </div>
         <QuizExamView
@@ -900,7 +911,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
 // ExamRouter — top-level export, receives courseId + learnerId from App.jsx
 // ---------------------------------------------------------------------------
 
-export function ExamRouter({ courseId, learnerId, classCode, initialConfig, onExit, onComplete, leadMagnetToken, onExamDone }) {
+export function ExamRouter({ courseId, learnerId, classCode, initialConfig, initialChapterId, onExit, onComplete, leadMagnetToken, onExamDone }) {
   const [chatState, setChatState] = useState({
     messages: [],
     displayContent: null,
@@ -924,8 +935,9 @@ export function ExamRouter({ courseId, learnerId, classCode, initialConfig, onEx
         lessonId={courseId}
         chatState={chatState}
         setChatState={setChatState}
-        startPhase={initialConfig ? 'exam' : 'lobby'}
+        startPhase={initialChapterId ? 'chapter_quiz' : initialConfig ? 'exam' : 'lobby'}
         initialConfig={initialConfig}
+        initialChapterId={initialChapterId}
         onExit={onExit}
         onComplete={onComplete}
         leadMagnetToken={leadMagnetToken}
