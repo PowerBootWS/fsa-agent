@@ -816,6 +816,7 @@ class Orchestrator:
                 course_id=course_id,
                 chapter_id=chapter_id,
                 correct=student_correct,
+                selected_index=selected_index,
             )
 
             if student_correct:
@@ -1888,6 +1889,7 @@ class Orchestrator:
             course_id=course_id,
             chapter_id=prev_q['chapter_id'],
             correct=correct,
+            selected_index=selected_index,
         )
 
     # ------------------------------------------------------------------

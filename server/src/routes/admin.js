@@ -211,4 +211,55 @@ router.get('/usage', requireAuth, requireAdminUser, async (req, res) => {
   }
 });
 
+// GET /api/admin/question-flags?status=open
+//
+// Students reporting bad questions. Russ also gets a Telegram message the
+// moment one is filed; this is for working through the backlog afterwards,
+// and for seeing when several students have flagged the same question — that
+// pattern is the strongest signal a key is wrong.
+router.get('/question-flags', requireAuth, requireAdminUser, async (req, res) => {
+  const status = req.query.status || 'open';
+  try {
+    const result = await pool.query(
+      `SELECT f.id, f.question_id, f.user_email, f.lesson_code, f.reason,
+              f.selected_index, f.keyed_index, f.status, f.created_at,
+              q.question_text, q.options, q.correct_answer AS current_key,
+              (SELECT count(*)::int FROM question_flags f2
+                WHERE f2.question_id = f.question_id) AS times_flagged
+         FROM question_flags f
+         JOIN questions q ON q.id = f.question_id
+        WHERE f.status = $1
+        ORDER BY times_flagged DESC, f.created_at DESC
+        LIMIT 200`,
+      [status]
+    );
+    res.json({ flags: result.rows });
+  } catch (error) {
+    console.error('Error listing question flags:', error);
+    res.status(500).json({ error: 'Failed to list question flags' });
+  }
+});
+
+// PATCH /api/admin/question-flags/:id — { status, note? }
+router.patch('/question-flags/:id', requireAuth, requireAdminUser, async (req, res) => {
+  const { status, note } = req.body;
+  if (!['open', 'confirmed', 'dismissed', 'fixed'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+  try {
+    const result = await pool.query(
+      `UPDATE question_flags
+          SET status = $1, reviewed_note = $2,
+              reviewed_at = CASE WHEN $1 = 'open' THEN NULL ELSE CURRENT_TIMESTAMP END
+        WHERE id = $3 RETURNING id`,
+      [status, (note || '').trim() || null, req.params.id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Flag not found' });
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error updating question flag:', error);
+    res.status(500).json({ error: 'Failed to update question flag' });
+  }
+});
+
 module.exports = router;

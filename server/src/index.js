@@ -190,6 +190,11 @@ app.use('/api/v2/course', requireAuth, requireActiveSubscription, v2CourseRouter
 const v2ProgressRouter = require('./routes/v2/progress');
 app.use('/api/v2/progress', requireAuth, requireActiveSubscription, v2ProgressRouter);
 
+// Reporting a bad question is not a subscription-gated feature: anyone who can
+// reach a question must be able to say it is wrong.
+const v2QuestionFlagRouter = require('./routes/v2/questionFlag');
+app.use('/api/v2/question-flag', requireAuth, v2QuestionFlagRouter);
+
 const authRouter = require('./routes/auth');
 const platformRouter = require('./routes/platform');
 const adminRouter = require('./routes/admin');

@@ -45,3 +45,6 @@ docs/source/lesson_content_*.json
 credentials/.worktrees
 
 .superpowers/
+
+# Generated question-key verification reports (large, regenerable)
+docs/verify/

@@ -422,6 +422,63 @@ body {
 .question-card .q-option.correct { background: rgba(82,168,130,0.15); border-color: var(--green-light); color: var(--green-light); }
 .question-card .q-option.wrong { background: rgba(220,38,38,0.1); border-color: #dc2626; color: #f87171; }
 
+/* Reporting a bad question. Deliberately quiet — it sits under the options as
+   a plain text link, not a button competing with the answers. A student who
+   needs it will find it; one who does not should barely notice it. */
+.question-card .q-flag { margin-top: 10px; }
+
+.question-card .q-flag-open {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 0.76rem;
+  color: var(--gray-mid);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.question-card .q-flag-open:hover { color: var(--orange); }
+
+.question-card .q-flag-reason {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--iron);
+  border: 1px solid var(--plate-edge);
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: var(--off-white);
+  font-family: inherit;
+  font-size: 0.82rem;
+  resize: vertical;
+}
+
+.question-card .q-flag-actions { display: flex; gap: 8px; margin-top: 6px; }
+
+.question-card .q-flag-send,
+.question-card .q-flag-cancel {
+  font-family: inherit;
+  font-size: 0.78rem;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.question-card .q-flag-send {
+  background: var(--orange);
+  border: 1px solid var(--orange);
+  color: #fff;
+}
+.question-card .q-flag-cancel {
+  background: none;
+  border: 1px solid var(--plate-edge);
+  color: var(--gray-light);
+}
+
+.question-card .q-flag-done {
+  font-size: 0.78rem;
+  color: var(--green-light);
+  line-height: 1.4;
+}
+
 .loading { display: flex; align-items: center; justify-content: center; height: 100vh; color: var(--gray-mid); }
 .error { color: #f87171; padding: 32px; }
 

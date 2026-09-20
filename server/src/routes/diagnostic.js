@@ -136,8 +136,8 @@ router.post('/results', async (req, res) => {
     // Batch-insert into question_responses
     if (enriched.length > 0) {
       const values = enriched.map((r, i) => {
-        const base = i * 6;
-        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`;
+        const base = i * 7;
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7})`;
       }).join(', ');
 
       const params = enriched.flatMap(r => [
@@ -147,11 +147,15 @@ router.post('/results', async (req, res) => {
         r.course_id || null,
         r.chapter_id || null,
         r.correct,
+        // Which option they picked, not just whether it scored. A question the
+        // whole cohort answers the same wrong way is a mis-keyed answer.
+        Number.isInteger(r.selected_index) ? r.selected_index : null,
       ]);
 
       await pool.query(
         `INSERT INTO question_responses
-           (user_email, question_id, session_type, course_id, chapter_id, correct)
+           (user_email, question_id, session_type, course_id, chapter_id, correct,
+            selected_index)
          VALUES ${values}`,
         params
       );

@@ -648,10 +648,15 @@ class Researcher:
             return []
 
     def record_response(self, user_email, question_id, session_type,
-                        course_id, chapter_id, correct):
+                        course_id, chapter_id, correct, selected_index=None):
         """
         Persist a single question response for progress tracking.
         Silently ignores errors (non-critical path).
+
+        selected_index is which option the student actually picked. Storing only
+        `correct` meant a mis-keyed question looked exactly like a hard one: on
+        2026-09-19 a whole chapter marked the right answer wrong and the data
+        could not show it. Both callers already had this value to hand.
         """
         try:
             conn = self._get_connection()
@@ -659,10 +664,12 @@ class Researcher:
             cursor.execute(
                 """
                 INSERT INTO question_responses
-                    (user_email, question_id, session_type, course_id, chapter_id, correct)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                    (user_email, question_id, session_type, course_id, chapter_id,
+                     correct, selected_index)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
-                (user_email, question_id, session_type, course_id, chapter_id, bool(correct))
+                (user_email, question_id, session_type, course_id, chapter_id,
+                 bool(correct), selected_index)
             )
             conn.commit()
             cursor.close()

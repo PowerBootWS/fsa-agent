@@ -32,9 +32,12 @@ const BETWEEN_MESSAGES = [
  * QuestionCard — renders a single practice question with answer selection.
  * Uses correct_answer (matches the DB column name).
  */
-function QuestionCard({ question, onAnswer }) {
+function QuestionCard({ question, lessonCode, onAnswer }) {
   const [selected, setSelected] = useState(null);
   const options = question.options || [];
+  // 'idle' -> 'open' (reason box showing) -> 'sent' | 'failed'
+  const [flagState, setFlagState] = useState('idle');
+  const [flagReason, setFlagReason] = useState('');
 
   function handleSelect(idx) {
     if (selected !== null) return; // already answered
@@ -46,6 +49,23 @@ function QuestionCard({ question, onAnswer }) {
       correct,
       correct_answer: question.correct_answer,
     });
+  }
+
+  async function submitFlag() {
+    // Optimistic: the student has done their bit the moment they click. Making
+    // them wait on a network round trip to find out whether their report
+    // counted is the kind of friction that stops the next one being filed.
+    setFlagState('sent');
+    try {
+      await postJson('/api/v2/question-flag', {
+        question_id: question.id,
+        lesson_code: lessonCode,
+        selected_index: selected,
+        reason: flagReason,
+      });
+    } catch {
+      setFlagState('failed');
+    }
   }
 
   return (
@@ -75,6 +95,42 @@ function QuestionCard({ question, onAnswer }) {
           </button>
         );
       })}
+      {selected !== null && (
+        <div className="q-flag">
+          {flagState === 'idle' && (
+            <button className="q-flag-open" onClick={() => setFlagState('open')}>
+              Think this question is wrong? Tell us
+            </button>
+          )}
+          {flagState === 'open' && (
+            <div className="q-flag-form">
+              <textarea
+                className="q-flag-reason"
+                rows={2}
+                value={flagReason}
+                placeholder="What looks wrong? (optional)"
+                onChange={e => setFlagReason(e.target.value)}
+              />
+              <div className="q-flag-actions">
+                <button className="q-flag-send" onClick={submitFlag}>Report it</button>
+                <button className="q-flag-cancel" onClick={() => setFlagState('idle')}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          {flagState === 'sent' && (
+            <div className="q-flag-done">
+              Thanks — Russ will look at this one personally.
+            </div>
+          )}
+          {flagState === 'failed' && (
+            <div className="q-flag-done">
+              We could not record that. Email support@fullsteamahead.ca and we will fix it.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -162,7 +218,14 @@ export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, on
       <div className="tutor-messages" ref={messagesContainerRef}>
         {messages.map((msg, i) => {
           if (msg.type === 'question') {
-            return <QuestionCard key={i} question={msg.question} onAnswer={handleAnswer} />;
+            return (
+              <QuestionCard
+                key={i}
+                question={msg.question}
+                lessonCode={lessonCode}
+                onAnswer={handleAnswer}
+              />
+            );
           }
           return (
             <div

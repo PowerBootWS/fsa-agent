@@ -301,6 +301,29 @@ def _build_answer_ground_truth(state):
         '\n- Do not congratulate her on an answer she did not give, and do not tell her she '
         'is wrong when the verdict above says she is right.'
     )
+    # The one exception to "the verdict is settled".
+    #
+    # The instructions above exist so the tutor does not contradict the green
+    # highlight the student is looking at. But the stored key can be wrong: on
+    # 2026-09-19 a student found that 20 of chapter 2B3-2's 30 questions were
+    # mis-keyed, and with only the rules above the tutor would have spent the
+    # entire conversation insisting they were mistaken. A confident student
+    # argues back; a less confident one concludes they do not understand DC
+    # machines. The second outcome is the one that loses us the student.
+    #
+    # Narrow on purpose: this licenses no re-derivation of its own, only a
+    # refusal to dig in when the student makes an actual technical case.
+    block += (
+        '\n- EXCEPTION — if the student argues that the keyed answer is itself wrong, and '
+        'gives a specific technical reason rather than simply disagreeing: do NOT insist, '
+        'do NOT keep defending the key, and do NOT tell them they are confused. Our answer '
+        'keys are not infallible and some have been found wrong. Say plainly that they may '
+        'well be right, that you cannot overrule the stored answer yourself, and that the '
+        'question has been noted for review — they can also use the "Think this question is '
+        'wrong?" link under the options to send it straight to Russ. Then engage with their '
+        'reasoning on the merits. Being wrong about a key costs us far less than telling a '
+        'student who is right that they are wrong.'
+    )
     return block
 
 
