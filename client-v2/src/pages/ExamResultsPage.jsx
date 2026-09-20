@@ -23,8 +23,18 @@ function GradeBadge({ grade }) {
   );
 }
 
-function WeaknessCard({ chapter, openId, setOpenId }) {
+// The legacy summary payload (fsa_last_exam) is chapter-level only: score,
+// correct, total. It carries nothing about WHICH objective the student missed.
+//
+// This card used to open `${chapter.chapter_id}-1` — objective 1 of the chapter
+// — which looks like a deep link but is a guess, and usually the wrong one: a
+// student who missed questions in objective 7 got objective 1 with no sign
+// anything was off. Rather than fake the precision, list the chapter's
+// objectives and let them pick. Reported by a student 2026-09-20 asking whether
+// the review link was supposed to land where the answer actually is.
+function WeaknessCard({ chapter, objectives, openId, setOpenId }) {
   const isOpen = openId === chapter.chapter_id;
+  const [chosen, setChosen] = useState(null);
   const grade = getGrade(chapter.score);
   const missed = chapter.total != null && chapter.correct != null
     ? chapter.total - chapter.correct
@@ -46,13 +56,33 @@ function WeaknessCard({ chapter, openId, setOpenId }) {
           if (!isOpen) {
             track('feature_use', { action: 'results_lesson_expanded', props: { chapter_id: chapter.chapter_id } });
           }
+          setChosen(null);
           setOpenId(isOpen ? null : chapter.chapter_id);
         }}
         className="er-weakness-btn"
       >
-        {isOpen ? '▲ Hide lesson' : '▶ Watch a lesson on this'}
+        {isOpen ? '▲ Hide lessons' : '▶ Watch a lesson on this'}
       </button>
-      {isOpen && <InlineLessonPlayer lessonCode={`${chapter.chapter_id}-1`} />}
+      {isOpen && (
+        objectives && objectives.length > 0 ? (
+          <div className="er-weakness-objs">
+            <p className="er-weakness-objs-hint">Pick the objective you want to review:</p>
+            {objectives.map(obj => (
+              <button
+                key={obj.lesson_code}
+                className={`er-weakness-obj${chosen === obj.lesson_code ? ' er-weakness-obj--active' : ''}`}
+                onClick={() => setChosen(chosen === obj.lesson_code ? null : obj.lesson_code)}
+              >
+                <span className="er-weakness-obj-code">{obj.lesson_code}</span>
+                <span className="er-weakness-obj-title">{obj.title}</span>
+              </button>
+            ))}
+            {chosen && <InlineLessonPlayer lessonCode={chosen} />}
+          </div>
+        ) : (
+          <p className="er-weakness-objs-hint">Could not load this chapter's objectives.</p>
+        )
+      )}
     </div>
   );
 }
@@ -236,15 +266,33 @@ export default function ExamResultsPage() {
   }
 
   // ── Fallback summary view (older results with no cached full debrief) ──
-  return <SummaryView summary={summary} navigate={navigate} />;
+  return <SummaryView summary={summary} navigate={navigate} courseId={courseId} />;
 }
 
 // Legacy summary layout, kept as a graceful fallback when only the lightweight
 // fsa_last_exam summary is available (e.g. an exam taken before full debriefs
 // were persisted).
-function SummaryView({ summary, navigate }) {
+function SummaryView({ summary, navigate, courseId }) {
   const [openCardId, setOpenCardId] = useState(null);
+  const [objsByChapter, setObjsByChapter] = useState({});
   const { score, total, correct, chapters = [], date } = summary;
+
+  // Objective titles for the picker. Best-effort: if this fails the card says
+  // so rather than falling back to a guessed lesson code.
+  useEffect(() => {
+    if (!courseId) return;
+    let cancelled = false;
+    fetch(`/api/platform/course-structure/${courseId}`, { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (cancelled || !data?.chapters) return;
+        const map = {};
+        data.chapters.forEach(ch => { map[ch.chapter_id] = ch.objectives || []; });
+        setObjsByChapter(map);
+      })
+      .catch(() => { /* card shows the fallback message */ });
+    return () => { cancelled = true; };
+  }, [courseId]);
   const overallGrade = getGrade(score);
   const weakChapters = chapters.filter(ch => getGrade(ch.score) !== 'A');
 
@@ -288,7 +336,13 @@ function SummaryView({ summary, navigate }) {
             </div>
           ) : (
             weakChapters.map(ch => (
-              <WeaknessCard key={ch.chapter_id} chapter={ch} openId={openCardId} setOpenId={setOpenCardId} />
+              <WeaknessCard
+                key={ch.chapter_id}
+                chapter={ch}
+                objectives={objsByChapter[ch.chapter_id]}
+                openId={openCardId}
+                setOpenId={setOpenCardId}
+              />
             ))
           )}
         </div>

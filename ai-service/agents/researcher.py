@@ -965,9 +965,16 @@ class Researcher:
 
     def get_questions_by_ids(self, ids):
         """
-        Fetch lesson_code, topic, explanation for a list of question IDs.
-        Fallback used when exam_results are missing enrichment fields.
-        Returns dict keyed by question id: {id: {lesson_code, topic, explanation}}
+        Fetch lesson_code, topic, explanation, earliest_slide for question IDs.
+        Used to enrich exam_results before the debrief is built.
+        Returns dict keyed by question id.
+
+        earliest_slide is the first slide at which the question becomes
+        answerable. The exam debrief uses it to open the lesson AT the relevant
+        slide instead of at slide 1: objectives run a median of 26 slides and up
+        to 101, so "review the material" used to mean "start at the top and
+        hunt". It is NULL for questions that have not been placed yet, and the
+        caller falls back to slide 1 for those.
         """
         if not ids:
             return {}
@@ -976,7 +983,7 @@ class Researcher:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT id, lesson_code, topic, explanation
+                SELECT id, lesson_code, topic, explanation, earliest_slide
                 FROM questions
                 WHERE id = ANY(%s)
                 """,
@@ -990,6 +997,7 @@ class Researcher:
                     'lesson_code': row['lesson_code'] or '',
                     'topic': row['topic'] or '',
                     'explanation': row['explanation'] or '',
+                    'earliest_slide': row['earliest_slide'],
                 }
                 for row in rows
             }

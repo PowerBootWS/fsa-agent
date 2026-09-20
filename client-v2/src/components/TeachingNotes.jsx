@@ -49,7 +49,10 @@ export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapt
               )}
             </div>
             {isOpen && obj.lesson_code && (
-              <InlineLessonPlayer lessonCode={obj.lesson_code} />
+              <InlineLessonPlayer
+                lessonCode={obj.lesson_code}
+                startSlide={obj.start_slide ?? null}
+              />
             )}
           </div>
         );

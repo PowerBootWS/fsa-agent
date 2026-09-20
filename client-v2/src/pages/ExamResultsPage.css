@@ -281,3 +281,45 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Objective picker on the legacy summary card. The card cannot know which
+   objective was missed (the old payload is chapter-level only), so it offers
+   the list instead of guessing objective 1. */
+.er-weakness-objs { margin-top: 10px; }
+
+.er-weakness-objs-hint {
+  font-size: 0.8rem;
+  color: var(--gray-light, #a8b4c0);
+  margin: 0 0 8px;
+}
+
+.er-weakness-obj {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: var(--iron, #161B22);
+  border: 1px solid var(--plate-edge, #252F42);
+  border-radius: 4px;
+  padding: 7px 10px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.84rem;
+  color: var(--gray-light, #a8b4c0);
+}
+.er-weakness-obj:hover { border-color: var(--orange, #E8720C); }
+.er-weakness-obj--active {
+  border-color: var(--orange, #E8720C);
+  background: rgba(232, 114, 12, 0.08);
+  color: var(--off-white, #E6EDF3);
+}
+
+.er-weakness-obj-code {
+  flex: 0 0 auto;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  color: var(--orange, #E8720C);
+}
+.er-weakness-obj-title { flex: 1 1 auto; }

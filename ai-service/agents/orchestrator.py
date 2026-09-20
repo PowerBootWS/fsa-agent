@@ -1173,8 +1173,18 @@ class Orchestrator:
                     'topic': r.get('topic', ''),
                     'explanation': r.get('explanation', ''),
                     'count': 0,
+                    'start_slide': None,
                 }
             by_objective[key]['count'] += 1
+            # Several missed questions can share an objective. Open at the
+            # earliest of them, so the student lands before every concept they
+            # got wrong and reads forward, rather than past some of it.
+            slide = r.get('earliest_slide')
+            if isinstance(slide, int):
+                current = by_objective[key]['start_slide']
+                by_objective[key]['start_slide'] = (
+                    slide if current is None else min(current, slide)
+                )
             # Keep first non-empty explanation
             if not by_objective[key]['explanation'] and r.get('explanation'):
                 by_objective[key]['explanation'] = r['explanation']
@@ -1348,16 +1358,25 @@ class Orchestrator:
                 'mode': 'practice_exam',
             }
 
-        # --- Enrich any wrong answers missing lesson_code (edge case fallback) ---
-        wrong_missing = [
-            r['question_id'] for r in results
-            if not r['correct'] and not r.get('lesson_code')
-        ]
-        if wrong_missing:
-            enrichment = researcher.get_questions_by_ids(wrong_missing)
+        # --- Enrich wrong answers for the debrief ---
+        #
+        # This used to run only for rows missing lesson_code. It now runs for
+        # every wrong answer, because earliest_slide is never carried in
+        # exam_results (the in-memory question dicts do not select it) and the
+        # debrief needs it to deep-link "Watch a lesson on this" at the slide
+        # that actually teaches the answer rather than at slide 1.
+        wrong_ids = [r['question_id'] for r in results if not r['correct']]
+        if wrong_ids:
+            enrichment = researcher.get_questions_by_ids(wrong_ids)
             for r in results:
-                if not r['correct'] and not r.get('lesson_code') and r['question_id'] in enrichment:
-                    r.update(enrichment[r['question_id']])
+                if r['correct'] or r['question_id'] not in enrichment:
+                    continue
+                meta = enrichment[r['question_id']]
+                r['earliest_slide'] = meta.get('earliest_slide')
+                # Existing in-memory values win — only fill what is missing.
+                for field in ('lesson_code', 'topic', 'explanation'):
+                    if not r.get(field) and meta.get(field):
+                        r[field] = meta[field]
 
         is_fourth_class = course_id in FOURTH_CLASS_COURSES
 
@@ -1403,6 +1422,9 @@ class Orchestrator:
                     'topic': topic_label,
                     'teaching_tip': tips.get(i + 1, obj['explanation'] or ''),
                     'wrong_count': obj['count'],
+                    # None when the missed questions carry no earliest_slide;
+                    # the client then opens at slide 1 as before.
+                    'start_slide': obj.get('start_slide'),
                 })
 
         # --- Aggregate chapter stats (unchanged for 4th Class — pure SQL, not an LLM feature) ---
