@@ -3,8 +3,6 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useInstall } from '../hooks/useInstall';
 import './AppShell.css';
 
-const COOLDOWN_DAYS = 7;
-
 export default function AppShell({ children }) {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('fsa_user') || '{}');
@@ -84,13 +82,6 @@ export default function AppShell({ children }) {
     }
   }
 
-  let daysUntilSwitch = 0;
-  if (accountInfo?.last_paper_switch_at) {
-    const diffMs = Date.now() - new Date(accountInfo.last_paper_switch_at).getTime();
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    daysUntilSwitch = Math.max(0, Math.ceil(COOLDOWN_DAYS - diffDays));
-  }
-
   return (
     <div className="as-shell">
       <nav className="as-sidebar">
@@ -128,21 +119,12 @@ export default function AppShell({ children }) {
                 </button>
               )}
               {hasCourse && (
-                daysUntilSwitch > 0 ? (
-                  <>
-                    <button className="as-menu-item--disabled" disabled>
-                      Switch Paper
-                    </button>
-                    <div className="as-menu-note">Available in {daysUntilSwitch} day{daysUntilSwitch !== 1 ? 's' : ''}</div>
-                  </>
-                ) : (
-                  <button
-                    className="as-menu-item"
-                    onClick={() => { setMenuOpen(false); navigate('/select-paper'); }}
-                  >
-                    Switch Paper
-                  </button>
-                )
+                <button
+                  className="as-menu-item"
+                  onClick={() => { setMenuOpen(false); navigate('/select-paper'); }}
+                >
+                  Switch Paper
+                </button>
               )}
               {showInstall && (
                 <button className="as-menu-item" onClick={handleInstallClick}>

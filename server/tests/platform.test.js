@@ -16,7 +16,7 @@ function buildTestApp() {
   return app;
 }
 
-async function createUser({ email, withSubscription }) {
+async function createUser({ email, withSubscription, lastSwitchAt }) {
   const token = `test-token-${email}`;
   const userResult = await pool.query(
     `INSERT INTO platform_users (email, first_name, last_name, current_session_token)
@@ -26,9 +26,9 @@ async function createUser({ email, withSubscription }) {
   const userId = userResult.rows[0].id;
   if (withSubscription) {
     await pool.query(
-      `INSERT INTO subscriptions (user_id, class_code, status, active_paper)
-       VALUES ($1, 'second', 'active', '2A1')`,
-      [userId]
+      `INSERT INTO subscriptions (user_id, class_code, status, active_paper, last_paper_switch_at)
+       VALUES ($1, 'second', 'active', '2A1', $2)`,
+      [userId, lastSwitchAt || null]
     );
   }
   return { userId, token };
@@ -60,5 +60,24 @@ describe('POST /api/platform/switch-paper', () => {
       .send({ paper: '2A2' });
     expect(res.status).toBe(200);
     expect(res.body.active_paper).toBe('2A2');
+  });
+
+  // There is no cooldown between switches (owner decision 2026-09-21). The old
+  // 7-day rule guessed at account sharing we had never actually observed, and
+  // because the signup paper picker posts to this same endpoint it froze every
+  // new student on whatever they chose in their first minute. Sharing is
+  // detected by IP and displaced-session instead.
+  it('lets a student switch again immediately after a previous switch', async () => {
+    const { token } = await createUser({
+      email: 'switchpaper-justswitched@example.com',
+      withSubscription: true,
+      lastSwitchAt: new Date(Date.now() - 60 * 1000), // one minute ago
+    });
+    const res = await request(buildTestApp())
+      .post('/api/platform/switch-paper')
+      .set('Cookie', `fsa_session=${token}`)
+      .send({ paper: '2A3' });
+    expect(res.status).toBe(200);
+    expect(res.body.active_paper).toBe('2A3');
   });
 });

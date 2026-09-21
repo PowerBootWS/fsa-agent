@@ -54,4 +54,4 @@ docker compose up -d ai-service
 
 ## Environment
 
-Two layers: `/home/debian/.env.shared` + `fsa-agent/.env`. Key vars: `LEARN_DOMAIN`, `INTERNAL_SECRET` (webhook → provision/deactivate), `ADMIN_API_KEY`, `SUPPORT_GMAIL_SA`/`EMAIL_FROM` (all outbound mail — Gmail API, no SMTP), `PLATFORM_BASE_URL`, `PAPER_SWITCH_COOLDOWN_DAYS`, `QUIZ_PASSING_THRESHOLD`, `POSTGRES_*`, `PYTHON_SERVICE_URL`. See the wiki for the full table.
+Two layers: `/home/debian/.env.shared` + `fsa-agent/.env`. Key vars: `LEARN_DOMAIN`, `INTERNAL_SECRET` (webhook → provision/deactivate), `ADMIN_API_KEY`, `SUPPORT_GMAIL_SA`/`EMAIL_FROM` (all outbound mail — Gmail API, no SMTP), `PLATFORM_BASE_URL`, `QUIZ_PASSING_THRESHOLD`, `POSTGRES_*`, `PYTHON_SERVICE_URL`. See the wiki for the full table.

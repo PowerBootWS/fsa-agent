@@ -18,8 +18,6 @@ const router = express.Router();
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:5000';
 
-const PAPER_SWITCH_COOLDOWN_DAYS = parseInt(process.env.PAPER_SWITCH_COOLDOWN_DAYS || '7', 10);
-
 /**
  * Middleware: verify x-internal-secret header matches INTERNAL_SECRET env var.
  */
@@ -420,24 +418,18 @@ router.post('/switch-paper', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'paper is required' });
     }
 
-    const { subscription_id, last_paper_switch_at } = req.user;
+    const { subscription_id } = req.user;
 
     if (!subscription_id) {
       return res.status(403).json({ error: 'An active subscription is required to select a paper.' });
     }
 
-    if (last_paper_switch_at) {
-      const switchedAt = new Date(last_paper_switch_at);
-      const now = new Date();
-      const diffMs = now - switchedAt;
-      const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-      if (diffDays < PAPER_SWITCH_COOLDOWN_DAYS) {
-        const daysRemaining = Math.ceil(PAPER_SWITCH_COOLDOWN_DAYS - diffDays);
-        return res.status(429).json({ error: 'Paper switch cooldown', days_remaining: daysRemaining });
-      }
-    }
-
+    // No cooldown between switches (owner decision 2026-09-21). The old 7-day
+    // rule was written against suspected account sharing we had never actually
+    // observed, and since the signup paper picker posts here too it silently
+    // froze every new student on whatever they picked in their first minute.
+    // Sharing is detected by IP and displaced-session instead.
+    // last_paper_switch_at is still recorded as an audit trail.
     await pool.query(
       `UPDATE subscriptions SET active_paper = $1, last_paper_switch_at = now() WHERE id = $2`,
       [paper, subscription_id]
