@@ -10,7 +10,7 @@ services:
     # container fails to start ("port is already allocated"). Not in the
     # original brief; added after hitting that error.
     ports: !override
-      - "5435:5432"
+      - "127.0.0.1:5435:5432"   # localhost only: Docker publishes bypass ufw (Phase 0, 2026-09-28)
     volumes:
       - fsa_postgres_staging_data:/var/lib/postgresql/data
 
