@@ -202,12 +202,14 @@ const documentsRouter = require('./routes/documents');
 const tailoringRouter = require('./routes/tailoring');
 const jobsRouter = require('./routes/jobs');
 const homeRouter = require('./routes/home');
+const announcementsRouter = require('./routes/announcements');
 
 app.use('/api/auth', authRouter);
 app.use('/api/platform', platformRouter);
 app.use('/api/platform', documentsRouter);
 app.use('/api/platform', tailoringRouter);
 app.use('/api/platform', homeRouter);
+app.use('/api/platform', announcementsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/jobs', jobsRouter);
 

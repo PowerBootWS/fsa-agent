@@ -156,8 +156,42 @@ async function findNextForUser(pool, user, { isAffiliate }) {
   return null;
 }
 
+async function announcementExists(pool, id) {
+  const { rows } = await pool.query(`SELECT id, title FROM announcements WHERE id = $1`, [id]);
+  return rows[0] || null;
+}
+
+// First action wins: a later dismiss after a CTA click (or feedback after a
+// dismiss) leaves the original row alone.
+async function recordView(pool, announcementId, userId, action) {
+  await pool.query(
+    `INSERT INTO announcement_views (announcement_id, user_id, action) VALUES ($1, $2, $3)
+     ON CONFLICT (announcement_id, user_id) DO NOTHING`,
+    [announcementId, userId, action]
+  );
+}
+
+async function saveFeedback(pool, announcementId, userId, message) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `INSERT INTO announcement_feedback (announcement_id, user_id, message) VALUES ($1, $2, $3)`,
+      [announcementId, userId, message]
+    );
+    await recordView(client, announcementId, userId, 'feedback');
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   AUDIENCES, CLASS_AUDIENCES, LIVE_SUB,
   validateAnnouncement, upsertAnnouncement, endAnnouncementNow, countEligible,
   userGroups, findNextForUser,
+  recordView, saveFeedback, announcementExists,
 };

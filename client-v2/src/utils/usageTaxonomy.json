@@ -18,6 +18,9 @@
     "paper_switched",
     "tailoring_started",
     "job_detail_opened",
-    "affiliate_joined"
+    "affiliate_joined",
+    "announcement_shown",
+    "announcement_cta",
+    "announcement_feedback"
   ]
 }
