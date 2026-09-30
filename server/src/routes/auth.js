@@ -56,13 +56,17 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    // Find user with active subscription
+    // Join only a live subscription — same condition as requireAuth. Cancelled or
+    // lapsed subscribers still log in (their saved jobs, profile and invoices live
+    // here); they simply come back with no class_code, exactly like a job-only
+    // account, and requireActiveSubscription keeps the course itself closed.
     const userResult = await pool.query(
       `SELECT u.id, u.email, u.first_name, u.last_name, u.password_hash,
               u.current_session_token AS prior_session_token,
-              s.status AS subscription_status, s.active_paper, s.class_code
+              s.active_paper, s.class_code
        FROM platform_users u
-       LEFT JOIN subscriptions s ON s.user_id = u.id
+       LEFT JOIN subscriptions s ON s.user_id = u.id AND s.status = 'active'
+         AND (s.cancel_at IS NULL OR s.cancel_at > NOW())
        WHERE u.email = $1
        LIMIT 1`,
       [email.toLowerCase().trim()]
@@ -71,12 +75,6 @@ router.post('/login', async (req, res) => {
     const user = userResult.rows[0];
 
     if (!user || !user.password_hash) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
-
-    // Block only users who HAD a subscription that is no longer active (lapsed/cancelled
-    // paid students) — allow through when there is no subscription row at all (job-only accounts).
-    if (user.subscription_status && user.subscription_status !== 'active') {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 

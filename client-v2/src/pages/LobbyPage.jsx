@@ -168,9 +168,13 @@ export default function LobbyPage() {
         </header>
         <div className="lb-content">
           <div className="lb-enroll-wrap">
-            <h2 className="lb-enroll-title">You're not enrolled in a course yet</h2>
+            <h2 className="lb-enroll-title">
+              {account.had_subscription ? "You don't have an active course right now" : "You're not enrolled in a course yet"}
+            </h2>
             <p className="lb-enroll-subtitle">
-              Pick your certification level to get instant access to every paper, lesson, and practice exam.
+              {account.had_subscription
+                ? 'Your saved jobs and profile are still here, and your invoices are under your name in the menu. Ready for your next class? Pick it below.'
+                : 'Pick your certification level to get instant access to every paper, lesson, and practice exam.'}
             </p>
             <div className="lb-enroll-options">
               <a className="lb-enroll-card" href="https://fullsteamahead.ca/enroll.html?class=second">

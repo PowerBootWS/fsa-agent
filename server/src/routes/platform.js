@@ -899,6 +899,14 @@ router.get('/check-access', requireAuth, async (req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const u = req.user;
+    // Any subscription row, live or not — drives the invoices link and the lobby
+    // copy for a student whose course has ended.
+    const { rows: [hist] } = await pool.query(
+      `SELECT COUNT(*) > 0 AS had_subscription,
+              COALESCE(BOOL_OR(stripe_subscription_id IS NOT NULL AND stripe_subscription_id <> ''), false) AS has_stripe_sub
+       FROM subscriptions WHERE user_id = $1`,
+      [u.id]
+    );
     return res.json({
       id: u.id,
       email: u.email,
@@ -910,6 +918,8 @@ router.get('/me', requireAuth, async (req, res) => {
       class_code: u.class_code,
       status: u.status,
       last_paper_switch_at: u.last_paper_switch_at,
+      had_subscription: hist.had_subscription,
+      has_billing_history: hist.has_stripe_sub,
     });
   } catch (err) {
     console.error('GET /api/platform/me error:', err);
@@ -1017,9 +1027,23 @@ router.post('/credits/checkout', requireAuth, async (req, res) => {
 
 // POST /api/platform/billing-portal
 // Creates a Stripe Customer Portal session and returns the URL.
+// Works for cancelled subscribers too — the portal is where they download
+// invoices for employer reimbursement. Resolves the customer from the live
+// subscription, else the most recent one of any status. stripe_customer_id is
+// deliberately not used: credit-pack checkout can create a separate customer
+// that holds none of the subscription invoices.
 router.post('/billing-portal', requireAuth, async (req, res) => {
   try {
-    const stripeSubId = req.user.stripe_subscription_id;
+    let stripeSubId = req.user.stripe_subscription_id;
+    if (!stripeSubId) {
+      const { rows } = await pool.query(
+        `SELECT stripe_subscription_id FROM subscriptions
+         WHERE user_id = $1 AND stripe_subscription_id IS NOT NULL AND stripe_subscription_id <> ''
+         ORDER BY id DESC LIMIT 1`,
+        [req.user.id]
+      );
+      stripeSubId = rows[0]?.stripe_subscription_id;
+    }
     if (!stripeSubId) {
       return res.status(400).json({ error: 'No Stripe subscription on file. Contact support@fullsteamahead.ca.' });
     }

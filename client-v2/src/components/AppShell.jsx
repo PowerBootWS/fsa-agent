@@ -12,6 +12,9 @@ export default function AppShell({ children }) {
   // go stale; /api/platform/me is the same source ProfilePage already trusts.
   const [accountInfo, setAccountInfo] = useState(null);
   const hasCourse = !!accountInfo?.class_code;
+  // A student whose course has ended keeps the portal link — it's where their
+  // invoices are (employer reimbursement).
+  const hasBilling = hasCourse || !!accountInfo?.has_billing_history;
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [billingLoading, setBillingLoading] = useState(false);
@@ -109,13 +112,13 @@ export default function AppShell({ children }) {
           </button>
           {menuOpen && (
             <div className="as-user-menu-dropdown">
-              {hasCourse && (
+              {hasBilling && (
                 <button
                   className="as-menu-item"
                   onClick={handleOpenBillingPortal}
                   disabled={billingLoading}
                 >
-                  {billingLoading ? 'Opening…' : 'Subscription'}
+                  {billingLoading ? 'Opening…' : (hasCourse ? 'Subscription & invoices' : 'Billing & invoices')}
                 </button>
               )}
               {hasCourse && (
