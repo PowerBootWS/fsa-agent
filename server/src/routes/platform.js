@@ -6,6 +6,7 @@ const { CREDIT_PACKS, PACK_ORDER } = require('../config/creditPacks');
 const { PAPERS_BY_CLASS, FOURTH_CLASS_CODES } = require('../config/papersForClass');
 const credits = require('../services/credits');
 const { grantSignupCredit } = require('../services/signupCredit');
+const { getObjectiveProgress, getLastExam } = require('../services/paperStats');
 
 // While the LMS transition stabilizes, automated deactivations are held for operator
 // confirmation instead of pulling access immediately. Default ON; set to 'false' to resume
@@ -464,20 +465,8 @@ router.get('/lobby-data', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'No active paper selected' });
     }
 
-    // 1. Count total objectives for this paper
-    const totalObjectivesResult = await pool.query(
-      `SELECT COUNT(*) FROM lessons WHERE lesson_code LIKE $1`,
-      [`${active_paper}-%`]
-    );
-    const totalObjectives = parseInt(totalObjectivesResult.rows[0].count);
-
-    // 2. Count completed objectives
-    const completedObjectivesResult = await pool.query(
-      `SELECT COUNT(*) FROM user_progress
-       WHERE user_email = $1 AND lesson_code LIKE $2 AND completed = true`,
-      [email, `${active_paper}-%`]
-    );
-    const completedObjectives = parseInt(completedObjectivesResult.rows[0].count);
+    // 1-2. Objective totals / completed
+    const { completed: completedObjectives, total: totalObjectives } = await getObjectiveProgress(pool, email, active_paper);
 
     // 3. Last visited lesson
     const lastVisitedResult = await pool.query(
@@ -518,21 +507,7 @@ router.get('/lobby-data', requireAuth, async (req, res) => {
     });
 
     // 5. Practice exam history — last attempt
-    const lastExamResult = await pool.query(
-      `SELECT
-         qr.chapter_id,
-         COUNT(*) as total,
-         SUM(CASE WHEN qr.correct THEN 1 ELSE 0 END) as correct,
-         DATE_TRUNC('minute', MAX(qr.answered_at)) as exam_date
-       FROM question_responses qr
-       WHERE qr.user_email = $1 AND qr.course_id = $2 AND qr.session_type = 'practice_exam'
-         AND qr.answered_at = (
-           SELECT MAX(answered_at) FROM question_responses
-           WHERE user_email = $1 AND course_id = $2 AND session_type = 'practice_exam'
-         )
-       GROUP BY qr.chapter_id`,
-      [email, active_paper]
-    );
+    const lastExam = await getLastExam(pool, email, active_paper);
 
     // 6. Total chapters for this paper
     const totalChaptersResult = await pool.query(
@@ -545,21 +520,6 @@ router.get('/lobby-data', requireAuth, async (req, res) => {
     const avgQuizScore = chapterQuizzes.length > 0
       ? Math.round(chapterQuizzes.reduce((sum, q) => sum + q.score, 0) / chapterQuizzes.length)
       : null;
-
-    // Calculate last exam total score
-    let lastExam = null;
-    if (lastExamResult.rows.length > 0) {
-      const totalCorrect = lastExamResult.rows.reduce((sum, r) => sum + parseInt(r.correct), 0);
-      const totalQs = lastExamResult.rows.reduce((sum, r) => sum + parseInt(r.total), 0);
-      lastExam = {
-        score: Math.round((totalCorrect / totalQs) * 100),
-        date: lastExamResult.rows[0].exam_date,
-        chapters: lastExamResult.rows.map(r => ({
-          chapter_id: r.chapter_id,
-          score: Math.round((parseInt(r.correct) / parseInt(r.total)) * 100),
-        })),
-      };
-    }
 
     // Next quiz ready = first chapter in sequence not yet passed
     const nextQuizChapterId = (() => {
@@ -649,34 +609,7 @@ router.get('/quiz-lobby-data', requireAuth, async (req, res) => {
         };
       });
 
-      const lastExamResult = await pool.query(
-        `SELECT
-           qr.chapter_id,
-           COUNT(*) as total,
-           SUM(CASE WHEN qr.correct THEN 1 ELSE 0 END) as correct,
-           DATE_TRUNC('minute', MAX(qr.answered_at)) as exam_date
-         FROM question_responses qr
-         WHERE qr.user_email = $1 AND qr.course_id = $2 AND qr.session_type = 'practice_exam'
-           AND qr.answered_at = (
-             SELECT MAX(answered_at) FROM question_responses
-             WHERE user_email = $1 AND course_id = $2 AND session_type = 'practice_exam'
-           )
-         GROUP BY qr.chapter_id`,
-        [email, paper]
-      );
-      let lastExam = null;
-      if (lastExamResult.rows.length > 0) {
-        const totalCorrect = lastExamResult.rows.reduce((sum, r) => sum + parseInt(r.correct), 0);
-        const totalQs = lastExamResult.rows.reduce((sum, r) => sum + parseInt(r.total), 0);
-        lastExam = {
-          score: Math.round((totalCorrect / totalQs) * 100),
-          date: lastExamResult.rows[0].exam_date,
-          chapters: lastExamResult.rows.map(r => ({
-            chapter_id: r.chapter_id,
-            score: Math.round((parseInt(r.correct) / parseInt(r.total)) * 100),
-          })),
-        };
-      }
+      const lastExam = await getLastExam(pool, email, paper);
 
       const totalChaptersResult = await pool.query(
         `SELECT COUNT(DISTINCT chapter_num) FROM chapters WHERE course_id = $1`,
