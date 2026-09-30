@@ -93,7 +93,7 @@ describe('HomePage', () => {
 
   it('affiliate: shows earnings and the referral link', async () => {
     renderHome({ ...base, affiliate: { is_affiliate: true, code: 'TAY1', referral_url: 'https://fullsteamahead.ca/?am_id=TAY1',
-      referred_count: 4, paying_referrals_count: 2, earned_cents: 5960 } });
+      referred_count: 4, enrolled_count: 2, earned_cents: 5960 } });
     expect(await screen.findByText('$59.60')).toBeInTheDocument();
     expect(screen.getByText('https://fullsteamahead.ca/?am_id=TAY1')).toBeInTheDocument();
   });
@@ -105,9 +105,9 @@ describe('HomePage', () => {
 
   it('Join flips the card to the referral link', async () => {
     renderHome(base);
-    await screen.findByText(/earn 20% of every referral, every month/i);
+    await screen.findByText(/earn 20% of every 2nd or 3rd class referral, every month/i);
     globalThis.fetch.mockResolvedValueOnce(respond({ affiliate: { is_affiliate: true, code: 'TAY1',
-      referral_url: 'https://fullsteamahead.ca/?am_id=TAY1', referred_count: 0, paying_referrals_count: 0, earned_cents: 0 } }));
+      referral_url: 'https://fullsteamahead.ca/?am_id=TAY1', referred_count: 0, enrolled_count: 0, earned_cents: 0 } }));
     fireEvent.click(screen.getByRole('button', { name: /join/i }));
     expect(await screen.findByText('https://fullsteamahead.ca/?am_id=TAY1')).toBeInTheDocument();
   });

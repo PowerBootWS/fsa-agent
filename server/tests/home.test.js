@@ -137,7 +137,7 @@ describe('GET /api/platform/home', () => {
 
 describe('POST /api/platform/affiliate/join', () => {
   const stats = { is_affiliate: true, code: 'TAYLOR1234', referral_url: 'https://fullsteamahead.ca/?am_id=TAYLOR1234',
-    referred_count: 0, paying_referrals_count: 0, earned_cents: 0 };
+    referred_count: 0, enrolled_count: 0, earned_cents: 0 };
   afterEach(async () => {
     jest.resetAllMocks();
     await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);

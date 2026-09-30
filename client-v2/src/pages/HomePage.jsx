@@ -95,7 +95,7 @@ function AffiliateCard({ affiliate, onJoin, joining, joinError }) {
     return (
       <section className="hm-card hm-card--quiet">
         <h2 className="hm-card-title">Referrals</h2>
-        <p>Earn 20% of every referral, every month.</p>
+        <p>Earn 20% of every 2nd or 3rd Class referral, every month.</p>
         {affiliate.paused
           ? <p className="hm-muted">Your referral account is paused. Reply to any Full Steam Ahead email and we'll sort it out.</p>
           : <button className="hm-btn hm-btn--ghost" onClick={onJoin} disabled={joining}>{joining ? 'Joining…' : 'Join'}</button>}
@@ -112,7 +112,7 @@ function AffiliateCard({ affiliate, onJoin, joining, joinError }) {
       <div className="hm-stats">
         <div><div className="hm-stat-value">{dollars(affiliate.earned_cents)}</div><div className="hm-stat-label">earned to date</div></div>
         <div><div className="hm-stat-value">{affiliate.referred_count}</div><div className="hm-stat-label">people referred</div></div>
-        <div><div className="hm-stat-value">{affiliate.paying_referrals_count}</div><div className="hm-stat-label">paying</div></div>
+        <div><div className="hm-stat-value">{affiliate.enrolled_count}</div><div className="hm-stat-label">enrolled</div></div>
       </div>
       <div className="hm-referral">
         <code className="hm-referral-url">{affiliate.referral_url}</code>

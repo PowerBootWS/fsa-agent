@@ -79,7 +79,7 @@ router.post('/affiliate/join', requireAuth, async (req, res) => {
       code: result.affiliate.code,
       referral_url: `https://fullsteamahead.ca/?am_id=${result.affiliate.code}`,
       referred_count: 0,
-      paying_referrals_count: 0,
+      enrolled_count: 0,
       earned_cents: 0,
     };
     return res.json({ affiliate });
