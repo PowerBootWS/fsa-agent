@@ -106,7 +106,58 @@ async function countEligible(pool, v) {
   return count;
 }
 
+async function userGroups(pool, userId) {
+  const { rows: [r] } = await pool.query(
+    `SELECT
+       ARRAY(SELECT s.class_code FROM subscriptions s WHERE s.user_id = $1 AND ${LIVE_SUB}) AS classes,
+       EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = $1) AS had_any,
+       EXISTS (SELECT 1 FROM saved_jobs j WHERE j.user_id = $1 AND j.status <> 'archived') AS has_saved`,
+    [userId]
+  );
+  const groups = new Set(['everyone']);
+  if (r.classes.length > 0) {
+    groups.add('students');
+    for (const c of r.classes) if (CLASS_AUDIENCES.includes(c)) groups.add(c);
+  }
+  if (r.has_saved || !r.had_any) groups.add('job_seekers');
+  return groups;
+}
+
+async function findNextForUser(pool, user, { isAffiliate }) {
+  const { rows } = await pool.query(
+    `SELECT a.id, a.title, a.body, a.cta_label, a.cta_url, a.audiences
+       FROM announcements a
+       JOIN platform_users pu ON pu.id = $1
+      WHERE now() >= a.starts_at AND now() < a.ends_at
+        AND pu.created_at <= a.starts_at
+        AND NOT EXISTS (
+          SELECT 1 FROM announcement_views v WHERE v.announcement_id = a.id AND v.user_id = $1
+        )
+      ORDER BY a.starts_at DESC, a.id DESC`,
+    [user.id]
+  );
+  if (rows.length === 0) return null;
+
+  const groups = await userGroups(pool, user.id);
+  let affiliate = null; // looked up lazily, at most once
+  for (const a of rows) {
+    let match = a.audiences.some(g => groups.has(g));
+    if (!match && a.audiences.includes('affiliates')) {
+      if (affiliate === null) {
+        try { affiliate = Boolean(await isAffiliate(user.email)); } catch { affiliate = false; }
+      }
+      match = affiliate;
+    }
+    if (match) {
+      const { id, title, body, cta_label, cta_url } = a;
+      return { id, title, body, cta_label, cta_url };
+    }
+  }
+  return null;
+}
+
 module.exports = {
   AUDIENCES, CLASS_AUDIENCES, LIVE_SUB,
   validateAnnouncement, upsertAnnouncement, endAnnouncementNow, countEligible,
+  userGroups, findNextForUser,
 };
