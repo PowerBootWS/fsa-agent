@@ -3,7 +3,7 @@
   "short_name": "FSA",
   "description": "Power Engineering exam prep — lessons, practice exams, and an AI tutor.",
   "id": "/",
-  "start_url": "/lobby",
+  "start_url": "/home",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0D1117",
