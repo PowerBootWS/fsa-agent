@@ -89,6 +89,9 @@ export default function AppShell({ children }) {
     <div className="as-shell">
       <nav className="as-sidebar">
         <div className="as-brand">Full Steam Ahead</div>
+        <NavLink to="/home" className={({ isActive }) => `as-nav-item${isActive ? ' as-nav-item--active' : ''}`}>
+          🏠 Home
+        </NavLink>
         <NavLink to="/lobby" className={({ isActive }) => `as-nav-item${isActive ? ' as-nav-item--active' : ''}`}>
           📚 Courses
         </NavLink>

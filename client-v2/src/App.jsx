@@ -23,6 +23,7 @@ import JobsCapturePage from './pages/JobsCapturePage';
 import CreditsPage from './pages/CreditsPage';
 import FreePracticeExamPage from './pages/FreePracticeExamPage';
 import AdminUsagePage from './pages/AdminUsagePage';
+import HomePage from './pages/HomePage';
 import { LessonPlayer } from './LessonPlayer';
 import { ExamRouter } from './ExamRouter';
 import { isFourthClassCode } from './utils/fourthClass';
@@ -67,6 +68,16 @@ export default function App() {
         element={
           <ProtectedRoute requirePaper={false} requireCourse={true}>
             <SelectPaperPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/home"
+        element={
+          <ProtectedRoute requirePaper={false}>
+            <AppShell>
+              <HomePage />
+            </AppShell>
           </ProtectedRoute>
         }
       />
@@ -151,13 +162,7 @@ export default function App() {
   );
 }
 
-// Job-only accounts (no active_paper, no class_code) have no course to land on —
-// send them to /jobs instead of /lobby, which would otherwise bounce them to
-// /select-paper. Everyone else keeps the existing default.
+// Everyone lands on Home; it links onward to the course lobby, jobs and profile.
 function DefaultRedirect() {
-  const user = JSON.parse(localStorage.getItem('fsa_user') || 'null');
-  if (user && !user.active_paper && !user.class_code) {
-    return <Navigate to="/jobs" replace />;
-  }
-  return <Navigate to="/lobby" replace />;
+  return <Navigate to="/home" replace />;
 }
