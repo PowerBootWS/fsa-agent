@@ -44,7 +44,7 @@ router.post('/jobs/:savedJobId/tailor', requireAuth, async (req, res) => {
     const resumeDoc = docsResult.rows.find((d) => d.doc_type === 'resume');
     const coverLetterDoc = docsResult.rows.find((d) => d.doc_type === 'cover_letter');
     if (!resumeDoc) {
-      return res.status(400).json({ error: 'Upload a resume before generating tailored documents' });
+      return res.status(400).json({ error: 'Upload a resume before building a custom resume or cover letter' });
     }
 
     const balance = await credits.getBalance(req.user.id);

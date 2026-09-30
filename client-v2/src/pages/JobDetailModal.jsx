@@ -153,7 +153,7 @@ export default function JobDetailModal({ jobId, onClose, focusTailoring = false 
                 <p className="jd-loading">Loading…</p>
               ) : !hasResume ? (
                 <p className="jd-tailoring-gate">
-                  Upload a resume on your <a href="/profile">Profile</a> page before generating tailored documents.
+                  Upload a resume on your <a href="/profile">Profile</a> page before building a custom resume or cover letter.
                 </p>
               ) : balance === 0 ? (
                 <p className="jd-tailoring-gate">
@@ -182,7 +182,7 @@ export default function JobDetailModal({ jobId, onClose, focusTailoring = false 
                     onClick={handleGenerate}
                   >
                     {generating
-                      ? 'Tailoring your documents… this can take up to a minute.'
+                      ? 'Building your custom documents… this can take up to a minute.'
                       : `Generate (${selectedCount} credit${selectedCount === 1 ? '' : 's'})`}
                   </button>
                   {tailorError && <p className="jd-error">{tailorError}</p>}
