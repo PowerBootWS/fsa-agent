@@ -87,17 +87,16 @@ announcement_feedback
 ## Authoring and publishing
 
 - Source of truth: one JSON file per announcement in
-  `server/announcements/<slug>.json`, committed to git:
+  `server/src/announcements/<slug>.json` (under `src/`, because the api image copies only `server/src/`), committed to git:
   `{ "slug", "title", "body", "cta_label"?, "cta_url"?, "audiences": [...], "starts_at"?, "ends_at"? }`.
   A missing `starts_at` means now; a missing `ends_at` means `starts_at` + 30 days.
-- Publish: `docker exec fsa-agent-api-1 node src/scripts/publish_announcement.js announcements/<slug>.json`.
+- Publish: `docker exec fsa-agent-api-1 node src/scripts/publish_announcement.js src/announcements/<slug>.json`.
   - It validates the file (audience values, copy length, `cta_url` is `/…` or `https://…`, no
     em dashes, never "tailor").
   - It upserts by `slug`, so re-running updates the copy.
   - It prints how many accounts are currently eligible, as a sanity check before it goes out.
   - Live immediately; no redeploy.
-  - The announcement files must be copied into the api image. Note this in the Dockerfile if
-    `server/` isn't copied wholesale.
+  - A new announcement file ships with the next api image build. To publish before that, `docker cp` the file into the running container first; the git commit stays the record.
 - To pull one early: run the same script with `--end-now`, which sets `ends_at = now()`.
 - **Process rule (in the wiki):** before publishing, Claude shows Russ the title, body, button,
   and audience list, and publishes only after he approves.
