@@ -8,6 +8,9 @@ async function weakestChapter(pool, paper, lastExam) {
   if (!lastExam || lastExam.chapters.length === 0) return null;
   const weakest = lastExam.chapters.reduce((a, b) => (b.score < a.score ? b : a));
   const chapterNum = parseInt(String(weakest.chapter_id).split('-').pop(), 10);
+  if (weakest.chapter_id == null || Number.isNaN(chapterNum)) {
+    return { chapter_id: weakest.chapter_id ?? null, title: null, score: weakest.score };
+  }
   const { rows } = await pool.query(
     `SELECT title FROM chapters WHERE course_id = $1 AND chapter_num = $2`,
     [paper, chapterNum]

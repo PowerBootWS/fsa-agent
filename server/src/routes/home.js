@@ -53,30 +53,40 @@ router.post('/affiliate/join', requireAuth, async (req, res) => {
     return res.status(502).json({ error: "Couldn't join right now, try again in a minute." });
   }
 
-  if (result.affiliate.status !== 'active') {
-    return res.status(409).json({
-      error: "Your referral account is paused. Reply to any Full Steam Ahead email and we'll sort it out.",
-    });
+  if (!result || !result.affiliate) {
+    console.error('POST /api/platform/affiliate/join: service returned no affiliate');
+    return res.status(502).json({ error: "Couldn't join right now, try again in a minute." });
   }
 
-  if (result.created) {
-    try {
-      await sendAffiliateWelcome(u.email, u.first_name, result.affiliate.code);
-    } catch (err) {
-      console.error('affiliate welcome email failed for user', u.id, '-', err.message);
+  try {
+    if (result.affiliate.status !== 'active') {
+      return res.status(409).json({
+        error: "Your referral account is paused. Reply to any Full Steam Ahead email and we'll sort it out.",
+      });
     }
-  }
 
-  const summary = await affiliateClient.getSummary(u.email);
-  const affiliate = summary && summary.is_affiliate ? summary : {
-    is_affiliate: true,
-    code: result.affiliate.code,
-    referral_url: `https://fullsteamahead.ca/?am_id=${result.affiliate.code}`,
-    referred_count: 0,
-    paying_referrals_count: 0,
-    earned_cents: 0,
-  };
-  return res.json({ affiliate });
+    if (result.created) {
+      try {
+        await sendAffiliateWelcome(u.email, u.first_name, result.affiliate.code);
+      } catch (err) {
+        console.error('affiliate welcome email failed for user', u.id, '-', err.message);
+      }
+    }
+
+    const summary = await affiliateClient.getSummary(u.email);
+    const affiliate = summary && summary.is_affiliate ? summary : {
+      is_affiliate: true,
+      code: result.affiliate.code,
+      referral_url: `https://fullsteamahead.ca/?am_id=${result.affiliate.code}`,
+      referred_count: 0,
+      paying_referrals_count: 0,
+      earned_cents: 0,
+    };
+    return res.json({ affiliate });
+  } catch (err) {
+    console.error('POST /api/platform/affiliate/join post-join error:', err.message);
+    return res.status(502).json({ error: "Couldn't join right now, try again in a minute." });
+  }
 });
 
 module.exports = router;

@@ -5,7 +5,7 @@ const { sendMagicLink, sendDeactivationReview } = require('../services/email');
 const { CREDIT_PACKS, PACK_ORDER } = require('../config/creditPacks');
 const { PAPERS_BY_CLASS, FOURTH_CLASS_CODES } = require('../config/papersForClass');
 const credits = require('../services/credits');
-const { grantSignupCredit } = require('../services/signupCredit');
+const signupCredit = require('../services/signupCredit');
 const { getObjectiveProgress, getLastExam } = require('../services/paperStats');
 
 // While the LMS transition stabilizes, automated deactivations are held for operator
@@ -168,7 +168,12 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
 
     // Every account gets the free custom-resume credit, not just free signups.
     if (userIsNew) {
-      await grantSignupCredit(pool, user.id);
+      try {
+        await signupCredit.grantSignupCredit(pool, user.id);
+      } catch (err) {
+        // A failed free credit must never fail paid provisioning.
+        console.error('provision-user: signup credit grant failed for user', user.id, '-', err.message);
+      }
     }
 
     // For a returning contact (no insert above), still backfill phone/address from

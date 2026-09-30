@@ -187,6 +187,16 @@ describe('POST /api/platform/affiliate/join', () => {
     expect(res.body.error).toBe("Couldn't join right now, try again in a minute.");
   });
 
+  it('2xx without an affiliate object returns 502, not an unhandled rejection', async () => {
+    affiliateClient.join.mockResolvedValue({ created: true });
+    const app = buildTestApp();
+    await createUser('homepage-noaff@example.com');
+    const cookie = await login(app, 'homepage-noaff@example.com');
+    const res = await request(app).post('/api/platform/affiliate/join').set('Cookie', cookie);
+    expect(res.status).toBe(502);
+    expect(res.body.error).toBe("Couldn't join right now, try again in a minute.");
+  });
+
   it('falls back to the create result when the summary call fails after joining', async () => {
     affiliateClient.join.mockResolvedValue({ affiliate: { code: 'TAYLOR1234', status: 'active' }, created: true });
     affiliateClient.getSummary.mockResolvedValue(null);

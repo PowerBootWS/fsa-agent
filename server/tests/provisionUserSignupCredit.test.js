@@ -56,6 +56,24 @@ describe('paid enrollment gets the free custom-resume credit', () => {
     expect(await creditState(email)).toEqual({ balance: 1, grants: 1 });
   });
 
+  it('a signup-credit failure does not fail paid provisioning', async () => {
+    const signupCredit = require('../src/services/signupCredit');
+    const spy = jest.spyOn(signupCredit, 'grantSignupCredit').mockRejectedValue(new Error('boom'));
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const app = buildTestApp();
+      const email = 'provcredit-fail@example.com';
+      expect((await provision(app, email)).status).toBe(200);
+      const { rows } = await pool.query(
+        `SELECT s.id FROM subscriptions s JOIN platform_users u ON u.id = s.user_id WHERE u.email = $1`, [email]);
+      expect(rows.length).toBeGreaterThan(0);
+      expect(spy).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      errSpy.mockRestore();
+    }
+  });
+
   it('backfill migration grants only accounts that never had a signup_grant', async () => {
     const { rows: [bare] } = await pool.query(
       `INSERT INTO platform_users (email, first_name, last_name) VALUES ('provcredit-bare@example.com', 'Bare', 'Fixture') RETURNING id`);

@@ -3,12 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { getJson } from '../utils/api';
 import './ProfilePage.css';
 
-// Job-only accounts (no active_paper, no class_code) have no lobby/course to go back
-// to — send them to /jobs instead. Mirrors the same check used in App.jsx's DefaultRedirect.
+// /home is the landing page for every account.
 function homeRoute() {
-  const user = JSON.parse(localStorage.getItem('fsa_user') || 'null');
-  if (user && !user.active_paper && !user.class_code) return '/jobs';
-  return '/lobby';
+  return '/home';
 }
 
 export default function ProfilePage() {

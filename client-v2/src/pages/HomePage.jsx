@@ -11,6 +11,13 @@ const AFFILIATE_DASHBOARD_URL = 'https://fullsteamahead.ca/affiliate-dashboard';
 const dollars = cents => `$${(cents / 100).toFixed(2)}`;
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
+function weakestLabel(w) {
+  if (!w) return null;
+  if (w.title) return w.title;
+  if (typeof w.chapter_id === 'string' && w.chapter_id) return `Chapter ${w.chapter_id.split('-').pop()}`;
+  return null;
+}
+
 function CourseCard({ course, firstName }) {
   if (!course) {
     return <section className="hm-card"><h2 className="hm-card-title">Your course</h2><p className="hm-muted">Couldn't load your course right now.</p></section>;
@@ -27,7 +34,8 @@ function CourseCard({ course, firstName }) {
   if (course.state === 'lapsed') {
     return (
       <section className="hm-card">
-        <h2 className="hm-card-title">Welcome back, {firstName}.</h2>
+        <h2 className="hm-card-title">Your course</h2>
+        <p>Welcome back, {firstName}.</p>
         <p>Your course access has ended. Pick up where you left off whenever you're ready.</p>
         <a className="hm-btn" href={ENROLL_URL}>See courses</a>
       </section>
@@ -52,7 +60,7 @@ function CourseCard({ course, firstName }) {
           {s.paper && (
             <p className="hm-muted">
               {s.last_exam_score !== null
-                ? <>Last practice exam {s.last_exam_score}%{s.weakest_chapter && <> · weakest: {s.weakest_chapter.title || `Chapter ${s.weakest_chapter.chapter_id.split('-').pop()}`}</>}</>
+                ? <>Last practice exam {s.last_exam_score}%{weakestLabel(s.weakest_chapter) && <> · weakest: {weakestLabel(s.weakest_chapter)}</>}</>
                 : 'No practice exam yet'}
             </p>
           )}
@@ -172,7 +180,7 @@ export default function HomePage() {
     setJoinError('');
     try {
       const res = await fetch('/api/platform/affiliate/join', { method: 'POST', credentials: 'include' });
-      const body = await res.json();
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || "Couldn't join right now, try again in a minute.");
       track('feature_use', { action: 'affiliate_joined' });
       setData(d => ({ ...d, affiliate: body.affiliate }));
@@ -204,7 +212,7 @@ export default function HomePage() {
       <div className="hm-grid hm-grid--small">
         {data.new_jobs_7d !== null && (
           <section className="hm-card hm-card--small">
-            <p>{data.new_jobs_7d} new postings in the last 7 days.</p>
+            <p>{plural(data.new_jobs_7d, 'new posting', 'new postings')} in the last 7 days.</p>
             <a className="hm-link" href={JOB_BOARD_URL}>Browse the board</a>
           </section>
         )}
