@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const { pool } = require('../services/database');
 const { sendMagicLink, sendPasswordReset } = require('../services/email');
 const nurture = require('../services/nurture');
+const { grantSignupCredit } = require('../services/signupCredit');
 
 const router = express.Router();
 
@@ -454,14 +455,7 @@ router.post('/signup', async (req, res) => {
       // free credit grant so the feature is usable ahead of the Stripe purchase flow
       // (sub-project 2). See server/migrations/011_resume_tailoring.sql for the matching
       // one-time backfill on pre-existing accounts.
-      await client.query(
-        `INSERT INTO credit_balances (user_id, balance) VALUES ($1, 1)`,
-        [user.id]
-      );
-      await client.query(
-        `INSERT INTO credit_transactions (user_id, delta, reason) VALUES ($1, 1, 'signup_grant')`,
-        [user.id]
-      );
+      await grantSignupCredit(client, user.id);
 
       await client.query('COMMIT');
     } catch (err) {

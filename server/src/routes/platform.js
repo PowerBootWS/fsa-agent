@@ -5,6 +5,7 @@ const { sendMagicLink, sendDeactivationReview } = require('../services/email');
 const { CREDIT_PACKS, PACK_ORDER } = require('../config/creditPacks');
 const { PAPERS_BY_CLASS, FOURTH_CLASS_CODES } = require('../config/papersForClass');
 const credits = require('../services/credits');
+const { grantSignupCredit } = require('../services/signupCredit');
 
 // While the LMS transition stabilizes, automated deactivations are held for operator
 // confirmation instead of pulling access immediately. Default ON; set to 'false' to resume
@@ -163,6 +164,11 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
       [normalizedEmail]
     );
     const user = userResult.rows[0];
+
+    // Every account gets the free custom-resume credit, not just free signups.
+    if (userIsNew) {
+      await grantSignupCredit(pool, user.id);
+    }
 
     // For a returning contact (no insert above), still backfill phone/address from
     // Stripe when provided — COALESCE keeps any existing value if a field is null.
