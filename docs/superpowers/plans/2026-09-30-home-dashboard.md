@@ -1833,7 +1833,7 @@ export default function HomePage() {
       <div className="hm-grid hm-grid--small">
         {data.new_jobs_7d !== null && (
           <section className="hm-card hm-card--small">
-            <p><strong>{data.new_jobs_7d}</strong> new postings in the last 7 days.</p>
+            <p>{data.new_jobs_7d} new postings in the last 7 days.</p>
             <a className="hm-link" href={JOB_BOARD_URL}>Browse the board</a>
           </section>
         )}
@@ -1957,9 +1957,9 @@ cd /home/debian && rtk proxy grep -n -i -E "tailor" \
   fsa-agent/client-v2/src/pages/JobDetailModal.jsx fsa-agent/server/src/routes/tailoring.js \
   fsa-nurture/engine/templates/saved-jobs-d0.html fsa-nurture/engine/templates/saved-jobs-d3.html \
   fsa-nurture/engine/templates/saved-jobs-d7.html fsa-nurture/engine/templates/job-digest-d7.html \
-  fsa-website/enrollment-confirmation.html | rtk proxy grep -v -E "className=|tailorError|tailorResult|tailoringRef|scrollToTailoring|focusTailoring|loadTailoringContext|tailoring_started|console.error|/tailor"
+  fsa-website/enrollment-confirmation.html | rtk proxy grep -v -i -E "className=|tailorError|tailorResult|tailoringRef|scrollToTailoring|focusTailoring|loadTailoringContext|tailoring_started|console.error|/tailor"
 ```
-Expected now: matching lines, meaning student-visible "tailor" text remains. The goal is no output.
+Expected now: matching lines, meaning student-visible "tailor" text remains. The goal: every remaining line is a code identifier, route path or log string, never text a student sees. Read each remaining line and judge; the filter is a helper, not the proof.
 
 - [ ] **Step 2: Replace the copy exactly**
 
@@ -1986,7 +1986,7 @@ Expected now: matching lines, meaning student-visible "tailor" text remains. The
 
 - [ ] **Step 3: Re-run the guard and the affected suites**
 
-Run the Step 1 command. Expected: no output.
+Run the Step 1 command. Expected: only code identifiers / route paths / log strings remain (list them in your report).
 Run: `cd /home/debian/fsa-nurture && npm run preflight` (expected: passes, and all templates still resolve).
 Run: `cd /home/debian/fsa-agent/server && POSTGRES_PASSWORD=$(grep -m1 '^POSTGRES_PASSWORD=' /home/debian/.env.shared | cut -d= -f2-) npm test -- tailoring` and `cd /home/debian/fsa-agent/client-v2 && npx vitest run`. Expected: pass.
 
