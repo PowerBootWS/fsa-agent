@@ -89,4 +89,25 @@ async function sendOpsEmail(to, subject, text) {
   await email.sendEmail({ from: FROM, to, subject, text });
 }
 
-module.exports = { sendMagicLink, sendPasswordReset, sendPracticeExamCode, sendDeactivationReview, sendOpsEmail };
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Sent when a student joins the affiliate program from the Home page. The
+// first name is whatever the account holder typed at signup, so it is escaped.
+async function sendAffiliateWelcome(email_, firstName, code) {
+  const link = `https://fullsteamahead.ca/?am_id=${code}`;
+  const dashboard = 'https://fullsteamahead.ca/affiliate-dashboard';
+  const name = escapeHtml(firstName || 'there');
+  await email.sendEmail({
+    from: FROM,
+    to: email_,
+    subject: 'Your Full Steam Ahead referral link',
+    html: `<p>Hi ${name},</p><p>You're in. Here's your referral link:</p><p><a href="${link}">${link}</a></p><p>Share it with anyone working toward their ticket. When someone enrolls through it, you earn 20% of what they pay, every month they stay enrolled.</p><p>Track your referrals and earnings anytime at <a href="${dashboard}">${dashboard}</a>. Log in with this email address.</p><p>Full Steam Ahead</p>`,
+    text: `Hi ${firstName || 'there'},\n\nYou're in. Here's your referral link:\n${link}\n\nShare it with anyone working toward their ticket. When someone enrolls through it, you earn 20% of what they pay, every month they stay enrolled.\n\nTrack your referrals and earnings anytime at ${dashboard}. Log in with this email address.\n\nFull Steam Ahead`,
+  });
+}
+
+module.exports = { sendMagicLink, sendPasswordReset, sendPracticeExamCode, sendDeactivationReview, sendOpsEmail, sendAffiliateWelcome, escapeHtml };

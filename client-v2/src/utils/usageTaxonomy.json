@@ -1,6 +1,7 @@
 {
   "screens": [
     "/select-paper",
+    "/home",
     "/lobby",
     "/jobs",
     "/chapters",
@@ -16,6 +17,7 @@
     "results_lesson_expanded",
     "paper_switched",
     "tailoring_started",
-    "job_detail_opened"
+    "job_detail_opened",
+    "affiliate_joined"
   ]
 }
