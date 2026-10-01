@@ -1,0 +1,8 @@
+{
+  "slug": "2026-10-home-dashboard",
+  "title": "Your new Home page is here",
+  "body": "Everything's in one place now: your course progress, the jobs you've saved, your free custom resume, and your referral earnings.\n\nPick up where you left off, or find a job worth going after and we'll build a resume for it.",
+  "cta_label": "Check it out",
+  "cta_url": "/home",
+  "audiences": ["everyone"]
+}
