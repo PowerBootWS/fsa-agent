@@ -189,9 +189,25 @@ async function saveFeedback(pool, announcementId, userId, message) {
   }
 }
 
+async function getReport(pool, slug) {
+  const { rows: [a] } = await pool.query(
+    `SELECT id, slug, title, audiences, starts_at, ends_at FROM announcements WHERE slug = $1`, [slug]);
+  if (!a) return null;
+  const { rows: counts } = await pool.query(
+    `SELECT action, count(*)::int AS n FROM announcement_views WHERE announcement_id = $1 GROUP BY action`, [a.id]);
+  const seen = { dismissed: 0, cta: 0, feedback: 0, total: 0 };
+  for (const c of counts) { seen[c.action] = c.n; seen.total += c.n; }
+  const { rows: feedback } = await pool.query(
+    `SELECT concat_ws(' ', pu.first_name, pu.last_name) AS name, pu.email, f.message, f.created_at
+       FROM announcement_feedback f JOIN platform_users pu ON pu.id = f.user_id
+      WHERE f.announcement_id = $1 ORDER BY f.created_at ASC, f.id ASC`, [a.id]);
+  const eligible = await countEligible(pool, { audiences: a.audiences, starts_at: a.starts_at });
+  return { slug: a.slug, title: a.title, starts_at: a.starts_at, ends_at: a.ends_at, eligible, seen, feedback };
+}
+
 module.exports = {
   AUDIENCES, CLASS_AUDIENCES, LIVE_SUB,
   validateAnnouncement, upsertAnnouncement, endAnnouncementNow, countEligible,
   userGroups, findNextForUser,
-  recordView, saveFeedback, announcementExists,
+  recordView, saveFeedback, announcementExists, getReport,
 };
