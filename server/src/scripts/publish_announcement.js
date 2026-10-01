@@ -18,8 +18,9 @@ async function publishFromFile(db, filePath) {
   const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   const result = validateAnnouncement(parsed);
   if (!result.ok) throw new Error(`Invalid announcement:\n  - ${result.errors.join('\n  - ')}`);
-  const { id, inserted } = await upsertAnnouncement(db, result.value);
-  const eligible = await countEligible(db, result.value);
+  const { id, inserted, starts_at } = await upsertAnnouncement(db, result.value);
+  // Use the stored start: a re-publish without dates keeps the original window.
+  const eligible = await countEligible(db, { ...result.value, starts_at });
   return { id, inserted, eligible };
 }
 

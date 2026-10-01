@@ -46,6 +46,7 @@ describe('validateAnnouncement', () => {
     expect(validateAnnouncement({ ...base, cta_label: 'Read more', cta_url: 'https://fullsteamahead.ca/jobs' }, NOW).ok).toBe(true);
     expect(validateAnnouncement({ ...base, cta_label: 'x', cta_url: 'http://evil.example' }, NOW).ok).toBe(false);
     expect(validateAnnouncement({ ...base, cta_label: 'x', cta_url: '//evil.example' }, NOW).ok).toBe(false);
+    expect(validateAnnouncement({ ...base, cta_label: 'x', cta_url: '/\\evil.example' }, NOW).ok).toBe(false);
     expect(validateAnnouncement({ ...base, cta_label: 'x', cta_url: 'javascript:alert(1)' }, NOW).ok).toBe(false);
   });
 
@@ -67,7 +68,7 @@ describe('publishing', () => {
     const first = await upsertAnnouncement(pool, validateAnnouncement(base).value);
     const again = await upsertAnnouncement(pool, validateAnnouncement({ ...base, title: 'Updated title' }).value);
     expect(first.inserted).toBe(true);
-    expect(again).toEqual({ id: first.id, inserted: false });
+    expect(again).toMatchObject({ id: first.id, inserted: false });
     const { rows } = await pool.query(`SELECT title FROM announcements WHERE slug = 'test-home'`);
     expect(rows).toEqual([{ title: 'Updated title' }]);
   });
@@ -112,5 +113,47 @@ describe('publishing', () => {
     fs.writeFileSync(file, JSON.stringify({ ...base, slug: 'test-bad', audiences: [] }));
     await expect(publishFromFile(pool, file)).rejects.toThrow(/Invalid announcement/);
     fs.unlinkSync(file);
+  });
+
+  describe('re-publishing without dates keeps the stored window', () => {
+    const win = async () => (await pool.query(
+      `SELECT starts_at, ends_at, title FROM announcements WHERE slug = 'test-home'`)).rows[0];
+
+    it('copy-only re-publish leaves starts_at/ends_at alone', async () => {
+      const file = path.join(os.tmpdir(), `test-ann-keep-${process.pid}.json`);
+      fs.writeFileSync(file, JSON.stringify({ ...base }));
+      await publishFromFile(pool, file);
+      await pool.query(`UPDATE announcements SET starts_at = starts_at - interval '10 days', ends_at = ends_at - interval '10 days' WHERE slug = 'test-home'`);
+      const before = await win();
+      fs.writeFileSync(file, JSON.stringify({ ...base, title: 'New title' }));
+      await publishFromFile(pool, file);
+      const after = await win();
+      fs.unlinkSync(file);
+      expect(after.starts_at).toEqual(before.starts_at);
+      expect(after.ends_at).toEqual(before.ends_at);
+      expect(after.title).toBe('New title');
+    });
+
+    it('stays ended after --end-now and a dateless re-publish', async () => {
+      const file = path.join(os.tmpdir(), `test-ann-end-${process.pid}.json`);
+      fs.writeFileSync(file, JSON.stringify({ ...base }));
+      await publishFromFile(pool, file);
+      await pool.query(`UPDATE announcements SET starts_at = now() - interval '2 days' WHERE slug = 'test-home'`);
+      await endAnnouncementNow(pool, 'test-home');
+      fs.writeFileSync(file, JSON.stringify({ ...base, title: 'Fixed typo' }));
+      await publishFromFile(pool, file);
+      fs.unlinkSync(file);
+      const { rows: [a] } = await pool.query(`SELECT ends_at <= now() AS ended FROM announcements WHERE slug = 'test-home'`);
+      expect(a.ended).toBe(true);
+    });
+
+    it('explicit dates on re-publish do update the window', async () => {
+      await upsertAnnouncement(pool, validateAnnouncement(base).value);
+      const r = validateAnnouncement({ ...base, starts_at: '2026-11-01T00:00:00Z', ends_at: '2026-11-15T00:00:00Z' }, NOW);
+      await upsertAnnouncement(pool, r.value);
+      const a = await win();
+      expect(a.starts_at.toISOString()).toBe('2026-11-01T00:00:00.000Z');
+      expect(a.ends_at.toISOString()).toBe('2026-11-15T00:00:00.000Z');
+    });
   });
 });

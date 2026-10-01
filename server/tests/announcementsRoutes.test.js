@@ -89,6 +89,7 @@ describe('announcement routes', () => {
     expect((await request(app).post(`/api/platform/announcements/${id}/seen`).set('Cookie', cookie).send({ action: 'feedback' })).status).toBe(400);
     expect((await request(app).post(`/api/platform/announcements/999999/seen`).set('Cookie', cookie).send({ action: 'dismissed' })).status).toBe(404);
     expect((await request(app).post(`/api/platform/announcements/abc/seen`).set('Cookie', cookie).send({ action: 'dismissed' })).status).toBe(404);
+    expect((await request(app).post(`/api/platform/announcements/12345678901234567890/seen`).set('Cookie', cookie).send({ action: 'dismissed' })).status).toBe(404);
   });
 
   it('feedback saves, marks seen, and notifies Russ', async () => {

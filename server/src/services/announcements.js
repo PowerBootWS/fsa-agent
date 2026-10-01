@@ -26,7 +26,7 @@ function validateAnnouncement(input, now = new Date()) {
   if (!body || body.length > 600) errors.push('body is required and at most 600 characters');
   if (Boolean(ctaLabel) !== Boolean(ctaUrl)) errors.push('cta_label and cta_url go together');
   if (ctaLabel && ctaLabel.length > 30) errors.push('cta_label is at most 30 characters');
-  if (ctaUrl && !(/^\/(?!\/)/.test(ctaUrl) || /^https:\/\//.test(ctaUrl))) {
+  if (ctaUrl && !(/^\/(?![\/\\])/.test(ctaUrl) || /^https:\/\//.test(ctaUrl))) {
     errors.push('cta_url must be an in-app path (/...) or an https:// URL');
   }
 
@@ -48,7 +48,9 @@ function validateAnnouncement(input, now = new Date()) {
   if (errors.length) return { ok: false, errors };
   return {
     ok: true,
-    value: { slug, title, body, cta_label: ctaLabel, cta_url: ctaUrl, audiences, starts_at: startsAt, ends_at: endsAt },
+    value: { slug, title, body, cta_label: ctaLabel, cta_url: ctaUrl, audiences, starts_at: startsAt, ends_at: endsAt,
+      starts_at_given: Boolean(a.starts_at), ends_at_given: Boolean(a.ends_at),
+    },
   };
 }
 
@@ -59,11 +61,13 @@ async function upsertAnnouncement(pool, v) {
      ON CONFLICT (slug) DO UPDATE SET
        title = EXCLUDED.title, body = EXCLUDED.body, cta_label = EXCLUDED.cta_label,
        cta_url = EXCLUDED.cta_url, audiences = EXCLUDED.audiences,
-       starts_at = EXCLUDED.starts_at, ends_at = EXCLUDED.ends_at
-     RETURNING id, (xmax = 0) AS inserted`,
-    [v.slug, v.title, v.body, v.cta_label, v.cta_url, v.audiences, v.starts_at, v.ends_at]
+       starts_at = CASE WHEN $9::boolean THEN EXCLUDED.starts_at ELSE announcements.starts_at END,
+       ends_at = CASE WHEN $10::boolean THEN EXCLUDED.ends_at ELSE announcements.ends_at END
+     RETURNING id, (xmax = 0) AS inserted, starts_at, ends_at`,
+    [v.slug, v.title, v.body, v.cta_label, v.cta_url, v.audiences, v.starts_at, v.ends_at,
+      v.starts_at_given === true, v.ends_at_given === true]
   );
-  return { id: row.id, inserted: row.inserted };
+  return { id: row.id, inserted: row.inserted, starts_at: row.starts_at, ends_at: row.ends_at };
 }
 
 async function endAnnouncementNow(pool, slug) {

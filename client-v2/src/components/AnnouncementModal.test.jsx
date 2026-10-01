@@ -123,4 +123,20 @@ describe('AnnouncementModal', () => {
     await screen.findByRole('dialog');
     expect(container.ownerDocument.body.textContent).not.toMatch(/tailor|—/i);
   });
+
+  it('re-checks on the next mount after a 401 (no page reload)', async () => {
+    globalThis.fetch = vi.fn(async () => respond({}, 401));
+    render(<MemoryRouter><AnnouncementModal /></MemoryRouter>);
+    await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+    await new Promise(r => setTimeout(r, 0));
+    cleanup();
+    setup();
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('sends the seen POST with keepalive so a CTA navigation cannot cancel it', async () => {
+    setup();
+    fireEvent.click(await screen.findByRole('button', { name: /dismiss|got it/i }));
+    expect(posts('/announcements/7/seen')[0][1].keepalive).toBe(true);
+  });
 });

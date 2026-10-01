@@ -14,6 +14,7 @@ function post(url, body) {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    keepalive: true, // survives the page leaving right after a CTA click
   });
 }
 
@@ -29,15 +30,20 @@ export default function AnnouncementModal() {
   useEffect(() => {
     if (checkedThisLoad) return;
     checkedThisLoad = true;
+    // Only a 200 counts as "checked"; a 401 (session displaced) or a network
+    // error must let the next mount try again after the user logs back in.
     fetch('/api/platform/announcements/next', { credentials: 'include' })
-      .then(res => (res.ok ? res.json() : null))
+      .then(res => {
+        if (!res.ok) { checkedThisLoad = false; return null; }
+        return res.json();
+      })
       .then(data => {
         if (data?.announcement) {
           setAnnouncement(data.announcement);
           track('feature_use', { action: 'announcement_shown', props: { id: data.announcement.id } });
         }
       })
-      .catch(() => {});
+      .catch(() => { checkedThisLoad = false; });
   }, []);
 
   function recordSeen(action) {

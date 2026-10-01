@@ -15,7 +15,7 @@ const feedbackLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 });
 const MAX_FEEDBACK = 2000;
 
 function parseId(raw) {
-  return /^\d+$/.test(String(raw)) ? Number(raw) : null;
+  return /^\d{1,9}$/.test(String(raw)) ? Number(raw) : null;
 }
 
 router.get('/announcements/next', requireAuth, async (req, res) => {
