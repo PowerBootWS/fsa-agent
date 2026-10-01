@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useInstall } from '../hooks/useInstall';
 import './AppShell.css';
+import AnnouncementModal from './AnnouncementModal';
 
 export default function AppShell({ children }) {
   const navigate = useNavigate();
@@ -146,6 +147,7 @@ export default function AppShell({ children }) {
         </div>
       </nav>
       <div className="as-content">{children}</div>
+      <AnnouncementModal />
 
       {showIosInstall && (
         <div className="as-install-modal-overlay" onClick={() => setShowIosInstall(false)}>
