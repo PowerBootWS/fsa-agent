@@ -1,0 +1,18 @@
+/* NpsPrompt: card styles come from AnnouncementModal.css (an-*). */
+.nps-scale { display: grid; grid-template-columns: repeat(11, 1fr); gap: 4px; }
+.nps-num {
+  background: #0D1117; color: #F4F5F7; border: 1px solid #252F42; border-radius: 4px;
+  padding: 8px 0; font: inherit; font-weight: 700; cursor: pointer; min-width: 0;
+}
+.nps-num:hover { border-color: #E8720C; }
+.nps-num--on { background: #E8720C; border-color: #E8720C; color: #fff; }
+.nps-ends { display: flex; justify-content: space-between; font-size: 12px; color: #9AA4B5; margin-top: -4px; }
+.nps-choices { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.nps-link {
+  display: block; background: #0D1117; border: 1px solid #252F42; border-radius: 4px;
+  padding: 8px 10px; font-size: 14px; color: #F4F5F7; overflow-wrap: anywhere;
+}
+.nps-dash { text-decoration: none; display: inline-block; }
+@media (max-width: 420px) {
+  .nps-scale { grid-template-columns: repeat(6, 1fr); }
+}

@@ -4,6 +4,7 @@ import { useInstall } from '../hooks/useInstall';
 import './AppShell.css';
 import AnnouncementModal from './AnnouncementModal';
 import ContactSupportModal from './ContactSupportModal';
+import NpsPrompt from './NpsPrompt';
 
 export default function AppShell({ children }) {
   const navigate = useNavigate();
@@ -156,6 +157,7 @@ export default function AppShell({ children }) {
       </nav>
       <div className="as-content">{children}</div>
       <AnnouncementModal />
+      <NpsPrompt />
       {showContact && <ContactSupportModal onClose={() => setShowContact(false)} />}
 
       {showIosInstall && (

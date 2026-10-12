@@ -6,7 +6,11 @@ import './AnnouncementModal.css';
 // One check per full page load: AppShell remounts on every in-app navigation,
 // and a "visit" should get at most one pop-up.
 let checkedThisLoad = false;
-export function _resetAnnouncementCheck() { checkedThisLoad = false; }
+export function _resetAnnouncementCheck() { checkedThisLoad = false; showingNow = false; }
+
+// Read by NpsPrompt so the two pop-ups never stack on the same visit.
+let showingNow = false;
+export function isAnnouncementShowing() { return showingNow; }
 
 function post(url, body) {
   return fetch(url, {
@@ -39,6 +43,7 @@ export default function AnnouncementModal() {
       })
       .then(data => {
         if (data?.announcement) {
+          showingNow = true;
           setAnnouncement(data.announcement);
           track('feature_use', { action: 'announcement_shown', props: { id: data.announcement.id } });
         }
