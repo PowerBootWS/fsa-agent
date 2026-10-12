@@ -1,5 +1,6 @@
 // client-v2/src/components/NavigationHeader.jsx
 import { useState, useEffect, useRef } from 'react';
+import ContactSupportModal from './ContactSupportModal';
 
 export function NavigationHeader({
   courseOutline,
@@ -11,6 +12,7 @@ export function NavigationHeader({
   onToggleComplete,
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const dropdownRef = useRef(null);
 
   const parts = activeLessonCode ? activeLessonCode.split('-') : [];
@@ -119,20 +121,37 @@ export function NavigationHeader({
       {/* Its own row, not inside .nav-objective-row — that row scrolls
           horizontally once a chapter has more objectives than fit, and a
           control the student needs on every slide must not scroll away. */}
-      {onToggleComplete && activeLessonCode && (
+      {activeLessonCode && (
         <div className="nav-complete-row">
           <button
             type="button"
-            className={`nav-complete-btn${isObjectiveComplete ? ' done' : ''}`}
-            aria-pressed={isObjectiveComplete}
-            onClick={() => onToggleComplete(activeLessonCode, !isObjectiveComplete)}
-            title={isObjectiveComplete
-              ? 'Marked complete — click to undo'
-              : 'Mark this objective complete'}
+            className="nav-report-btn"
+            onClick={() => setShowReport(true)}
+            title="Tell us about a problem or a mistake on this lesson"
           >
-            {isObjectiveComplete ? '✓ Completed' : '○ Mark complete'}
+            ⚑ Report an issue
           </button>
+          {onToggleComplete && (
+            <button
+              type="button"
+              className={`nav-complete-btn${isObjectiveComplete ? ' done' : ''}`}
+              aria-pressed={isObjectiveComplete}
+              onClick={() => onToggleComplete(activeLessonCode, !isObjectiveComplete)}
+              title={isObjectiveComplete
+                ? 'Marked complete — click to undo'
+                : 'Mark this objective complete'}
+            >
+              {isObjectiveComplete ? '✓ Completed' : '○ Mark complete'}
+            </button>
+          )}
         </div>
+      )}
+      {showReport && (
+        <ContactSupportModal
+          defaultCategory="content"
+          lessonCode={activeLessonCode}
+          onClose={() => setShowReport(false)}
+        />
       )}
     </div>
   );

@@ -43,6 +43,12 @@
   border-left: 3px solid transparent;
 }
 
+.as-nav-contact {
+  background: none; border-top: 0; border-right: 0; border-bottom: 0;
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.as-nav-contact:hover { color: #F4F5F7; }
+
 .as-nav-item--active {
   color: #F4F5F7;
   border-left-color: #E8720C;
@@ -224,6 +230,10 @@
     z-index: 100;
   }
   .as-brand {
+    display: none;
+  }
+  /* No room in the bottom bar; on phones it lives in the user menu. */
+  .as-nav-contact {
     display: none;
   }
   .as-nav-item {

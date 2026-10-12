@@ -649,7 +649,25 @@ body {
 .nav-complete-row {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   padding-bottom: 8px;
+}
+
+.nav-report-btn {
+  background: none;
+  border: 1px solid var(--plate-edge);
+  border-radius: 20px;
+  color: var(--gray-mid);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  padding: 4px 14px;
+  white-space: nowrap;
+}
+
+.nav-report-btn:hover {
+  border-color: #E8720C;
+  color: #E8720C;
 }
 
 .nav-complete-btn {

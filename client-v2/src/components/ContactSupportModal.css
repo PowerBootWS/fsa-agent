@@ -1,0 +1,10 @@
+/* ContactSupportModal: card styles come from AnnouncementModal.css (an-*). */
+.cs-select {
+  width: 100%; box-sizing: border-box;
+  background: #0D1117; color: #F4F5F7; border: 1px solid #252F42; border-radius: 4px;
+  padding: 8px 10px; font: inherit; font-size: 15px;
+}
+.cs-select:focus { outline: 2px solid #E8720C; outline-offset: 1px; }
+.cs-alt { margin: 0; font-size: 13px; color: #9AA4B5; }
+.cs-alt a { color: #E8720C; }
+.an-cta:disabled { opacity: 0.5; cursor: default; }

@@ -203,6 +203,7 @@ const tailoringRouter = require('./routes/tailoring');
 const jobsRouter = require('./routes/jobs');
 const homeRouter = require('./routes/home');
 const announcementsRouter = require('./routes/announcements');
+const supportMessageRouter = require('./routes/supportMessage');
 
 app.use('/api/auth', authRouter);
 app.use('/api/platform', platformRouter);
@@ -210,6 +211,7 @@ app.use('/api/platform', documentsRouter);
 app.use('/api/platform', tailoringRouter);
 app.use('/api/platform', homeRouter);
 app.use('/api/platform', announcementsRouter);
+app.use('/api/platform', supportMessageRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/jobs', jobsRouter);
 

@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useInstall } from '../hooks/useInstall';
 import './AppShell.css';
 import AnnouncementModal from './AnnouncementModal';
+import ContactSupportModal from './ContactSupportModal';
 
 export default function AppShell({ children }) {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ export default function AppShell({ children }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [billingLoading, setBillingLoading] = useState(false);
   const [showIosInstall, setShowIosInstall] = useState(false);
+  const [showContact, setShowContact] = useState(false);
   const menuRef = useRef(null);
 
   const { canPrompt, isIOS, isStandalone, promptInstall } = useInstall();
@@ -102,6 +104,9 @@ export default function AppShell({ children }) {
         <NavLink to="/profile" className={({ isActive }) => `as-nav-item${isActive ? ' as-nav-item--active' : ''}`}>
           👤 Profile
         </NavLink>
+        <button type="button" className="as-nav-item as-nav-contact" onClick={() => setShowContact(true)}>
+          💬 Contact support
+        </button>
 
         <div className="as-user-menu-wrap" ref={menuRef}>
           <button
@@ -133,6 +138,9 @@ export default function AppShell({ children }) {
                   Switch Paper
                 </button>
               )}
+              <button className="as-menu-item" onClick={() => { setMenuOpen(false); setShowContact(true); }}>
+                💬 Contact support
+              </button>
               {showInstall && (
                 <button className="as-menu-item" onClick={handleInstallClick}>
                   📲 Install app
@@ -148,6 +156,7 @@ export default function AppShell({ children }) {
       </nav>
       <div className="as-content">{children}</div>
       <AnnouncementModal />
+      {showContact && <ContactSupportModal onClose={() => setShowContact(false)} />}
 
       {showIosInstall && (
         <div className="as-install-modal-overlay" onClick={() => setShowIosInstall(false)}>
