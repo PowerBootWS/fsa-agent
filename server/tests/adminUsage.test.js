@@ -106,16 +106,17 @@ describe('GET /api/admin/usage', () => {
     // per (user_email, lesson_id), so this counts conversations begun in
     // the window, not messages exchanged. See the comment at the query.
     expect(res.body.activity).toHaveProperty('tutor_conversations_started');
+    expect(res.body.activity).toHaveProperty('tutor_conversations_active');
     expect(res.body.activity).not.toHaveProperty('tutor_turns');
   });
 
-  it('clamps an absurd or non-numeric days parameter to the default', async () => {
+  it('caps days at the 90-day retention window and defaults a non-numeric one', async () => {
     const cookie = `fsa_session=${ADMIN_TOKEN}`;
     const app = buildApp();
 
     const tooBig = await request(app).get('/api/admin/usage?days=9999').set('Cookie', cookie);
     expect(tooBig.status).toBe(200);
-    expect(tooBig.body.window_days).toBe(30);
+    expect(tooBig.body.window_days).toBe(90);
 
     const nonsense = await request(app).get('/api/admin/usage?days=nonsense').set('Cookie', cookie);
     expect(nonsense.status).toBe(200);

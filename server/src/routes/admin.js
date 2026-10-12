@@ -151,7 +151,10 @@ router.post('/credits/test-checkout', requireAdminKey, async (req, res) => {
 // cookie, and forcing session auth onto them would break them.
 router.get('/usage', requireAuth, requireAdminUser, async (req, res) => {
   const parsed = parseInt(req.query.days, 10);
-  const days = Number.isFinite(parsed) && parsed > 0 && parsed <= 365 ? parsed : 30;
+  // Capped at usage_events' 90-day raw retention (prune_usage_events.js):
+  // a longer window would quietly undercount. usage_events_daily is a
+  // deliberate archive of older rollups, not read here (backlog #117).
+  const days = Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 90) : 30;
   const since = `${days} days`;
 
   try {
@@ -184,15 +187,12 @@ router.get('/usage', requireAuth, requireAdminUser, async (req, res) => {
            (SELECT COUNT(*)::int FROM user_progress WHERE last_accessed >= now() - $1::interval) AS lessons_touched,
            (SELECT COUNT(*)::int FROM practice_exam_attempts WHERE created_at >= now() - $1::interval) AS exams_attempted,
            (SELECT COUNT(*)::int FROM saved_jobs WHERE saved_at >= now() - $1::interval) AS jobs_saved,
-           -- chat_history is one row per (user_email, lesson_id), upserted via
-           -- ON CONFLICT ... DO UPDATE SET messages = ...; created_at is set once,
-           -- at first insert, and never touched again. This counts distinct tutor
-           -- conversations STARTED in the window, not messages/turns exchanged --
-           -- a long-running conversation from before the window contributes 0
-           -- here even if the student sent 40 messages in it this week. Counting
-           -- real turns needs an updated_at column on chat_history (follow-up,
-           -- out of scope here).
+           -- chat_history is one row per (user_email, lesson_id). created_at is
+           -- when a conversation began; updated_at (migration 023, trigger-kept)
+           -- is its last turn. "active" counts conversations with at least one
+           -- turn in the window, however old they are.
            (SELECT COUNT(*)::int FROM chat_history WHERE created_at >= now() - $1::interval) AS tutor_conversations_started,
+           (SELECT COUNT(*)::int FROM chat_history WHERE updated_at >= now() - $1::interval) AS tutor_conversations_active,
            (SELECT COUNT(*)::int FROM subscriptions WHERE status = 'active') AS subscribers_active`,
         [since]
       ),

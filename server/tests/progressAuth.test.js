@@ -37,7 +37,19 @@ const OTHER = 'progress-other@example.com';
 // suite's own fixture emails.
 const FIXTURE_EMAIL_LIKE = 'progress-%@example.com';
 
+beforeAll(async () => {
+  // fsa_agent_test is a schema copy of production (scripts/rebuild-test-db.sh),
+  // so user_progress.lesson_id carries production's FK to lessons. Lesson 84
+  // is the id the original report used; make it exist as this suite's own row.
+  await pool.query(
+    `INSERT INTO lessons (id, title, lesson_code) VALUES (84, 'progressAuth fixture', 'TEST-PA-84')
+     ON CONFLICT (id) DO NOTHING`
+  );
+  await pool.query(`SELECT setval('lessons_id_seq', GREATEST(84, (SELECT max(id) FROM lessons)))`);
+});
+
 afterAll(async () => {
+  await pool.query(`DELETE FROM lessons WHERE lesson_code = 'TEST-PA-84'`);
   await pool.end();
 });
 
@@ -59,30 +71,6 @@ async function createUser({ email, withSubscription }) {
 }
 
 describe('/api/progress requires authentication', () => {
-  beforeAll(async () => {
-    // The test DB is provisioned from the platform migrations and has no
-    // user_progress table; create the columns this route touches.
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS user_progress (
-        id SERIAL PRIMARY KEY,
-        user_email VARCHAR(255) NOT NULL,
-        lesson_id INTEGER,
-        score INTEGER DEFAULT 0,
-        struggles JSONB,
-        attempts JSONB DEFAULT '{}'::jsonb,
-        complexity_level INTEGER DEFAULT 3,
-        completed BOOLEAN DEFAULT false,
-        last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        outcome VARCHAR(20),
-        session_notes TEXT,
-        understanding_level VARCHAR(50) DEFAULT 'good',
-        current_section INTEGER DEFAULT 0,
-        lesson_code VARCHAR(20),
-        CONSTRAINT uq_user_progress_user_lesson UNIQUE (user_email, lesson_id)
-      )`);
-  });
 
   afterEach(async () => {
     await pool.query(`DELETE FROM user_progress WHERE user_email LIKE $1`, [FIXTURE_EMAIL_LIKE]);
