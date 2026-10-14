@@ -1689,14 +1689,6 @@ body {
    Lesson tutor redesign slice 4, behind TUTOR_V2_EMAILS. The slide gets the
    full width; the tutor opens beside it on demand (desktop) or as a sheet
    over it (phones). See docs/superpowers/specs/2026-10-13-lesson-tutor-redesign.md */
-.lesson-player--v2 .content-panel {
-  flex: 1 1 100%;
-  border-right: none;
-}
-.lesson-player--v2.lesson-player--tutor-open .content-panel {
-  flex: 0 0 60%;
-  border-right: 1px solid var(--plate-edge);
-}
 
 .tutor-header {
   display: flex;
@@ -1807,18 +1799,39 @@ body {
    line; without this they collapse into one run-on paragraph. */
 .tutor-panel--drawer .tutor-msg { white-space: pre-line; }
 
-/* Slide images were sized for the 60% content column (50% of it, about 30%
-   of the screen). With the v2 slide at full width that doubled them and
-   pushed tall diagrams below the fold, so keep them to the old on-screen
-   size and never taller than the visible area. Desktop only — phones keep
-   their full-width image. */
+/* v2 desktop layout: the lesson pane keeps the width it always had (60% of
+   the screen, capped for wide monitors) and sits centred while the tutor is
+   closed; opening the tutor moves it left with the tutor beside it, which is
+   the old two-column layout exactly. Phones are unaffected. */
 @media (min-width: 769px) {
-  .lesson-player--v2 .slide-image {
-    width: auto;
-    max-width: 30%;
-    max-height: 55vh;
+  .lesson-player--v2 { justify-content: center; }
+  .lesson-player--v2 .content-panel,
+  .lesson-player--v2.lesson-player--tutor-open .content-panel {
+    flex: 0 0 60%;
+    max-width: 1000px;
+    border-left: 1px solid var(--plate-edge);
+    border-right: 1px solid var(--plate-edge);
   }
-  .lesson-player--v2.lesson-player--tutor-open .slide-image { max-width: 50%; }
-  .lesson-player--v2 .slide-image-latex { max-width: 40%; max-height: 40vh; }
-  .lesson-player--v2.lesson-player--tutor-open .slide-image-latex { max-width: 65%; }
+  .lesson-player--v2.lesson-player--tutor-open { justify-content: flex-start; }
+  .lesson-player--v2.lesson-player--tutor-open .content-panel { border-left: none; }
+  .lesson-player--v2 .tutor-panel--drawer {
+    flex: 1 1 40%;
+    animation: tutor-drawer-in 180ms var(--ease);
+  }
+
+  /* Never taller than the space the slide has, so a diagram is seen whole
+     without scrolling. Applies to both layouts. */
+  .slide-image {
+    width: auto;
+    max-width: 50%;
+    max-height: max(220px, calc(100vh - 400px));
+  }
+}
+
+@keyframes tutor-drawer-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lesson-player--v2 .tutor-panel--drawer { animation: none; }
 }
