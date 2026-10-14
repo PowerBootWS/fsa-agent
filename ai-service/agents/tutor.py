@@ -198,8 +198,12 @@ class TutorAgent:
         # Call the LLM. `student_gave_number` arms the verify-before-judge
         # guard: without a number from the student there is no numeric verdict
         # to police, and the turn stays a single API call.
+        # A quick-exercise turn carries feedback plus a whole question block,
+        # and the model's hidden reasoning counts against the same budget: at
+        # 1200 a live run spent it all thinking and returned nothing.
         api_result = self._call_api(
-            system_prompt, messages, student_gave_number=contains_number(user_message))
+            system_prompt, messages, student_gave_number=contains_number(user_message),
+            max_tokens=2500 if state.get('exercise') else 600)
         response_text = self._sanitize_response(api_result['text'])
 
         # Update rolling chat history in state (orchestrator owns state)
@@ -219,7 +223,7 @@ class TutorAgent:
 
         return {'response': response_text}
 
-    def _call_api(self, system_prompt, messages, student_gave_number=False):
+    def _call_api(self, system_prompt, messages, student_gave_number=False, max_tokens=600):
         """Run one tutor turn, giving the model a calculator it must use before
         judging any number.
 
@@ -229,7 +233,7 @@ class TutorAgent:
         budget = _TurnBudget()
         conversation = [{'role': 'system', 'content': system_prompt}, *messages]
 
-        text, calculated = self._run_tool_loop(conversation, budget)
+        text, calculated = self._run_tool_loop(conversation, budget, max_tokens=max_tokens)
 
         # The guard. Narrow on purpose: it fires only where #97 lived — the
         # student put a number in front of the tutor and the tutor passed
@@ -244,7 +248,7 @@ class TutorAgent:
 
         if needs_verification and budget.remaining and not budget.expired:
             forced_text, calculated = self._run_tool_loop(
-                conversation, budget, force_calculator=True)
+                conversation, budget, force_calculator=True, max_tokens=max_tokens)
             if calculated:
                 return {'text': forced_text, 'calculated': True}
             text = forced_text or text
@@ -255,7 +259,7 @@ class TutorAgent:
 
         return {'text': text, 'calculated': calculated}
 
-    def _run_tool_loop(self, conversation, budget, force_calculator=False):
+    def _run_tool_loop(self, conversation, budget, force_calculator=False, max_tokens=600):
         """Call the model, service any calculator calls, return (text, calculated)."""
         messages = list(conversation)
         calculated = False
@@ -263,7 +267,7 @@ class TutorAgent:
         while budget.remaining and not budget.expired:
             payload = {
                 'model': self.model,
-                'max_tokens': 600,
+                'max_tokens': max_tokens,
                 'messages': messages,
             }
             if CALCULATOR_ENABLED:

@@ -24,6 +24,8 @@
     "announcement_feedback",
     "checkin_shown",
     "checkin_exercise_started",
-    "tutor_ask_opened"
+    "tutor_ask_opened",
+    "exercise_question_answered",
+    "exercise_completed"
   ]
 }

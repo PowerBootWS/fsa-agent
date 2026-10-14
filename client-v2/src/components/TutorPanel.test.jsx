@@ -128,20 +128,48 @@ describe('TutorPanel — drawer mode', () => {
     expect(globalThis.fetch.mock.calls[0][0]).toBe('/api/chat/history/2B1-1-1');
   });
 
-  it('sends a request on the student\'s behalf once, with the card on screen', async () => {
-    globalThis.fetch.mockImplementation(async url => (
-      url === '/api/chat' ? ok({ tutor_response: 'First question: ...' }) : ok({ messages: [] })
-    ));
-    const card = { question_text: 'Which?', options: ['a', 'b'], selected_index: null, correct_answer: null };
-    const request = { id: 1, text: 'Quick exercise please' };
-    const { rerender } = render(<TutorPanel drawer lessonCode="2B1-1-1" learnerId="s" slideNumber={22}
-      screenQuestion={card} request={request} onClose={() => {}} />);
-    expect(await screen.findByText('First question: ...')).toBeInTheDocument();
-    rerender(<TutorPanel drawer lessonCode="2B1-1-1" learnerId="s" slideNumber={22}
-      screenQuestion={card} request={request} onClose={() => {}} />);
+  it('runs a quick exercise: card per question, graded click sent back, done button at the end', async () => {
+    const q = n => ({ question_text: `Question ${n}?`, options: ['a', 'b', 'c', 'd'], correct_answer: 1, explanation: 'because' });
+    let turn = 0;
+    globalThis.fetch.mockImplementation(async url => {
+      if (url !== '/api/chat') return ok({ messages: [] });
+      turn += 1;
+      if (turn <= 4) return ok({ tutor_response: `Reply ${turn}`, exercise_question: q(turn) });
+      return ok({ tutor_response: 'Nice work, 4 of 4.', exercise_question: null, exercise_done: true });
+    });
+    const onFinish = vi.fn();
+    const card = { question_text: 'Card?', options: ['x', 'y'], selected_index: null, correct_answer: null };
+    render(<TutorPanel drawer lessonCode="2B1-1-1" learnerId="s" slideNumber={23} screenQuestion={card}
+      exerciseStart={{ id: 1, from_slide: 19, after_slide: 22, recap_points: ['p'] }}
+      onFinishExercise={onFinish} onClose={() => {}} />);
 
-    expect(chatBodies()).toHaveLength(1);
-    expect(chatBodies()[0]).toMatchObject({ message: 'Quick exercise please', slideNumber: 22, screenQuestion: card });
+    for (let n = 1; n <= 4; n += 1) {
+      expect(await screen.findByText(`Question ${n}?`)).toBeInTheDocument();
+      expect(screen.getByText(`Question ${n} of 4`)).toBeInTheDocument();
+      const options = screen.getAllByRole('button', { name: 'b' });
+      fireEvent.click(options[options.length - 1]);
+    }
+    fireEvent.click(await screen.findByRole('button', { name: /back to the lesson/i }));
+    expect(onFinish).toHaveBeenCalledOnce();
+
+    const bodies = chatBodies();
+    expect(bodies[0]).toMatchObject({ message: "Let's do the quick exercise.", slideNumber: 23, screenQuestion: card,
+      exercise: { from_slide: 19, after_slide: 22, asked: 0, correct: 0, recap_points: ['p'] } });
+    expect(bodies[1].message).toBe('I picked B.');
+    expect(bodies[1].exercise).toMatchObject({ asked: 1, correct: 1,
+      last: { question_text: 'Question 1?', correct_index: 1, selected_index: 1, explanation: 'because' } });
+    expect(bodies[4].exercise).toMatchObject({ asked: 4, correct: 4 });
+    expect(bodies).toHaveLength(5);
+  });
+
+  it('leaves the flag link off generated questions', async () => {
+    globalThis.fetch.mockImplementation(async url => (url === '/api/chat'
+      ? ok({ tutor_response: 'Go', exercise_question: { question_text: 'Gen?', options: ['a', 'b', 'c', 'd'], correct_answer: 0 } })
+      : ok({ messages: [] })));
+    render(<TutorPanel drawer lessonCode="x" learnerId="s" exerciseStart={{ id: 2, from_slide: 0, after_slide: 3 }} onClose={() => {}} />);
+    await screen.findByText('Gen?');
+    fireEvent.click(screen.getByRole('button', { name: 'a' }));
+    expect(screen.queryByText(/think this question is wrong/i)).not.toBeInTheDocument();
   });
 
   it('closes', () => {

@@ -1,6 +1,7 @@
 // fsa-agent/client-v2/src/components/TutorPanel.jsx
 import { useState, useRef, useEffect } from 'react';
 import { getJson, postJson } from '../utils/api';
+import { track } from '../utils/usage';
 import { KatexSpan } from './MathContent';
 import 'katex/dist/katex.min.css';
 
@@ -49,7 +50,7 @@ export function screenQuestionFrom(messages) {
  * QuestionCard — renders a single practice question with answer selection.
  * Uses correct_answer (matches the DB column name).
  */
-export function QuestionCard({ question, lessonCode, onAnswer, sublabel }) {
+export function QuestionCard({ question, lessonCode, onAnswer, sublabel, label = 'Practice question', allowFlag = true }) {
   const [selected, setSelected] = useState(null);
   const options = question.options || [];
   // 'idle' -> 'open' (reason box showing) -> 'sent' | 'failed'
@@ -91,7 +92,7 @@ export function QuestionCard({ question, lessonCode, onAnswer, sublabel }) {
           the slide — students hit a same-topic question next to a worked
           example and assume it is the same problem. Say plainly that it is a
           separate exercise. */}
-      <div className="q-label">Practice question</div>
+      <div className="q-label">{label}</div>
       <div className="q-sublabel">
         {sublabel || 'Separate from the example on the left — same topic, your turn to try it.'}
       </div>
@@ -112,7 +113,7 @@ export function QuestionCard({ question, lessonCode, onAnswer, sublabel }) {
           </button>
         );
       })}
-      {selected !== null && (
+      {selected !== null && allowFlag && (
         <div className="q-flag">
           {flagState === 'idle' && (
             <button className="q-flag-open" onClick={() => setFlagState('open')}>
@@ -171,19 +172,27 @@ export function QuestionCard({ question, lessonCode, onAnswer, sublabel }) {
  *   onAnswered     — (entry) => void               (panel mode)
  *   drawer         — boolean                       (drawer mode)
  *   screenQuestion — card on screen, /api/chat shape (drawer mode)
- *   request        — { id, text } to send as the student (drawer mode)
+ *   exerciseStart  — { id, from_slide, after_slide, recap_points } starts a
+ *                    quick exercise (drawer mode)
+ *   onFinishExercise — () => void, "Back to the lesson" (drawer mode)
  *   onClose        — () => void                    (drawer mode)
  */
+
+const LETTERS = 'ABCD';
+const EXERCISE_QUESTIONS = 4; // must match agents/exercise.py MAX_QUESTIONS
 export function TutorPanel({
   lessonCode, learnerId, slideNumber, checkpoint, onAnswered,
-  drawer = false, screenQuestion, request, onClose,
+  drawer = false, screenQuestion, exerciseStart, onFinishExercise, onClose,
 }) {
   const [messages, setMessages] = useState([WELCOME]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
-  const sentRequestId = useRef(null);
+  const startedExerciseId = useRef(null);
+  // Quick-exercise progress (slice 5). It lives here and travels with every
+  // turn, so the tutor service holds no exercise state of its own.
+  const exerciseRef = useRef(null);
 
   // Scroll to bottom within the messages container (not scrollIntoView — that bubbles to parent page in iframes)
   useEffect(() => {
@@ -226,9 +235,10 @@ export function TutorPanel({
     if (drawer) inputRef.current?.focus();
   }, [drawer]);
 
-  async function send(text) {
+  async function send(text, last = null) {
     setMessages(prev => [...prev, { type: 'user', text }]);
     setLoading(true);
+    const ex = exerciseRef.current;
     try {
       const data = await postJson('/api/chat', {
         user: learnerId,
@@ -236,9 +246,32 @@ export function TutorPanel({
         message: text,
         ...(Number.isInteger(slideNumber) ? { slideNumber } : {}),
         screenQuestion: drawer ? screenQuestion : screenQuestionFrom(messages),
+        ...(ex && !ex.done ? {
+          exercise: {
+            from_slide: ex.from_slide, after_slide: ex.after_slide,
+            recap_points: ex.recap_points, asked: ex.asked, correct: ex.correct,
+            ...(last ? { last } : {}),
+          },
+        } : {}),
       });
-      const reply = data.tutor_response || data.response || data.message || 'Sorry, I could not respond right now.';
-      setMessages(prev => [...prev, { type: 'tutor', text: reply }]);
+      const reply = data.tutor_response || data.response || data.message
+        || (data.exercise_question ? '' : 'Sorry, I could not respond right now.');
+      const added = [];
+      if (reply) added.push({ type: 'tutor', text: reply });
+      if (ex && !ex.done && data.exercise_question) {
+        ex.asked += 1;
+        added.push({
+          type: 'exercise-question',
+          number: ex.asked,
+          question: { ...data.exercise_question, id: `x-${Date.now()}` },
+        });
+      }
+      if (ex && !ex.done && data.exercise_done) {
+        ex.done = true;
+        track('feature_use', { action: 'exercise_completed', props: { lesson_code: lessonCode, asked: ex.asked, correct: ex.correct } });
+        added.push({ type: 'exercise-done' });
+      }
+      setMessages(prev => [...prev, ...added]);
     } catch {
       setMessages(prev => [...prev, { type: 'tutor', text: 'Connection error. Please try again.' }]);
     } finally {
@@ -246,13 +279,35 @@ export function TutorPanel({
     }
   }
 
-  // A message sent on the student's behalf — the check-in's "Quick exercise".
+  // The check-in's "Quick exercise": start a fresh exercise on its slides.
   useEffect(() => {
-    if (!request?.text || request.id === sentRequestId.current) return;
-    sentRequestId.current = request.id;
-    send(request.text);
+    if (!exerciseStart || exerciseStart.id === startedExerciseId.current) return;
+    startedExerciseId.current = exerciseStart.id;
+    exerciseRef.current = {
+      from_slide: exerciseStart.from_slide,
+      after_slide: exerciseStart.after_slide,
+      recap_points: exerciseStart.recap_points || [],
+      asked: 0,
+      correct: 0,
+      done: false,
+    };
+    send("Let's do the quick exercise.");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request]);
+  }, [exerciseStart]);
+
+  function handleExerciseAnswer(msg, entry) {
+    const ex = exerciseRef.current;
+    if (!ex || ex.done) return;
+    if (entry.correct) ex.correct += 1;
+    track('feature_use', { action: 'exercise_question_answered', props: { lesson_code: lessonCode, correct: entry.correct } });
+    send(`I picked ${LETTERS[entry.answer_index]}.`, {
+      question_text: msg.question.question_text,
+      options: msg.question.options,
+      correct_index: msg.question.correct_answer,
+      selected_index: entry.answer_index,
+      explanation: msg.question.explanation || '',
+    });
+  }
 
   function handleSend() {
     const text = input.trim();
@@ -293,6 +348,28 @@ export function TutorPanel({
       </div>
       <div className="tutor-messages" ref={messagesContainerRef}>
         {messages.map((msg, i) => {
+          if (msg.type === 'exercise-question') {
+            return (
+              <QuestionCard
+                key={msg.question.id}
+                question={msg.question}
+                lessonCode={lessonCode}
+                label={`Question ${msg.number} of ${EXERCISE_QUESTIONS}`}
+                sublabel="Pick an answer and the tutor will go through it with you."
+                allowFlag={false}
+                onAnswer={entry => handleExerciseAnswer(msg, entry)}
+              />
+            );
+          }
+          if (msg.type === 'exercise-done') {
+            return (
+              <div key={i} className="exercise-done">
+                <button className="checkin-continue-from-tutor" onClick={onFinishExercise}>
+                  Back to the lesson →
+                </button>
+              </div>
+            );
+          }
           if (msg.type === 'question') {
             return (
               <QuestionCard

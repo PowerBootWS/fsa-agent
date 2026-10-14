@@ -43,6 +43,7 @@ def chat():
     # card currently in their chat panel (already sanitised by the Node API).
     slide_number = data.get('slideNumber')
     screen_question = data.get('screenQuestion')
+    exercise = data.get('exercise')
 
     if not all([user, lesson_id, message]):
         return jsonify({'error': 'Missing required parameters'}), 400
@@ -70,6 +71,8 @@ def chat():
         kwargs['slide_number'] = slide_number
     if isinstance(screen_question, dict):
         kwargs['screen_question'] = screen_question
+    if isinstance(exercise, dict):
+        kwargs['exercise'] = exercise
     response = orchestrator.process(**kwargs)
 
     return jsonify(response)

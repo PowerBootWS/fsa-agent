@@ -24,10 +24,44 @@ function cleanScreenQuestion(q) {
   };
 }
 
+// Quick-exercise state from the lesson player (slice 5): which slides it
+// covers, progress so far and the pick just made. Sizes capped here; the
+// ai-service checks the shape again before it reaches the prompt.
+function cleanExercise(ex) {
+  const int = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : null);
+  if (!ex || typeof ex !== 'object') return undefined;
+  const from = int(ex.from_slide, 0, 10000);
+  const after = int(ex.after_slide, 0, 10000);
+  if (from === null || after === null || after < from) return undefined;
+  const out = {
+    from_slide: from,
+    after_slide: after,
+    asked: int(ex.asked, 0, 50) ?? 0,
+    correct: int(ex.correct, 0, 50) ?? 0,
+    recap_points: Array.isArray(ex.recap_points)
+      ? ex.recap_points.filter(p => typeof p === 'string').slice(0, 6).map(p => p.slice(0, 300))
+      : [],
+  };
+  const last = ex.last;
+  if (last && typeof last === 'object' && typeof last.question_text === 'string'
+      && Array.isArray(last.options) && last.options.length === 4
+      && last.options.every(o => typeof o === 'string')
+      && int(last.correct_index, 0, 3) !== null && int(last.selected_index, 0, 3) !== null) {
+    out.last = {
+      question_text: last.question_text.slice(0, 2000),
+      options: last.options.map(o => o.slice(0, 500)),
+      correct_index: last.correct_index,
+      selected_index: last.selected_index,
+      explanation: typeof last.explanation === 'string' ? last.explanation.slice(0, 1000) : '',
+    };
+  }
+  return out;
+}
+
 // Send message to Tutor Agent
 router.post('/', async (req, res) => {
   try {
-    const { lessonId, message, examConfig, slideNumber, screenQuestion } = req.body;
+    const { lessonId, message, examConfig, slideNumber, screenQuestion, exercise } = req.body;
     // The session owner, never the body: the tutor now reads saved transcripts
     // and a cross-objective memory keyed on this, so a client-chosen `user`
     // would let one student read another's conversations.
@@ -43,6 +77,8 @@ router.post('/', async (req, res) => {
     if (Number.isInteger(slideNumber) && slideNumber >= 0) payload.slideNumber = slideNumber;
     const sq = cleanScreenQuestion(screenQuestion);
     if (sq) payload.screenQuestion = sq;
+    const ex = cleanExercise(exercise);
+    if (ex) payload.exercise = ex;
 
     const response = await axios.post(`${PYTHON_SERVICE_URL}/agent/chat`, payload);
 
@@ -68,4 +104,5 @@ router.get('/history/:lessonCode', async (req, res) => {
 });
 
 router.cleanScreenQuestion = cleanScreenQuestion;
+router.cleanExercise = cleanExercise;
 module.exports = router;

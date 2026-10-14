@@ -76,7 +76,8 @@ describe('LessonPlayer with tutor_v2', () => {
     expect(await screen.findByText('Here is question one.')).toBeInTheDocument();
     const chat = globalThis.fetch.mock.calls.find(([u]) => u === '/api/chat');
     const body = JSON.parse(chat[1].body);
-    expect(body.message).toMatch(/slides 0 to 3/);
+    expect(body.exercise).toMatchObject({ from_slide: 0, after_slide: 3, asked: 0, correct: 0, recap_points: ['Point one.', 'Point two.'] });
+    expect(body.slideNumber).toBe(3); // the card stands in for slide 4, which they haven't seen
     expect(body.screenQuestion).toEqual({ question_text: 'Which one?', options: ['A', 'B'], selected_index: null, correct_answer: null });
   });
 });

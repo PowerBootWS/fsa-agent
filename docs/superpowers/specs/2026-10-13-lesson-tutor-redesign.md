@@ -197,3 +197,16 @@ Each slice is shippable on its own. Slices 1–2 also improve the current UI.
 - **Check-in card:** shown in place of the arriving slide, with that slide's audio held until Continue. It shows the recap, the lesson's practice question (when there is one) and "Quick exercise with the tutor". That button opens the drawer and sends a request for multiple-choice questions on slides X to Y, with the card's question passed as `screenQuestion` (its answer only after the student has picked). Slice 5 replaces that request with structured exercise turns.
 - **Checkpoint request:** the player now sends `slide_number` with the checkpoint request, because the `last_section` PATCH just before it is fire-and-forget and could land second.
 - **Usage events:** `checkin_shown`, `checkin_exercise_started` and `tutor_ask_opened`, which feed the opt-in-rate metric.
+
+## Implementation notes (slice 5)
+
+- **Deviation from §7 slice 5:** there is no new `/api/v2/tutor/turn` endpoint. The exercise rides the existing `/api/chat` lesson path as an `exercise` field, because slices 1-2 already gave that path everything the spec asked for: covered-so-far grounding, memory, transcript save and reload, and the calculator guard. The exercise's progress (`asked`, `correct`, the pick just made, and the key and explanation behind it) lives in the drawer and travels with every turn, so ai-service holds no exercise state.
+- **Question format:** the tutor writes each question as a `[QUESTION] ... [/QUESTION]` block in a line format (`Q:`, `A)`-`D)`, `ANSWER:`, `WHY:`), not JSON. Questions carry LaTeX, and `\frac` is a valid JSON escape (form feed), so a missed backslash would silently corrupt the formula. `agents/exercise.py` parses it, and a block without exactly four options and a valid answer produces no card rather than a broken one. The transcript stores the readable question, not the raw block.
+- **Grading and the end of the exercise:** the client grades the click against the tutor's own key, then sends `I picked X.` plus the graded pick. Coaching after a wrong answer asks a follow-up on the same idea, with more support each time. After question 4 (`MAX_QUESTIONS`, mirrored as `EXERCISE_QUESTIONS` in TutorPanel), the server returns `exercise_done` and drops any extra block, and the drawer shows "Back to the lesson →".
+- **Context while a card is up:** while a check-in card is showing, the tutor's covered-so-far context stops at the slide before it, because the student hasn't seen the slide the card stands in for. Without this, the live run quizzed on that slide.
+- **Live-run fixes (anthropic/claude-sonnet-5 via `OPENROUTER_MODEL`):**
+  - The model's hidden reasoning shares `max_tokens`; at 1200 one turn returned nothing, so exercise turns get 2500.
+  - The model took "again" and "last one" cues from older exercises in the history, and once wrapped up after two questions. The prompt now states the counts are the truth and that only the app ends the exercise.
+- **Generated questions have no "Think this question is wrong?" link;** a dispute goes through the chat.
+- **Usage events:** `exercise_question_answered` and `exercise_completed`.
+- **Not done:** per-turn token logging (§7 slice 5 step 5). Spend is visible in OpenRouter in the meantime.

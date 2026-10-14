@@ -76,6 +76,26 @@ describe('POST /api/chat', () => {
   });
 });
 
+describe('POST /api/chat — quick exercise state', () => {
+  const last = { question_text: 'Q?', options: ['a', 'b', 'c', 'd'], correct_index: 1, selected_index: 2, explanation: 'why' };
+
+  it('passes a well-formed exercise through', async () => {
+    const exercise = { from_slide: 19, after_slide: 22, asked: 2, correct: 1, recap_points: ['p'], last };
+    await request(app()).post('/api/chat')
+      .send({ lessonId: '2B1-1-1', message: 'I picked C.', exercise }).expect(200);
+    expect(sent().exercise).toEqual(exercise);
+  });
+
+  it('drops a bad slide range and a malformed last question', () => {
+    const clean = chatRouter.cleanExercise;
+    expect(clean({ from_slide: 9, after_slide: 3 })).toBeUndefined();
+    expect(clean(null)).toBeUndefined();
+    const out = clean({ from_slide: 0, after_slide: 3, last: { ...last, options: ['a', 'b'] } });
+    expect(out).not.toHaveProperty('last');
+    expect(out.asked).toBe(0);
+  });
+});
+
 describe('GET /api/chat/history/:lessonCode', () => {
   it('returns the session owner\'s conversation for that objective', async () => {
     const messages = [{ role: 'user', content: 'call me Garlock' }, { role: 'assistant', content: 'Will do.' }];

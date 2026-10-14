@@ -5,6 +5,8 @@ All prompt logic lives here to keep tutor.py clean.
 """
 import json
 
+from agents import exercise as exercise_mod
+
 
 def build(lesson_context, progress, state, first_name=None):
     """
@@ -81,6 +83,9 @@ def build(lesson_context, progress, state, first_name=None):
     if lesson_mode and state.get('screen_question_present'):
         sections.append(_build_screen_question_note(state))
 
+    if lesson_mode and state.get('exercise'):
+        sections.append(_build_exercise_block(state['exercise']))
+
     if activity == 'staged_problem':
         sections.append(_build_staged_problem_block(state))
 
@@ -155,6 +160,46 @@ The student is on slide {len(slides)} of {total} in this objective. Below is eve
 These slides are the authoritative wording for this course. Base every explanation on them. If your general knowledge disagrees with a slide, the slide is right and you are wrong — say what the slide says.
 
 {slides_text}{source_block}"""
+
+
+def _build_exercise_block(ex):
+    """The quick exercise the student started from a check-in card (slice 5)."""
+    span = f"slides {ex['from_slide']} to {ex['after_slide']}"
+    recap = ''
+    if ex.get('recap_points'):
+        recap = '\nThe check-in card summarised them as:\n' + '\n'.join(f'- {p}' for p in ex['recap_points'])
+    last = exercise_mod.describe_last(ex.get('last'))
+    finished = bool(ex.get('last')) and ex['asked'] >= exercise_mod.MAX_QUESTIONS
+    if finished:
+        step = ('This was the final question. Give brief feedback on their pick, then a one or two sentence '
+                'wrap-up: how they did overall and anything worth reviewing. Do NOT include a question block.')
+    elif ex.get('last'):
+        step = ('Respond to their pick in two or three sentences at most (the grading above is final; do not '
+                're-derive it, and only describe the pick stated above). If they got it wrong, point to the idea they '
+                'missed and make your next question a follow-up on that same idea, giving a little more support each '
+                'time they miss. Then you MUST end with the next question block.')
+    elif ex['asked'] == 0:
+        step = 'Start the exercise: one short friendly line, then the first question.'
+    else:
+        step = ('The student has typed something instead of picking an answer. If they are asking for the next '
+                'question, ask it with a question block. Otherwise answer them briefly and invite them to pick from '
+                'the question card they already have, without a new block.')
+    return f"""## QUICK EXERCISE IN PROGRESS
+The student chose a quick multiple-choice exercise on {span} of this lesson. This overrides the LESSON CHAT rule about writing practice questions into your reply.{recap}
+
+Questions asked so far in THIS exercise: {ex['asked']} of {exercise_mod.MAX_QUESTIONS}. Answered correctly: {ex['correct']}.
+These counts are the truth. Any earlier exercise in the conversation history is finished and does not count, so never say "again" or "last one" based on it. Never wrap up or end the exercise yourself before question {exercise_mod.MAX_QUESTIONS} has been answered; the app ends it.
+{last}
+
+What to do now: {step}
+
+Rules for every question:
+- Exactly one question per reply, written in the block below, placed at the end. The block becomes a clickable card, so never write the question or its options anywhere else in your reply.
+- Only from {span}. Exam-style and self-contained, four options, exactly one correct, wrong options plausible.
+- For any numeric option, compute the right value with the calculate tool before you write it.
+- Keep the text before the block to one to three sentences. The block is the point of the turn; never let feedback crowd it out.
+
+{exercise_mod.FORMAT}"""
 
 
 def _build_screen_question_note(state):

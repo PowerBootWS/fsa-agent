@@ -51,7 +51,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   // so a slow or failed /me leaves the student on the current layout.
   const [tutorV2, setTutorV2] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
-  const [tutorRequest, setTutorRequest] = useState(null);
+  const [exerciseStart, setExerciseStart] = useState(null);
   const [checkpointAnswer, setCheckpointAnswer] = useState(null);
   useEffect(() => {
     let cancelled = false;
@@ -174,7 +174,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
       setAutoPlay(false);
       setCheckpoint(null);
       setTutorOpen(false);
-      setTutorRequest(null);
+      setExerciseStart(null);
       sectionsSeenSinceCheckpoint.current = 0;
       writeProgress(lessonCode, clamped);
     } catch (err) {
@@ -266,7 +266,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   // objective) closes it and gives the slide its full width back.
   const closeTutor = useCallback(() => {
     setTutorOpen(false);
-    setTutorRequest(null);
+    setExerciseStart(null);
   }, []);
 
   function goNext() {
@@ -330,11 +330,17 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   if (loading) return <div className="loading">Loading lesson…</div>;
 
   const isComplete = sectionIndex === sections.length;
-  const currentSlideNumber = sections[Math.min(sectionIndex, sections.length - 1)]?.slide_number;
+  // While a check-in card stands in for the slide just arrived at, the student
+  // hasn't seen that slide yet, so the tutor's "covered so far" stops at the
+  // one before it. Otherwise a quick exercise could quiz them on it.
+  const showingCheckin = tutorV2 && Boolean(checkpoint) && !isComplete;
+  const currentSlideNumber = showingCheckin && sectionIndex > 0
+    ? sections[sectionIndex - 1]?.slide_number
+    : sections[Math.min(sectionIndex, sections.length - 1)]?.slide_number;
 
-  function openTutor(requestText) {
+  function openTutor(start) {
     setTutorOpen(true);
-    if (requestText) setTutorRequest({ id: Date.now(), text: requestText });
+    if (start) setExerciseStart({ id: Date.now(), ...start });
   }
 
   // The card's practice question, in the shape /api/chat expects. The answer
@@ -357,9 +363,16 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
       onAnswer={handleAnswered}
       onExercise={hideTutor ? null : () => {
         track('feature_use', { action: 'checkin_exercise_started', props: { lesson_code: activeLessonCode } });
+        // Without a recap card, the exercise covers the slides since the
+        // previous checkpoint: the four before the one just arrived at.
         const c = checkpoint.checkin;
-        const range = c ? ` (slides ${c.from_slide} to ${c.after_slide})` : '';
-        openTutor(`Quick exercise please: ask me a few multiple-choice questions, one at a time, on what I just covered${range}.`);
+        const fromIdx = Math.max(0, sectionIndex - CHECKPOINT_INTERVAL);
+        const afterIdx = Math.max(0, sectionIndex - 1);
+        openTutor({
+          from_slide: c?.from_slide ?? sections[fromIdx]?.slide_number ?? 0,
+          after_slide: c?.after_slide ?? sections[afterIdx]?.slide_number ?? 0,
+          recap_points: c?.recap_points || [],
+        });
       }}
       onContinue={() => { setCheckpoint(null); closeTutor(); }}
     />
@@ -431,7 +444,8 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
           learnerId={learnerId || 'anonymous'}
           slideNumber={currentSlideNumber}
           screenQuestion={screenQuestion}
-          request={tutorRequest}
+          exerciseStart={exerciseStart}
+          onFinishExercise={() => { setCheckpoint(null); closeTutor(); }}
           onClose={closeTutor}
         />
       )}

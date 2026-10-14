@@ -7,6 +7,7 @@ import re
 import requests
 
 from agents import memory
+from agents import exercise as exercise_mod
 from agents.tutor import MAX_HISTORY_ENTRIES
 
 
@@ -116,7 +117,7 @@ class Orchestrator:
 
     def process(self, user, lesson_id, message, lesson_context, progress,
                 tutor, display, researcher, exam_config=None,
-                slide_number=None, screen_question=None):
+                slide_number=None, screen_question=None, exercise=None):
         """
         Main entry point — coordinates the full agent pipeline.
 
@@ -223,7 +224,7 @@ class Orchestrator:
         if mode == 'lesson':
             return self._process_lesson(
                 state, message, lesson_context, progress, researcher, tutor,
-                slide_number, screen_question,
+                slide_number, screen_question, exercise,
             )
 
         # Route chapter quiz and practice exam modes entirely separately
@@ -424,7 +425,7 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def _process_lesson(self, state, message, lesson_context, progress,
-                        researcher, tutor, slide_number, screen_question):
+                        researcher, tutor, slide_number, screen_question, exercise=None):
         """
         One tutor turn in the lesson player: plain Q&A grounded in the slides
         the student has reached.
@@ -471,6 +472,7 @@ class Orchestrator:
         )
 
         _apply_screen_question(state, screen_question)
+        state['exercise'] = exercise_mod.sanitize(exercise)
 
         tutor_result = tutor.respond(
             user_message=message,
@@ -486,6 +488,23 @@ class Orchestrator:
             tutor_response = str(tutor_result)
             action = None
 
+        exercise_question = None
+        exercise_done = False
+        ex = state['exercise']
+        if ex:
+            tutor_response, exercise_question = exercise_mod.parse_reply(tutor_response)
+            if ex['asked'] >= exercise_mod.MAX_QUESTIONS and ex.get('last'):
+                # The final pick has been answered. Any block the model added
+                # anyway is dropped: the client caps the exercise here.
+                exercise_question, exercise_done = None, True
+            # The transcript keeps the question as the student saw it, not the
+            # raw block, so later turns and the reopened drawer read naturally.
+            readable = exercise_mod.as_text(tutor_response, exercise_question)
+            for key in ('chat_history', 'full_transcript'):
+                turns = state.get(key) or []
+                if turns and turns[-1].get('role') == 'assistant':
+                    turns[-1]['content'] = readable
+
         # Every turn, not every third: the transcript is now what a restart
         # resumes from, so a lost turn is a turn the tutor forgets.
         researcher.save_chat_history(
@@ -499,6 +518,8 @@ class Orchestrator:
 
         return {
             'tutor_response': tutor_response,
+            'exercise_question': exercise_question,
+            'exercise_done': exercise_done,
             'display_update': None,
             'progress_update': {
                 'score': state['score'],

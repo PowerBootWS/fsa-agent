@@ -1835,3 +1835,17 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .lesson-player--v2 .tutor-panel--drawer { animation: none; }
 }
+
+/* End of a quick exercise (slice 5): one clear way back to the lesson. */
+.exercise-done { margin: 4px 0 12px; }
+.checkin-continue-from-tutor {
+  background: var(--orange);
+  border: 1px solid var(--orange);
+  color: var(--white);
+  border-radius: 4px;
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.checkin-continue-from-tutor:hover { background: var(--orange-glow); }
