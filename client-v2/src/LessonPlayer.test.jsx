@@ -81,6 +81,36 @@ describe('LessonPlayer with tutor_v2', () => {
   });
 });
 
+describe('LessonPlayer with tutor_v2 — drawer closes when the student moves on', () => {
+  async function openDrawerAtCheckpoint() {
+    globalThis.fetch = routes(true);
+    render(<LessonPlayer lessonCode="2B1-1-1" learnerId="s@x" classCode="second" />);
+    await screen.findByRole('button', { name: /ask about this slide/i });
+    await advanceToCheckpoint();
+    fireEvent.click(await screen.findByRole('button', { name: /quick exercise/i }));
+    await screen.findByText('Here is question one.');
+  }
+
+  it('closes on "Continue the lesson"', async () => {
+    await openDrawerAtCheckpoint();
+    fireEvent.click(screen.getByRole('button', { name: /continue the lesson/i }));
+    expect(screen.queryByText('AI Tutor')).not.toBeInTheDocument();
+    expect(screen.getByText('Body 4')).toBeInTheDocument();
+  });
+
+  it('closes on Next and Back, and reopens from "Ask about this slide"', async () => {
+    await openDrawerAtCheckpoint();
+    fireEvent.click(screen.getByRole('button', { name: /continue the lesson/i }));
+    fireEvent.click(screen.getByRole('button', { name: /ask about this slide/i }));
+    expect(screen.getByText('AI Tutor')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /next/i }));
+    expect(screen.queryByText('AI Tutor')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /ask about this slide/i }));
+    fireEvent.click(screen.getByRole('button', { name: /back/i }));
+    expect(screen.queryByText('AI Tutor')).not.toBeInTheDocument();
+  });
+});
+
 describe('LessonPlayer without tutor_v2', () => {
   it('keeps the always-on panel and no check-in card', async () => {
     globalThis.fetch = routes(false);

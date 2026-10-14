@@ -1806,3 +1806,19 @@ body {
 /* The tutor writes multiple-choice questions with each option on its own
    line; without this they collapse into one run-on paragraph. */
 .tutor-panel--drawer .tutor-msg { white-space: pre-line; }
+
+/* Slide images were sized for the 60% content column (50% of it, about 30%
+   of the screen). With the v2 slide at full width that doubled them and
+   pushed tall diagrams below the fold, so keep them to the old on-screen
+   size and never taller than the visible area. Desktop only — phones keep
+   their full-width image. */
+@media (min-width: 769px) {
+  .lesson-player--v2 .slide-image {
+    width: auto;
+    max-width: 30%;
+    max-height: 55vh;
+  }
+  .lesson-player--v2.lesson-player--tutor-open .slide-image { max-width: 50%; }
+  .lesson-player--v2 .slide-image-latex { max-width: 40%; max-height: 40vh; }
+  .lesson-player--v2.lesson-player--tutor-open .slide-image-latex { max-width: 65%; }
+}

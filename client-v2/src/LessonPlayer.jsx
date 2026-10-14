@@ -173,6 +173,8 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
       setSectionIndex(clamped);
       setAutoPlay(false);
       setCheckpoint(null);
+      setTutorOpen(false);
+      setTutorRequest(null);
       sectionsSeenSinceCheckpoint.current = 0;
       writeProgress(lessonCode, clamped);
     } catch (err) {
@@ -259,7 +261,16 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkpoint]);
 
+  // The drawer is for when the student has asked for the tutor. Moving on
+  // through the lesson in any other way (Next, Back, Continue, another
+  // objective) closes it and gives the slide its full width back.
+  const closeTutor = useCallback(() => {
+    setTutorOpen(false);
+    setTutorRequest(null);
+  }, []);
+
   function goNext() {
+    closeTutor();
     // Last slide → show completion screen
     if (sectionIndex >= sections.length - 1) {
       setSectionIndex(sections.length);  // virtual "completion" index
@@ -295,6 +306,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   }
 
   function goBack() {
+    closeTutor();
     if (sectionIndex <= 0) return;
     // From completion screen, go back to last slide; otherwise go to previous slide
     const prev = sectionIndex >= sections.length ? sections.length - 1 : sectionIndex - 1;
@@ -349,7 +361,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
         const range = c ? ` (slides ${c.from_slide} to ${c.after_slide})` : '';
         openTutor(`Quick exercise please: ask me a few multiple-choice questions, one at a time, on what I just covered${range}.`);
       }}
-      onContinue={() => setCheckpoint(null)}
+      onContinue={() => { setCheckpoint(null); closeTutor(); }}
     />
   ) : null;
 
@@ -420,7 +432,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
           slideNumber={currentSlideNumber}
           screenQuestion={screenQuestion}
           request={tutorRequest}
-          onClose={() => { setTutorOpen(false); setTutorRequest(null); }}
+          onClose={closeTutor}
         />
       )}
     </div>
