@@ -48,3 +48,6 @@ credentials/.worktrees
 
 # Generated question-key verification reports (large, regenerable)
 docs/verify/
+
+# Generated content awaiting review (check-in cards etc.)
+data/

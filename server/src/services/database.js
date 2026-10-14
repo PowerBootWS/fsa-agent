@@ -279,6 +279,23 @@ async function getCheckpointQuestionPool(lessonCode, lastSection = null) {
   return all.rows;
 }
 
+// The check-in card for a checkpoint reached on arrival at `lastSection`: the
+// latest card whose recap ends before that slide (lesson tutor redesign,
+// slice 3). "Latest before" rather than an exact position because the
+// player's checkpoint counter drifts when a student goes back and forth.
+async function getCheckinForSlide(lessonCode, lastSection) {
+  if (lastSection === null || lastSection === undefined) return null;
+  const result = await pool.query(
+    `SELECT id, lesson_code, from_slide, after_slide, recap_points, exercise_prompt
+       FROM lesson_checkins
+      WHERE lesson_code = $1 AND after_slide < $2
+      ORDER BY after_slide DESC
+      LIMIT 1`,
+    [lessonCode, lastSection]
+  );
+  return result.rows[0] || null;
+}
+
 async function getCourseOutline(courseId) {
   const lessonsResult = await pool.query(
     `SELECT lesson_code, title FROM lessons
@@ -360,6 +377,7 @@ module.exports = {
   updateLearnerSession,
   getLearnerSession,
   getCheckpointQuestionPool,
+  getCheckinForSlide,
   getCourseOutline,
   getCourseProgress,
   upsertCourseProgress,

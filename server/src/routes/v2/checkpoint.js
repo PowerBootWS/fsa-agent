@@ -6,7 +6,8 @@ const db = require('../../services/database');
 // POST /api/v2/checkpoint
 // Body: { session_id, lesson_code }
 //
-// Returns a practice question and nothing else. There used to be an
+// Returns a practice question, plus the check-in recap card for this point in
+// the lesson when one exists (`checkin`, else null). There used to be an
 // LLM-written check-in message alongside it ("Try this practice question to
 // test your understanding…"), generated before we knew whether a question was
 // actually available — so an exhausted question pool produced a chatty message
@@ -27,8 +28,19 @@ router.post('/', async (req, res) => {
     // slides in could offer a question whose formula appears ten slides later
     // (backlog #102). `??` rather than `||` so slide 0 stays slide 0.
     const lastSection = session.last_section ?? null;
+
+    // The recap card for this checkpoint (slice 3 of the lesson tutor
+    // redesign). Optional by construction: a missing card, a missing table or
+    // a failed query must never cost the student the practice question.
+    let checkin = null;
+    try {
+      checkin = await db.getCheckinForSlide(lesson_code, lastSection);
+    } catch (err) {
+      console.error('checkpoint checkin lookup failed:', err.message);
+    }
+
     const questions = await db.getCheckpointQuestionPool(lesson_code, lastSection);
-    if (questions.length === 0) return res.json({ question: null });
+    if (questions.length === 0) return res.json({ question: null, checkin });
 
     const askedIds = (session.checkpoint_log || [])
       .map(e => e.question_id)
@@ -48,7 +60,7 @@ router.post('/', async (req, res) => {
       );
     }
 
-    res.json({ question });
+    res.json({ question, checkin });
   } catch (err) {
     console.error('checkpoint error:', err.message);
     res.status(500).json({ error: 'Checkpoint failed' });

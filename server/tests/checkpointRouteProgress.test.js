@@ -12,6 +12,7 @@ const request = require('supertest');
 jest.mock('../src/services/database', () => ({
   getLearnerSession: jest.fn(),
   getCheckpointQuestionPool: jest.fn(),
+  getCheckinForSlide: jest.fn(),
 }));
 const db = require('../src/services/database');
 const checkpointRouter = require('../src/routes/v2/checkpoint');
@@ -25,7 +26,10 @@ function app() {
 
 const QUESTION = { id: 1, question_text: 'q', options: ['a', 'b'], correct_answer: 0 };
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  db.getCheckinForSlide.mockResolvedValue(null);
+});
 
 describe('POST /api/v2/checkpoint', () => {
   it('passes the learner\'s current slide to the question pool', async () => {
@@ -68,5 +72,31 @@ describe('POST /api/v2/checkpoint', () => {
       .send({ session_id: 7, lesson_code: '2A2-1-1' }).expect(200);
 
     expect(res.body.question).toBeNull();
+  });
+
+  it('returns the check-in card for the learner\'s slide alongside the question', async () => {
+    const card = { id: 3, after_slide: 3, recap_points: ['a', 'b'], exercise_prompt: 'Try some?' };
+    db.getLearnerSession.mockResolvedValue({ id: 7, checkpoint_log: [], last_section: 4 });
+    db.getCheckpointQuestionPool.mockResolvedValue([QUESTION]);
+    db.getCheckinForSlide.mockResolvedValue(card);
+
+    const res = await request(app()).post('/api/v2/checkpoint')
+      .send({ session_id: 7, lesson_code: '2A2-1-1' }).expect(200);
+
+    expect(db.getCheckinForSlide).toHaveBeenCalledWith('2A2-1-1', 4);
+    expect(res.body.checkin).toEqual(card);
+    expect(res.body.question.id).toBe(1);
+  });
+
+  it('still serves the question when the check-in lookup fails', async () => {
+    db.getLearnerSession.mockResolvedValue({ id: 7, checkpoint_log: [], last_section: 4 });
+    db.getCheckpointQuestionPool.mockResolvedValue([QUESTION]);
+    db.getCheckinForSlide.mockRejectedValue(new Error('relation "lesson_checkins" does not exist'));
+
+    const res = await request(app()).post('/api/v2/checkpoint')
+      .send({ session_id: 7, lesson_code: '2A2-1-1' }).expect(200);
+
+    expect(res.body.question.id).toBe(1);
+    expect(res.body.checkin).toBeNull();
   });
 });
