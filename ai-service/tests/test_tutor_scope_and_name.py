@@ -109,6 +109,55 @@ def test_search_library_returns_one_chunk_per_lesson():
     assert result[0]['lesson_title'] == 'Superheat tables'
 
 
+def test_search_library_scopes_to_class_prefix():
+    r = make_researcher()
+    conn, cursor = make_conn(fetchall_rows=[])
+    with patch.object(r, '_get_connection', return_value=conn):
+        r.search_library('latent heat', exclude_lesson_code='2A3-2-1', class_prefix='2')
+
+    sql, params = cursor.execute.call_args[0]
+    assert "LIKE %s || '%%'" in sql
+    assert params.count('2') == 2
+
+
+def test_class_prefix_from_lesson_code():
+    from agents.orchestrator import _class_prefix
+    assert _class_prefix('2B1-1-1') == '2'
+    assert _class_prefix('3A2-4-2') == '3'
+    assert _class_prefix('4A-1-1') == '4'
+    assert _class_prefix('152') is None
+
+
+def test_relevant_chunks_or_joins_a_full_sentence():
+    # plainto_tsquery ANDed every word, so a student's full sentence matched
+    # nothing and the tutor got slides 1-4 (first NPS response, 2026-10-13).
+    r = make_researcher()
+    conn, cursor = make_conn(fetchall_rows=[
+        {'slide_number': 22, 'title': 'Four-Casing Cross Compound Nuclear Arrangement',
+         'body': '', 'narration': '', 'source_content': '', 'rank': 0.5},
+    ] * 4)
+    with patch.object(r, '_get_connection', return_value=conn):
+        r.get_relevant_chunks(
+            '2B1-1-1', 'free_discussion',
+            context_hint='which turbine arrangement is used in nuclear plants', limit=4)
+
+    sql, params = cursor.execute.call_args_list[0][0]
+    assert 'plainto_tsquery' not in sql
+    assert "to_tsquery('english', %s)" in sql
+    assert 'nuclear' in params[0] and ' | ' in params[0]
+
+
+def test_relevant_chunks_no_meaningful_terms_uses_opening_slides():
+    r = make_researcher()
+    conn, cursor = make_conn(fetchall_rows=[])
+    with patch.object(r, '_get_connection', return_value=conn):
+        r.get_relevant_chunks('2B1-1-1', 'free_discussion', context_hint='how does that work')
+
+    sql = cursor.execute.call_args_list[0][0][0]
+    assert 'tsquery' not in sql
+    assert 'ORDER BY slide_number ASC' in sql
+
+
 def test_search_library_no_meaningful_terms_skips_query():
     r = make_researcher()
     with patch.object(r, '_get_connection') as conn:

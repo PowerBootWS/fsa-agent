@@ -45,6 +45,16 @@ def _detect_mode(lesson_id):
     return 'lesson'  # numeric id or UUID → lesson
 
 
+def _class_prefix(lesson_id):
+    """
+    Certification-level digit of a lesson code ('2B1-1-1' → '2'), used to keep
+    library search inside the papers the student can actually open. None for a
+    numeric id or anything without a leading level digit.
+    """
+    m = re.match(r'^([1-4])[A-Z]', str(lesson_id), re.IGNORECASE)
+    return m.group(1) if m else None
+
+
 def _remember_current_question(state, question):
     """Keep the text and options of the question now on display in session state.
 
@@ -285,6 +295,7 @@ class Orchestrator:
                 context_hint=message,
                 exclude_lesson_code=lesson_id,
                 limit=3,
+                class_prefix=_class_prefix(lesson_id),
             )
             if self._wants_library_background(state, message, is_init_hello)
             else []

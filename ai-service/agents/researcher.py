@@ -319,7 +319,14 @@ class Researcher:
             conn = self._get_connection()
             cur = conn.cursor()
 
-            if activity in ('greeting', 'review_concepts') or not context_hint:
+            # OR-joined, not plainto_tsquery: plainto ANDs every word, so a
+            # full sentence from a student ("what should my thought process be
+            # for ... nuclear plants ... 800 and 1300 MW") matched zero slides
+            # and the tutor was handed slides 1-4 and answered from general
+            # recall — wrongly, against the lesson. Found via the first NPS
+            # response, 2026-10-13.
+            tsquery = self._build_or_tsquery(context_hint)
+            if activity in ('greeting', 'review_concepts') or not tsquery:
                 # Return the opening slides — they set the lesson context
                 cur.execute(
                     """
@@ -341,7 +348,7 @@ class Researcher:
                                    coalesce(title,'') || ' ' ||
                                    coalesce(body,'') || ' ' ||
                                    coalesce(narration,'')),
-                               plainto_tsquery('english', %s)
+                               to_tsquery('english', %s)
                            ) AS rank
                     FROM lesson_chunks
                     WHERE lesson_code = %s
@@ -349,11 +356,11 @@ class Researcher:
                               coalesce(title,'') || ' ' ||
                               coalesce(body,'') || ' ' ||
                               coalesce(narration,''))
-                          @@ plainto_tsquery('english', %s)
+                          @@ to_tsquery('english', %s)
                     ORDER BY rank DESC, slide_number ASC
                     LIMIT %s
                     """,
-                    (context_hint, lesson_code, context_hint, limit)
+                    (tsquery, lesson_code, tsquery, limit)
                 )
                 rows = cur.fetchall()
 
@@ -437,10 +444,16 @@ class Researcher:
             return None
         return ' | '.join(terms)
 
-    def search_library(self, context_hint, exclude_lesson_code=None, limit=3):
+    def search_library(self, context_hint, exclude_lesson_code=None, limit=3,
+                       class_prefix=None):
         """
-        Full-text search lesson_chunks across the ENTIRE library — every paper,
-        every certification level — not just the student's current course.
+        Full-text search lesson_chunks across every paper in the student's
+        certification level (class_prefix, e.g. '2' for 2nd Class) — not just
+        the student's current course.
+
+        class_prefix scoping: unscoped, the tutor cited 3A1/3B1 lessons to a
+        2nd Class student who has no access to them (first NPS response,
+        2026-10-13). None searches everything, for callers with no level.
 
         This is the research step behind cross-paper tutoring. A lesson often
         *references* a concept that is formally taught in an earlier chapter or
@@ -481,10 +494,12 @@ class Researcher:
                           coalesce(c.narration,''))
                       @@ to_tsquery('english', %s)
                   AND (%s::varchar IS NULL OR c.lesson_code <> %s)
+                  AND (%s::varchar IS NULL OR c.lesson_code LIKE %s || '%%')
                 ORDER BY rank DESC
                 LIMIT %s
                 """,
-                (tsquery, tsquery, exclude_lesson_code, exclude_lesson_code, limit * 6)
+                (tsquery, tsquery, exclude_lesson_code, exclude_lesson_code,
+                 class_prefix, class_prefix, limit * 6)
             )
             rows = cur.fetchall()
             cur.close()
