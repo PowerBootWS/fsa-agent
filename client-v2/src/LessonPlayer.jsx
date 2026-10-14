@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ContentPanel } from './components/ContentPanel';
 import { TutorPanel } from './components/TutorPanel';
+import { CheckInCard } from './components/CheckInCard';
+import { track } from './utils/usage';
 import { isFourthClassCode } from './utils/fourthClass';
 import { getJson, postJson } from './utils/api';
 
@@ -42,6 +44,22 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const sectionsSeenSinceCheckpoint = useRef(0);
+
+  // Lesson tutor redesign (slice 4), per-user behind TUTOR_V2_EMAILS: the
+  // always-on chat panel becomes a drawer opened on demand, and checkpoints
+  // become check-in cards shown in place of the slide. Off until /me says on,
+  // so a slow or failed /me leaves the student on the current layout.
+  const [tutorV2, setTutorV2] = useState(false);
+  const [tutorOpen, setTutorOpen] = useState(false);
+  const [tutorRequest, setTutorRequest] = useState(null);
+  const [checkpointAnswer, setCheckpointAnswer] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    getJson('/api/platform/me')
+      .then(me => { if (!cancelled) setTutorV2(Boolean(me?.features?.tutor_v2)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // One learner session per objective. This used to be created once, for the
   // lesson the player opened on, and kept as the student navigated — so the
@@ -214,17 +232,32 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   // Pull the next practice question for a lesson pause. Nothing is shown when
   // the lesson has no question to give — the tutor stays quiet rather than
   // announcing a question that isn't there.
-  const triggerCheckpoint = useCallback(async () => {
+  const triggerCheckpoint = useCallback(async (slideNumber) => {
     if (!sessionId || !activeLessonCode) return;
     try {
+      // slide_number travels with the request because the last_section PATCH
+      // that goNext fires just before this is not awaited, and the route would
+      // otherwise sometimes read the previous slide.
       const data = await postJson('/api/v2/checkpoint', {
-        session_id: sessionId, lesson_code: activeLessonCode,
+        session_id: sessionId, lesson_code: activeLessonCode, slide_number: slideNumber,
       });
-      if (data?.question) setCheckpoint(data);
+      if (data?.question || (tutorV2 && data?.checkin)) {
+        setCheckpointAnswer(null);
+        setCheckpoint(data);
+      }
     } catch {
       // checkpoint failure is non-fatal
     }
-  }, [sessionId, activeLessonCode]);
+  }, [sessionId, activeLessonCode, tutorV2]);
+
+  useEffect(() => {
+    if (!tutorV2 || !checkpoint) return;
+    track('feature_use', {
+      action: 'checkin_shown',
+      props: { lesson_code: activeLessonCode, has_recap: Boolean(checkpoint.checkin) },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkpoint]);
 
   function goNext() {
     // Last slide → show completion screen
@@ -256,7 +289,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
     const forceCheckpoint = nextSection?.checkpoint_after === true;
     const intervalCheckpoint = sectionsSeenSinceCheckpoint.current >= CHECKPOINT_INTERVAL;
     if (forceCheckpoint || intervalCheckpoint) {
-      triggerCheckpoint();
+      triggerCheckpoint(nextSection?.slide_number);
       sectionsSeenSinceCheckpoint.current = 0;
     }
   }
@@ -272,6 +305,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   }
 
   function handleAnswered(entry) {
+    setCheckpointAnswer(entry.answer_index);
     if (!sessionId) return;
     fetch(`/api/v2/session/${sessionId}`, {
       method: 'PATCH',
@@ -284,10 +318,50 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   if (loading) return <div className="loading">Loading lesson…</div>;
 
   const isComplete = sectionIndex === sections.length;
+  const currentSlideNumber = sections[Math.min(sectionIndex, sections.length - 1)]?.slide_number;
+
+  function openTutor(requestText) {
+    setTutorOpen(true);
+    if (requestText) setTutorRequest({ id: Date.now(), text: requestText });
+  }
+
+  // The card's practice question, in the shape /api/chat expects. The answer
+  // only goes once picked, so the tutor never holds the answer to a live question.
+  const cardQuestion = checkpoint?.question;
+  const answered = Number.isInteger(checkpointAnswer);
+  const screenQuestion = tutorV2 && cardQuestion ? {
+    question_text: cardQuestion.question_text || '',
+    options: cardQuestion.options || [],
+    selected_index: answered ? checkpointAnswer : null,
+    correct_answer: answered ? cardQuestion.correct_answer : null,
+  } : undefined;
+
+  const checkinOverlay = tutorV2 && checkpoint && !isComplete ? (
+    <CheckInCard
+      key={`${activeLessonCode}-${sectionIndex}`}
+      checkin={checkpoint.checkin}
+      question={checkpoint.question}
+      lessonCode={activeLessonCode}
+      onAnswer={handleAnswered}
+      onExercise={hideTutor ? null : () => {
+        track('feature_use', { action: 'checkin_exercise_started', props: { lesson_code: activeLessonCode } });
+        const c = checkpoint.checkin;
+        const range = c ? ` (slides ${c.from_slide} to ${c.after_slide})` : '';
+        openTutor(`Quick exercise please: ask me a few multiple-choice questions, one at a time, on what I just covered${range}.`);
+      }}
+      onContinue={() => setCheckpoint(null)}
+    />
+  ) : null;
 
   return (
-    <div className={`lesson-player lesson-player--show-${mobileTab}${hideTutor ? ' lesson-player--tutor-hidden' : ''}`}>
-      <div className="lesson-mobile-tabs" role="tablist">
+    <div className={[
+      'lesson-player',
+      `lesson-player--show-${mobileTab}`,
+      hideTutor ? 'lesson-player--tutor-hidden' : '',
+      tutorV2 ? 'lesson-player--v2' : '',
+      tutorV2 && tutorOpen ? 'lesson-player--tutor-open' : '',
+    ].filter(Boolean).join(' ')}>
+      {!tutorV2 && <div className="lesson-mobile-tabs" role="tablist">
         <button
           role="tab"
           aria-selected={mobileTab === 'lesson'}
@@ -306,7 +380,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
             💬 AI Tutor
           </button>
         )}
-      </div>
+      </div>}
       <ContentPanel
         section={sections[sectionIndex] || null}
         sectionIndex={sectionIndex}
@@ -323,14 +397,30 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
         isComplete={isComplete}
         completedCodes={completedCodes}
         onToggleComplete={setComplete}
+        overlay={checkinOverlay}
+        onAsk={tutorV2 && !hideTutor ? () => {
+          track('feature_use', { action: 'tutor_ask_opened', props: { lesson_code: activeLessonCode } });
+          openTutor();
+        } : null}
       />
-      {!hideTutor && (
+      {!hideTutor && !tutorV2 && (
         <TutorPanel
           lessonCode={activeLessonCode}
           learnerId={learnerId || 'anonymous'}
-          slideNumber={sections[Math.min(sectionIndex, sections.length - 1)]?.slide_number}
+          slideNumber={currentSlideNumber}
           checkpoint={checkpoint}
           onAnswered={handleAnswered}
+        />
+      )}
+      {!hideTutor && tutorV2 && tutorOpen && (
+        <TutorPanel
+          drawer
+          lessonCode={activeLessonCode}
+          learnerId={learnerId || 'anonymous'}
+          slideNumber={currentSlideNumber}
+          screenQuestion={screenQuestion}
+          request={tutorRequest}
+          onClose={() => { setTutorOpen(false); setTutorRequest(null); }}
         />
       )}
     </div>

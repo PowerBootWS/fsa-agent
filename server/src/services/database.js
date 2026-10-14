@@ -296,6 +296,23 @@ async function getCheckinForSlide(lessonCode, lastSection) {
   return result.rows[0] || null;
 }
 
+// The saved tutor conversation for one student and objective, oldest first.
+// chat_history is keyed on lessons.id; the lesson player only knows the code.
+async function getChatTranscript(userEmail, lessonCode) {
+  const result = await pool.query(
+    `SELECT c.messages
+       FROM chat_history c
+       JOIN lessons l ON l.id = c.lesson_id
+      WHERE c.user_email = $1 AND l.lesson_code = $2`,
+    [userEmail, lessonCode]
+  );
+  const messages = result.rows[0]?.messages;
+  if (!Array.isArray(messages)) return [];
+  return messages.filter(
+    (m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string'
+  );
+}
+
 async function getCourseOutline(courseId) {
   const lessonsResult = await pool.query(
     `SELECT lesson_code, title FROM lessons
@@ -378,6 +395,7 @@ module.exports = {
   getLearnerSession,
   getCheckpointQuestionPool,
   getCheckinForSlide,
+  getChatTranscript,
   getCourseOutline,
   getCourseProgress,
   upsertCourseProgress,

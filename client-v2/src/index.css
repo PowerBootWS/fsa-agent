@@ -1684,3 +1684,125 @@ body {
 /* LaTeX */
 .katex-display { margin: 12px 0; overflow-x: auto; }
 .katex { font-size: 1.05em; }
+
+/* ── Lesson tutor v2: check-in cards + tutor drawer ───────────
+   Lesson tutor redesign slice 4, behind TUTOR_V2_EMAILS. The slide gets the
+   full width; the tutor opens beside it on demand (desktop) or as a sheet
+   over it (phones). See docs/superpowers/specs/2026-10-13-lesson-tutor-redesign.md */
+.lesson-player--v2 .content-panel {
+  flex: 1 1 100%;
+  border-right: none;
+}
+.lesson-player--v2.lesson-player--tutor-open .content-panel {
+  flex: 0 0 60%;
+  border-right: 1px solid var(--plate-edge);
+}
+
+.tutor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.tutor-close {
+  background: none;
+  border: none;
+  color: var(--gray-mid);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.tutor-close:hover { color: var(--off-white); }
+
+.audio-controls .ask-tutor-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--steel-light);
+  color: var(--steel-light);
+}
+.audio-controls .ask-tutor-btn:hover { background: var(--steel-dim); color: var(--off-white); }
+
+.checkin-card {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 4px 0 16px;
+}
+.checkin-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 6px;
+}
+.checkin-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin: 0 0 12px;
+  color: var(--off-white);
+}
+.checkin-points {
+  margin: 0 0 20px;
+  padding-left: 20px;
+  color: var(--gray-light);
+  line-height: 1.55;
+}
+.checkin-points li + li { margin-top: 6px; }
+.checkin-card .question-card { margin: 0 0 20px; }
+.checkin-offer {
+  margin: 0 0 10px;
+  color: var(--gray-mid);
+  font-size: 0.9rem;
+}
+.checkin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.checkin-actions button {
+  border-radius: 4px;
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.checkin-exercise {
+  background: var(--orange);
+  border: 1px solid var(--orange);
+  color: var(--white);
+}
+.checkin-exercise:hover { background: var(--orange-glow); }
+.checkin-continue {
+  background: transparent;
+  border: 1px solid var(--plate-edge);
+  color: var(--gray-light);
+}
+.checkin-continue:hover { border-color: var(--gray-mid); color: var(--off-white); }
+
+@media (max-width: 768px) {
+  .lesson-player--v2 .content-panel,
+  .lesson-player--v2.lesson-player--tutor-open .content-panel {
+    display: flex;
+    flex: 1 1 auto;
+    border-right: none;
+  }
+  /* The drawer is a sheet over the lesson, not a second column. */
+  .lesson-player--v2 .tutor-panel--drawer {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 85vh;
+    z-index: 50;
+    border-top: 2px solid var(--orange);
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
+  }
+  .audio-controls .ask-tutor-btn { margin-left: 0; width: 100%; }
+  .checkin-actions button { flex: 1 1 100%; }
+}
+/* The tutor writes multiple-choice questions with each option on its own
+   line; without this they collapse into one run-on paragraph. */
+.tutor-panel--drawer .tutor-msg { white-space: pre-line; }

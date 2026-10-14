@@ -187,3 +187,13 @@ Each slice is shippable on its own. Slices 1–2 also improve the current UI.
 - Model `google/gemini-3-flash-preview` with low reasoning effort costs about $0.0025 a card (≈ $14 for the full set). Replies are validated: 2 to 6 points, length caps, no CJK, and em dashes rewritten.
 - `server/scripts/apply-026-checkins.sh` is the production step: backup, migration, api deploy, load. Run it only after the sample has been reviewed.
 - Shipped 2026-10-14. Russ reviewed the 50-card sample (seed 20261013) and approved the set; those 50 rows have `reviewed_at` set, and the rest are NULL. An automated check found 388 numbers in 219 cards that don't appear as digits in their slides or the source text. Six were checked by hand, and all were either written out in words on the slides or worked from slide values.
+
+## Implementation notes (slice 4)
+
+- **Switch:** no per-user flag mechanism existed, so this follows the `ADMIN_EMAILS` pattern. `TUTOR_V2_EMAILS` in `fsa-agent/.env` takes comma-separated emails or `*`, and fails closed. `server/src/config/features.js` reads it, and `/api/platform/me` returns `features.tutor_v2`. The player stays on the old layout until `/me` says otherwise, so a failed `/me` never strands a student.
+- **v2 layout:** the slide takes the full width. "💬 Ask about this slide" in the audio row opens the tutor as a right-hand 40% column on desktop, or as an 85vh sheet on phones; the old Lesson / AI Tutor tab bar is gone in v2.
+  - The drawer loads the saved conversation from `GET /api/chat/history/:lessonCode`, which is session-scoped.
+  - Closing the drawer unmounts it, and reopening reloads the conversation.
+- **Check-in card:** shown in place of the arriving slide, with that slide's audio held until Continue. It shows the recap, the lesson's practice question (when there is one) and "Quick exercise with the tutor". That button opens the drawer and sends a request for multiple-choice questions on slides X to Y, with the card's question passed as `screenQuestion` (its answer only after the student has picked). Slice 5 replaces that request with structured exercise turns.
+- **Checkpoint request:** the player now sends `slide_number` with the checkpoint request, because the `last_section` PATCH just before it is fire-and-forget and could land second.
+- **Usage events:** `checkin_shown`, `checkin_exercise_started` and `tutor_ask_opened`, which feed the opt-in-rate metric.

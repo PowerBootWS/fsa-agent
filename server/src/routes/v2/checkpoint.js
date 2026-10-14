@@ -27,7 +27,11 @@ router.post('/', async (req, res) => {
     // thrown away: the pool was queried without it, so a checkpoint four
     // slides in could offer a question whose formula appears ten slides later
     // (backlog #102). `??` rather than `||` so slide 0 stays slide 0.
-    const lastSection = session.last_section ?? null;
+    // The player sends the slide it is arriving at, because its last_section
+    // PATCH is fire-and-forget and can land after this request. Fall back to
+    // the session's copy for older clients.
+    const { slide_number } = req.body;
+    const lastSection = Number.isInteger(slide_number) ? slide_number : (session.last_section ?? null);
 
     // The recap card for this checkpoint (slice 3 of the lesson tutor
     // redesign). Optional by construction: a missing card, a missing table or

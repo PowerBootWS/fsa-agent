@@ -1,5 +1,5 @@
 // client-v2/src/components/ContentPanel.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { KatexSpan } from './MathContent';
 import 'katex/dist/katex.min.css';
 import { useAudio } from '../hooks/useAudio';
@@ -89,6 +89,8 @@ export function ContentPanel({
   completedCodes,
   onToggleComplete,
   hideNarration = false,
+  overlay = null,
+  onAsk = null,
 }) {
   const [sectionStartTime, setSectionStartTime] = useState(() => Date.now());
   const { play, pause, playing, muted, toggleMute, currentTimeMs, playbackRate, setPlaybackRate } = useAudio(
@@ -106,11 +108,24 @@ export function ContentPanel({
   }, [section?.slide_number]);
 
   useEffect(() => {
-    if (autoPlay && section?.audio_url && !muted) {
+    if (autoPlay && section?.audio_url && !muted && !overlay) {
       play();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section?.slide_number]);
+
+  // A check-in card (lesson tutor redesign, slice 4) is shown in place of the
+  // slide it arrived on. Hold that slide's narration while the card is up, and
+  // start it when the student continues — otherwise the audio for a slide they
+  // can't see plays under the card.
+  const holdAudio = Boolean(overlay);
+  const wasHeld = useRef(holdAudio);
+  useEffect(() => {
+    if (holdAudio) pause();
+    else if (wasHeld.current && autoPlay && section?.audio_url && !muted) play();
+    wasHeld.current = holdAudio;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdAudio]);
 
   if (!section && !isComplete) return null;
 
@@ -139,6 +154,8 @@ export function ContentPanel({
           onContinue={() => onNavigate(nextLessonCode, 0)}
           onReview={() => onNavigate(activeLessonCode, 0)}
         />
+      ) : overlay ? (
+        <div className="content-scroll">{overlay}</div>
       ) : (
         <>
           <div className="content-scroll">
@@ -189,6 +206,9 @@ export function ContentPanel({
               <input type="checkbox" checked={muted} onChange={toggleMute} />
               Mute audio
             </label>
+            {onAsk && (
+              <button className="ask-tutor-btn" onClick={onAsk}>💬 Ask about this slide</button>
+            )}
           </div>
 
           <div className="nav-bar">

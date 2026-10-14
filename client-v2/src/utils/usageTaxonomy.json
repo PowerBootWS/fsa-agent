@@ -21,6 +21,9 @@
     "affiliate_joined",
     "announcement_shown",
     "announcement_cta",
-    "announcement_feedback"
+    "announcement_feedback",
+    "checkin_shown",
+    "checkin_exercise_started",
+    "tutor_ask_opened"
   ]
 }

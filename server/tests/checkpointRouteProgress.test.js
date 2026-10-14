@@ -99,4 +99,15 @@ describe('POST /api/v2/checkpoint', () => {
     expect(res.body.question.id).toBe(1);
     expect(res.body.checkin).toBeNull();
   });
+
+  it('prefers the slide number the player sends over the session copy', async () => {
+    db.getLearnerSession.mockResolvedValue({ id: 7, checkpoint_log: [], last_section: 3 });
+    db.getCheckpointQuestionPool.mockResolvedValue([QUESTION]);
+
+    await request(app()).post('/api/v2/checkpoint')
+      .send({ session_id: 7, lesson_code: '2A2-1-1', slide_number: 8 }).expect(200);
+
+    expect(db.getCheckinForSlide).toHaveBeenCalledWith('2A2-1-1', 8);
+    expect(db.getCheckpointQuestionPool).toHaveBeenCalledWith('2A2-1-1', 8);
+  });
 });

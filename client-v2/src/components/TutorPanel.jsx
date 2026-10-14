@@ -1,6 +1,6 @@
 // fsa-agent/client-v2/src/components/TutorPanel.jsx
 import { useState, useRef, useEffect } from 'react';
-import { postJson } from '../utils/api';
+import { getJson, postJson } from '../utils/api';
 import { KatexSpan } from './MathContent';
 import 'katex/dist/katex.min.css';
 
@@ -49,7 +49,7 @@ export function screenQuestionFrom(messages) {
  * QuestionCard — renders a single practice question with answer selection.
  * Uses correct_answer (matches the DB column name).
  */
-function QuestionCard({ question, lessonCode, onAnswer }) {
+export function QuestionCard({ question, lessonCode, onAnswer, sublabel }) {
   const [selected, setSelected] = useState(null);
   const options = question.options || [];
   // 'idle' -> 'open' (reason box showing) -> 'sent' | 'failed'
@@ -93,7 +93,7 @@ function QuestionCard({ question, lessonCode, onAnswer }) {
           separate exercise. */}
       <div className="q-label">Practice question</div>
       <div className="q-sublabel">
-        Separate from the example on the left — same topic, your turn to try it.
+        {sublabel || 'Separate from the example on the left — same topic, your turn to try it.'}
       </div>
       <div className="q-text">{renderInline(question.question_text || '', 'qt')}</div>
       {options.map((opt, idx) => {
@@ -153,20 +153,37 @@ function QuestionCard({ question, lessonCode, onAnswer }) {
 }
 
 /**
- * TutorPanel — right 40% of the lesson player.
+ * TutorPanel — the AI tutor chat in the lesson player.
+ *
+ * Two modes:
+ *  - panel (default): the always-on right 40%. Checkpoint question cards are
+ *    injected into the thread.
+ *  - drawer (lesson tutor redesign, slice 4): opened on demand from "Ask about
+ *    this slide" or a check-in's "Quick exercise". Practice questions live on
+ *    the check-in card instead, reported here as `screenQuestion`, and the
+ *    saved conversation for the objective is loaded when it opens.
  *
  * Props:
  *   lessonCode     — string
  *   learnerId      — string
  *   slideNumber    — lesson_chunks.slide_number the student is on (grounds the tutor)
- *   checkpoint     — { question } | null
- *   onAnswered     — (entry) => void
+ *   checkpoint     — { question } | null           (panel mode)
+ *   onAnswered     — (entry) => void               (panel mode)
+ *   drawer         — boolean                       (drawer mode)
+ *   screenQuestion — card on screen, /api/chat shape (drawer mode)
+ *   request        — { id, text } to send as the student (drawer mode)
+ *   onClose        — () => void                    (drawer mode)
  */
-export function TutorPanel({ lessonCode, learnerId, slideNumber, checkpoint, onAnswered }) {
+export function TutorPanel({
+  lessonCode, learnerId, slideNumber, checkpoint, onAnswered,
+  drawer = false, screenQuestion, request, onClose,
+}) {
   const [messages, setMessages] = useState([WELCOME]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesContainerRef = useRef(null);
+  const inputRef = useRef(null);
+  const sentRequestId = useRef(null);
 
   // Scroll to bottom within the messages container (not scrollIntoView — that bubbles to parent page in iframes)
   useEffect(() => {
@@ -180,31 +197,45 @@ export function TutorPanel({ lessonCode, learnerId, slideNumber, checkpoint, onA
   // starts a fresh thread; the tutor itself still remembers the old one.
   useEffect(() => {
     setMessages([WELCOME]);
-  }, [lessonCode]);
+    if (!drawer || !lessonCode) return undefined;
+    // Drawer mode shows the saved conversation for this objective, so coming
+    // back to a lesson reads as the same conversation rather than a new one.
+    let cancelled = false;
+    getJson(`/api/chat/history/${encodeURIComponent(lessonCode)}`)
+      .then(data => {
+        if (cancelled) return;
+        const earlier = (data?.messages || []).map(m => ({
+          type: m.role === 'user' ? 'user' : 'tutor', text: m.content,
+        }));
+        if (earlier.length) setMessages(prev => [...earlier, ...prev.filter(m => m !== WELCOME)]);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [lessonCode, drawer]);
 
   // Checkpoint injection — the question card, on its own. It carries its own
   // header and sub-label, so a written preamble introducing it was pure
   // padding, and when no question came back the preamble was left announcing
   // one that never appeared.
   useEffect(() => {
-    if (!checkpoint?.question) return;
+    if (drawer || !checkpoint?.question) return;
     setMessages(prev => [...prev, { type: 'question', question: checkpoint.question }]);
-  }, [checkpoint]);
+  }, [checkpoint, drawer]);
 
-  async function handleSend() {
-    const text = input.trim();
-    if (!text || loading) return;
-    setInput('');
+  useEffect(() => {
+    if (drawer) inputRef.current?.focus();
+  }, [drawer]);
+
+  async function send(text) {
     setMessages(prev => [...prev, { type: 'user', text }]);
     setLoading(true);
-
     try {
       const data = await postJson('/api/chat', {
         user: learnerId,
         lessonId: lessonCode,
         message: text,
         ...(Number.isInteger(slideNumber) ? { slideNumber } : {}),
-        screenQuestion: screenQuestionFrom(messages),
+        screenQuestion: drawer ? screenQuestion : screenQuestionFrom(messages),
       });
       const reply = data.tutor_response || data.response || data.message || 'Sorry, I could not respond right now.';
       setMessages(prev => [...prev, { type: 'tutor', text: reply }]);
@@ -213,6 +244,21 @@ export function TutorPanel({ lessonCode, learnerId, slideNumber, checkpoint, onA
     } finally {
       setLoading(false);
     }
+  }
+
+  // A message sent on the student's behalf — the check-in's "Quick exercise".
+  useEffect(() => {
+    if (!request?.text || request.id === sentRequestId.current) return;
+    sentRequestId.current = request.id;
+    send(request.text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request]);
+
+  function handleSend() {
+    const text = input.trim();
+    if (!text || loading) return;
+    setInput('');
+    send(text);
   }
 
   function handleKeyDown(e) {
@@ -238,8 +284,13 @@ export function TutorPanel({ lessonCode, learnerId, slideNumber, checkpoint, onA
   }
 
   return (
-    <div className="tutor-panel">
-      <div className="tutor-header">AI Tutor</div>
+    <div className={`tutor-panel${drawer ? ' tutor-panel--drawer' : ''}`}>
+      <div className="tutor-header">
+        AI Tutor
+        {drawer && (
+          <button className="tutor-close" onClick={onClose} aria-label="Close tutor">✕</button>
+        )}
+      </div>
       <div className="tutor-messages" ref={messagesContainerRef}>
         {messages.map((msg, i) => {
           if (msg.type === 'question') {
@@ -265,10 +316,11 @@ export function TutorPanel({ lessonCode, learnerId, slideNumber, checkpoint, onA
       </div>
       <div className="tutor-input-row">
         <input
+          ref={inputRef}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask the tutor…"
+          placeholder={drawer ? 'Ask about this slide…' : 'Ask the tutor…'}
           disabled={loading}
         />
         <button onClick={handleSend} disabled={loading || !input.trim()}>Send</button>

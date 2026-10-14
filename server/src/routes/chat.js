@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const db = require('../services/database');
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:5000';
 
@@ -49,6 +50,20 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error('Error in chat:', error.message);
     res.status(500).json({ error: 'Failed to get response from tutor' });
+  }
+});
+
+// GET /api/chat/history/:lessonCode — the session owner's saved conversation
+// for one objective, so the tutor drawer reopens on the same conversation.
+router.get('/history/:lessonCode', async (req, res) => {
+  const email = req.user && req.user.email;
+  if (!email) return res.status(401).json({ error: 'Not authenticated' });
+  try {
+    const messages = await db.getChatTranscript(email, req.params.lessonCode);
+    res.json({ messages });
+  } catch (err) {
+    console.error('chat history error:', err.message);
+    res.status(500).json({ error: 'Failed to load conversation' });
   }
 });
 

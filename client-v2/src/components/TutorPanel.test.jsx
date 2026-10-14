@@ -111,3 +111,45 @@ describe('TutorPanel — thread and grounding', () => {
     expect(screenQuestionFrom([{ type: 'tutor', text: 'x' }])).toBeUndefined();
   });
 });
+
+describe('TutorPanel — drawer mode', () => {
+  const ok = body => ({ ok: true, status: 200, text: async () => JSON.stringify(body), json: async () => body });
+  const chatBodies = () => globalThis.fetch.mock.calls
+    .filter(([url]) => url === '/api/chat').map(([, opts]) => JSON.parse(opts.body));
+
+  it('shows the saved conversation for the objective', async () => {
+    globalThis.fetch.mockImplementation(async url => (
+      url.startsWith('/api/chat/history/')
+        ? ok({ messages: [{ role: 'user', content: 'call me Garlock' }, { role: 'assistant', content: 'You got it, Garlock.' }] })
+        : ok({})
+    ));
+    render(<TutorPanel drawer lessonCode="2B1-1-1" learnerId="s@test.example" slideNumber={5} onClose={() => {}} />);
+    expect(await screen.findByText('You got it, Garlock.')).toBeInTheDocument();
+    expect(globalThis.fetch.mock.calls[0][0]).toBe('/api/chat/history/2B1-1-1');
+  });
+
+  it('sends a request on the student\'s behalf once, with the card on screen', async () => {
+    globalThis.fetch.mockImplementation(async url => (
+      url === '/api/chat' ? ok({ tutor_response: 'First question: ...' }) : ok({ messages: [] })
+    ));
+    const card = { question_text: 'Which?', options: ['a', 'b'], selected_index: null, correct_answer: null };
+    const request = { id: 1, text: 'Quick exercise please' };
+    const { rerender } = render(<TutorPanel drawer lessonCode="2B1-1-1" learnerId="s" slideNumber={22}
+      screenQuestion={card} request={request} onClose={() => {}} />);
+    expect(await screen.findByText('First question: ...')).toBeInTheDocument();
+    rerender(<TutorPanel drawer lessonCode="2B1-1-1" learnerId="s" slideNumber={22}
+      screenQuestion={card} request={request} onClose={() => {}} />);
+
+    expect(chatBodies()).toHaveLength(1);
+    expect(chatBodies()[0]).toMatchObject({ message: 'Quick exercise please', slideNumber: 22, screenQuestion: card });
+  });
+
+  it('closes', () => {
+    globalThis.fetch.mockResolvedValue(ok({ messages: [] }));
+    const onClose = vi.fn();
+    render(<TutorPanel drawer lessonCode="2B1-1-1" learnerId="s" onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: /close tutor/i }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+

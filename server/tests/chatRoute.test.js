@@ -11,7 +11,9 @@ const express = require('express');
 const request = require('supertest');
 
 jest.mock('axios', () => ({ post: jest.fn() }));
+jest.mock('../src/services/database', () => ({ getChatTranscript: jest.fn() }));
 const axios = require('axios');
+const db = require('../src/services/database');
 const chatRouter = require('../src/routes/chat');
 
 function app(user = { email: 'owner@example.com' }) {
@@ -71,5 +73,28 @@ describe('POST /api/chat', () => {
       .toEqual({ question_text: 'q', options: ['a'], selected_index: null, correct_answer: null });
     expect(clean({ question_text: '  ', options: [] })).toBeUndefined();
     expect(clean('nope')).toBeUndefined();
+  });
+});
+
+describe('GET /api/chat/history/:lessonCode', () => {
+  it('returns the session owner\'s conversation for that objective', async () => {
+    const messages = [{ role: 'user', content: 'call me Garlock' }, { role: 'assistant', content: 'Will do.' }];
+    db.getChatTranscript.mockResolvedValue(messages);
+
+    const res = await request(app()).get('/api/chat/history/2B1-1-1').expect(200);
+
+    expect(db.getChatTranscript).toHaveBeenCalledWith('owner@example.com', '2B1-1-1');
+    expect(res.body.messages).toEqual(messages);
+  });
+
+  it('cannot be pointed at another student', async () => {
+    db.getChatTranscript.mockResolvedValue([]);
+    await request(app()).get('/api/chat/history/2B1-1-1?user=someone-else@example.com').expect(200);
+    expect(db.getChatTranscript).toHaveBeenCalledWith('owner@example.com', '2B1-1-1');
+  });
+
+  it('answers 500 when the lookup fails', async () => {
+    db.getChatTranscript.mockRejectedValue(new Error('boom'));
+    await request(app()).get('/api/chat/history/2B1-1-1').expect(500);
   });
 });

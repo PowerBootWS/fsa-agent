@@ -15,6 +15,7 @@ const DEACTIVATION_REQUIRES_CONFIRMATION =
   (process.env.DEACTIVATION_REQUIRES_CONFIRMATION || 'true').toLowerCase() !== 'false';
 const requireAuth = require('../middleware/requireAuth');
 const axios = require('axios');
+const { featuresFor } = require('../config/features');
 
 const router = express.Router();
 
@@ -864,6 +865,7 @@ router.get('/me', requireAuth, async (req, res) => {
       last_paper_switch_at: u.last_paper_switch_at,
       had_subscription: hist.had_subscription,
       has_billing_history: hist.has_stripe_sub,
+      features: featuresFor(u.email),
     });
   } catch (err) {
     console.error('GET /api/platform/me error:', err);
