@@ -292,6 +292,151 @@ class Researcher:
             print(f'Researcher.save_chat_history error: {e}')
             return False
 
+    def get_chat_history(self, user_email, lesson_id):
+        """
+        The saved transcript for one student + objective, oldest first, or [].
+
+        Until 2026-10-13 transcripts were written and never read back, so the
+        tutor forgot a whole conversation on every ai-service restart.
+        """
+        try:
+            db_id = self._resolve_lesson_db_id(lesson_id)
+            if db_id is None:
+                return []
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT messages FROM chat_history WHERE user_email = %s AND lesson_id = %s',
+                (user_email, db_id)
+            )
+            row = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            messages = row['messages'] if row else None
+            if not isinstance(messages, list):
+                return []
+            return [
+                {'role': m['role'], 'content': m['content']}
+                for m in messages
+                if isinstance(m, dict) and m.get('role') in ('user', 'assistant')
+                and isinstance(m.get('content'), str)
+            ]
+        except Exception as e:
+            print(f'Researcher.get_chat_history error: {e}')
+            return []
+
+    def get_tutor_memory(self, user_email):
+        """A student's cross-objective tutor memory (tutor_memory row), or {}."""
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT preferred_name, preferences, notes FROM tutor_memory WHERE user_email = %s',
+                (user_email,)
+            )
+            row = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            if not row:
+                return {}
+            return {
+                'preferred_name': row['preferred_name'],
+                'preferences': row['preferences'] or [],
+                'notes': row['notes'] or [],
+            }
+        except Exception as e:
+            print(f'Researcher.get_tutor_memory error: {e}')
+            return {}
+
+    def save_tutor_memory(self, user_email, memory):
+        """Upsert a student's tutor memory. `memory` is already normalised."""
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO tutor_memory (user_email, preferred_name, preferences, notes)
+                VALUES (%s, %s, %s::jsonb, %s::jsonb)
+                ON CONFLICT (user_email) DO UPDATE SET
+                    preferred_name = EXCLUDED.preferred_name,
+                    preferences    = EXCLUDED.preferences,
+                    notes          = EXCLUDED.notes,
+                    updated_at     = now()
+                """,
+                (
+                    user_email,
+                    memory.get('preferred_name'),
+                    json.dumps(memory.get('preferences') or []),
+                    json.dumps(memory.get('notes') or []),
+                )
+            )
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f'Researcher.save_tutor_memory error: {e}')
+            return False
+
+    # The objective's source text is identical on every slide row and holds the
+    # formulas (slide bodies show them only as images). Capped: p95 is ~13k.
+    SOURCE_TEXT_CAP = 12000
+
+    def get_slides_through(self, lesson_code, slide_number):
+        """
+        Everything the student has reached in this objective: slides up to and
+        including `slide_number` (title, body, narration), the objective's slide
+        count, and its source text.
+
+        Replaces retrieval for lesson-mode tutoring. Four retrieved slides meant
+        the tutor answered most questions from general recall — wrongly, on the
+        2026-10-13 NPS response — and slides the student hasn't reached yet
+        are left out so it can't jump ahead.
+        """
+        empty = {'slides': [], 'total': 0, 'source': ''}
+        try:
+            conn = self._get_connection()
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT slide_number, title, body, narration
+                FROM lesson_chunks
+                WHERE lesson_code = %s AND slide_number <= %s
+                ORDER BY slide_number ASC
+                """,
+                (lesson_code, slide_number)
+            )
+            slides = cur.fetchall()
+            cur.execute(
+                """
+                SELECT count(*) AS total,
+                       (SELECT source_content FROM lesson_chunks
+                         WHERE lesson_code = %s AND coalesce(source_content, '') <> ''
+                         ORDER BY slide_number LIMIT 1) AS source
+                FROM lesson_chunks WHERE lesson_code = %s
+                """,
+                (lesson_code, lesson_code)
+            )
+            meta = cur.fetchone() or {}
+            cur.close()
+            conn.close()
+            return {
+                'slides': [
+                    {
+                        'slide_number': r['slide_number'],
+                        'title': r['title'] or '',
+                        'body': r['body'] or '',
+                        'narration': r['narration'] or '',
+                    }
+                    for r in slides
+                ],
+                'total': meta.get('total') or 0,
+                'source': (meta.get('source') or '')[:self.SOURCE_TEXT_CAP],
+            }
+        except Exception as e:
+            print(f'Researcher.get_slides_through error: {e}')
+            return empty
+
     # ------------------------------------------------------------------
     # Chunk retrieval
     # ------------------------------------------------------------------

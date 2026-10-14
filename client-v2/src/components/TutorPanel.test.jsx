@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { TutorPanel } from './TutorPanel';
+import { TutorPanel, screenQuestionFrom } from './TutorPanel';
 
 const CONNECTION_ERROR = /connection error/i;
 
@@ -62,5 +62,52 @@ describe('TutorPanel', () => {
 
     expect(await screen.findByText(/heat above saturation/i)).toBeInTheDocument();
     expect(screen.queryByText(CONNECTION_ERROR)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * First NPS response (2026-10-13): the chat was wiped on every slide, and the
+ * tutor had no idea which slide or practice card the student was looking at.
+ */
+describe('TutorPanel — thread and grounding', () => {
+  const ok = body => ({
+    ok: true, status: 200,
+    text: async () => JSON.stringify(body),
+    json: async () => body,
+  });
+  const lastBody = () => JSON.parse(globalThis.fetch.mock.calls.at(-1)[1].body);
+
+  it('keeps the conversation when the student moves to another slide', async () => {
+    globalThis.fetch.mockResolvedValue(ok({ tutor_response: 'Superheat is heat above saturation.' }));
+    const { rerender } = render(<TutorPanel lessonCode="2A2-1-1" learnerId="s@test.example" slideNumber={3} />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'what is superheat?' } });
+    fireEvent.click(screen.getByRole('button', { name: /send/i }));
+    await screen.findByText(/heat above saturation/i);
+
+    rerender(<TutorPanel lessonCode="2A2-1-1" learnerId="s@test.example" slideNumber={4} />);
+
+    expect(screen.getByText(/heat above saturation/i)).toBeInTheDocument();
+    expect(screen.getByText('what is superheat?')).toBeInTheDocument();
+  });
+
+  it('sends the slide the student is on', async () => {
+    globalThis.fetch.mockResolvedValue(ok({ tutor_response: 'ok' }));
+    render(<TutorPanel lessonCode="2B1-1-1" learnerId="s@test.example" slideNumber={22} />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'which arrangement?' } });
+    fireEvent.click(screen.getByRole('button', { name: /send/i }));
+    await screen.findByText('ok');
+
+    expect(lastBody().slideNumber).toBe(22);
+    expect(lastBody().screenQuestion).toBeUndefined();
+  });
+
+  it('reports the on-screen card, with the answer only once it is picked', () => {
+    const question = { id: 9, question_text: 'Which?', options: ['a', 'b', 'c', 'd'], correct_answer: 3 };
+    expect(screenQuestionFrom([{ type: 'question', question }])).toEqual({
+      question_text: 'Which?', options: ['a', 'b', 'c', 'd'], selected_index: null, correct_answer: null,
+    });
+    expect(screenQuestionFrom([{ type: 'question', question, answerIndex: 1 }, { type: 'tutor', text: 'x' }]))
+      .toEqual({ question_text: 'Which?', options: ['a', 'b', 'c', 'd'], selected_index: 1, correct_answer: 3 });
+    expect(screenQuestionFrom([{ type: 'tutor', text: 'x' }])).toBeUndefined();
   });
 });

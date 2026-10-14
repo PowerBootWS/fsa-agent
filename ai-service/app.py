@@ -39,6 +39,10 @@ def chat():
     lesson_id = data.get('lessonId')
     message = data.get('message')
     exam_config = data.get('examConfig')  # optional: {count: int, timed: bool}
+    # Lesson player only: which slide the student is on, and the checkpoint
+    # card currently in their chat panel (already sanitised by the Node API).
+    slide_number = data.get('slideNumber')
+    screen_question = data.get('screenQuestion')
 
     if not all([user, lesson_id, message]):
         return jsonify({'error': 'Missing required parameters'}), 400
@@ -62,6 +66,10 @@ def chat():
     )
     if exam_config is not None:
         kwargs['exam_config'] = exam_config
+    if isinstance(slide_number, int):
+        kwargs['slide_number'] = slide_number
+    if isinstance(screen_question, dict):
+        kwargs['screen_question'] = screen_question
     response = orchestrator.process(**kwargs)
 
     return jsonify(response)

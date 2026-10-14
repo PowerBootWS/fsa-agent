@@ -22,11 +22,28 @@ function renderInline(text, keyPrefix) {
   });
 }
 
-const BETWEEN_MESSAGES = [
-  "You can ask me anything about this section at any time.",
-  "Take your time — I'm here if you have questions.",
-  "Did that make sense? Keep going or ask me to explain anything differently.",
-];
+const WELCOME = { type: 'proactive', text: "Welcome! I'm your AI tutor. Ask me anything as we go through this lesson." };
+
+/**
+ * The checkpoint card the student is looking at, in the shape /api/chat
+ * expects — the latest question card in the thread. The correct answer goes
+ * along only once they have picked, so the tutor can explain it without ever
+ * being handed the answer to a question still in play.
+ */
+export function screenQuestionFrom(messages) {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const msg = messages[i];
+    if (msg.type !== 'question') continue;
+    const answered = Number.isInteger(msg.answerIndex);
+    return {
+      question_text: msg.question.question_text || '',
+      options: msg.question.options || [],
+      selected_index: answered ? msg.answerIndex : null,
+      correct_answer: answered ? msg.question.correct_answer : null,
+    };
+  }
+  return undefined;
+}
 
 /**
  * QuestionCard — renders a single practice question with answer selection.
@@ -141,14 +158,12 @@ function QuestionCard({ question, lessonCode, onAnswer }) {
  * Props:
  *   lessonCode     — string
  *   learnerId      — string
- *   sectionIndex   — current section index (triggers between-section messages)
+ *   slideNumber    — lesson_chunks.slide_number the student is on (grounds the tutor)
  *   checkpoint     — { question } | null
  *   onAnswered     — (entry) => void
  */
-export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, onAnswered }) {
-  const [messages, setMessages] = useState([
-    { type: 'proactive', text: "Welcome! I'm your AI tutor. Ask me anything as we go through this lesson." },
-  ]);
+export function TutorPanel({ lessonCode, learnerId, slideNumber, checkpoint, onAnswered }) {
+  const [messages, setMessages] = useState([WELCOME]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesContainerRef = useRef(null);
@@ -159,12 +174,13 @@ export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, on
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  // On section change, clear chat and show a fresh single message
+  // The thread lasts for the whole objective. It used to be wiped on every
+  // slide change, which students experienced as the tutor forgetting what
+  // they had just asked (first NPS response, 2026-10-13). A new objective
+  // starts a fresh thread; the tutor itself still remembers the old one.
   useEffect(() => {
-    if (sectionIndex === 0) return;
-    const msg = BETWEEN_MESSAGES[sectionIndex % BETWEEN_MESSAGES.length];
-    setMessages([{ type: 'proactive', text: msg }]);
-  }, [sectionIndex]);
+    setMessages([WELCOME]);
+  }, [lessonCode]);
 
   // Checkpoint injection — the question card, on its own. It carries its own
   // header and sub-label, so a written preamble introducing it was pure
@@ -187,6 +203,8 @@ export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, on
         user: learnerId,
         lessonId: lessonCode,
         message: text,
+        ...(Number.isInteger(slideNumber) ? { slideNumber } : {}),
+        screenQuestion: screenQuestionFrom(messages),
       });
       const reply = data.tutor_response || data.response || data.message || 'Sorry, I could not respond right now.';
       setMessages(prev => [...prev, { type: 'tutor', text: reply }]);
@@ -205,11 +223,18 @@ export function TutorPanel({ lessonCode, learnerId, sectionIndex, checkpoint, on
   }
 
   function handleAnswer(entry) {
-    onAnswered(entry);
+    onAnswered?.(entry);
     const feedback = entry.correct
       ? "Correct! Great work."
       : `Not quite — the correct answer was option ${(entry.correct_answer ?? 0) + 1}. Don't worry, keep going!`;
-    setMessages(prev => [...prev, { type: 'proactive', text: feedback }]);
+    setMessages(prev => [
+      ...prev.map(m => (
+        m.type === 'question' && m.question.id === entry.question_id && !Number.isInteger(m.answerIndex)
+          ? { ...m, answerIndex: entry.answer_index }
+          : m
+      )),
+      { type: 'proactive', text: feedback },
+    ]);
   }
 
   return (

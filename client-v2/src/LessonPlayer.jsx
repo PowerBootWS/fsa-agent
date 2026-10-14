@@ -328,7 +328,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
         <TutorPanel
           lessonCode={activeLessonCode}
           learnerId={learnerId || 'anonymous'}
-          sectionIndex={sectionIndex}
+          slideNumber={sections[Math.min(sectionIndex, sections.length - 1)]?.slide_number}
           checkpoint={checkpoint}
           onAnswered={handleAnswered}
         />

@@ -19,7 +19,10 @@ def build(lesson_context, progress, state, first_name=None):
     Returns:
         str: fully-formed system prompt
     """
-    raw_name = first_name or state.get('first_name') or ''
+    memory_record = state.get('memory') or {}
+    lesson_mode = state.get('mode') == 'lesson'
+    # A name the student asked for beats the one on their account.
+    raw_name = memory_record.get('preferred_name') or first_name or state.get('first_name') or ''
     name = str(raw_name).strip() if raw_name and str(raw_name).strip() not in ('None', 'undefined', 'null') else 'there'
     activity = state.get('activity', 'greeting')
 
@@ -53,10 +56,15 @@ def build(lesson_context, progress, state, first_name=None):
 
     library_chunks = state.get('library_chunks') or []
 
-    sections = [
-        _build_identity(name),
-        _build_lesson_content(lesson_context, relevant_chunks),
-    ]
+    covered = state.get('covered') or {}
+
+    sections = [_build_identity(name)]
+    if memory_record.get('preferred_name') or memory_record.get('preferences') or memory_record.get('notes'):
+        sections.append(_build_memory(memory_record))
+    if covered.get('slides'):
+        sections.append(_build_covered_content(lesson_context, covered))
+    else:
+        sections.append(_build_lesson_content(lesson_context, relevant_chunks))
 
     if library_chunks:
         sections.append(
@@ -70,10 +78,13 @@ def build(lesson_context, progress, state, first_name=None):
     if question_in_display:
         sections.append(_build_display_panel_note(activity, awaiting_next_question, state))
 
+    if lesson_mode and state.get('screen_question_present'):
+        sections.append(_build_screen_question_note(state))
+
     if activity == 'staged_problem':
         sections.append(_build_staged_problem_block(state))
 
-    sections.append(_build_behaviour_rules(name, activity, session_limit_reached, near_context_limit))
+    sections.append(_build_behaviour_rules(name, activity, session_limit_reached, near_context_limit, lesson_mode))
 
     return '\n\n'.join(sections)
 
@@ -81,8 +92,81 @@ def build(lesson_context, progress, state, first_name=None):
 def _build_identity(name):
     return f"""## IDENTITY
 You are an expert tutor for Power Engineering students in Canada preparing for certification exams (2nd Class, 3rd Class, etc.).
-The student you are working with right now is named {name}. Address them by name naturally throughout the conversation — not in every sentence, but warmly when appropriate.
+The student you are working with right now is named {name}. Use their name occasionally — at most once every few replies, never in every message. Overusing it reads as scripted (a student asked us to stop, 2026-10-13).
 Your tone is encouraging, patient, and professional. You are knowledgeable but approachable — like a mentor who genuinely wants to see this student succeed."""
+
+
+def _build_memory(memory_record):
+    """What the tutor remembers about this student from earlier sessions."""
+    lines = []
+    if memory_record.get('preferred_name'):
+        lines.append(f"They asked to be called: {memory_record['preferred_name']}")
+    prefs = memory_record.get('preferences') or []
+    if prefs:
+        lines.append('Their standing preferences — follow these:\n' + '\n'.join(f'- {p}' for p in prefs))
+    notes = memory_record.get('notes') or []
+    if notes:
+        lines.append('Notes:\n' + '\n'.join(f'- {n}' for n in notes))
+    body = '\n'.join(lines)
+    return f"""## WHAT YOU REMEMBER ABOUT THIS STUDENT
+From earlier conversations, in this lesson or others. Act on it naturally; don't announce that you remember, and never ask them to repeat something recorded here. Their preferences override any default in these instructions (for example, if they asked you to use their name less, most replies should not use it at all).
+{body}"""
+
+
+def _build_covered_content(lesson_context, covered):
+    """
+    Every slide the student has reached in this objective, plus its source text.
+
+    Replaces four retrieved slides, which left the tutor answering most
+    questions from general recall — on 2026-10-13 it told a student the
+    800-1300 MW nuclear arrangement was tandem compound while slide 22 of her
+    own lesson said four-casing cross compound.
+    """
+    slides = covered.get('slides') or []
+    total = covered.get('total') or len(slides)
+    title = lesson_context.get('title', 'This Lesson')
+    parts = []
+    for slide in slides:
+        header = f"### Slide {slide.get('slide_number', '')}"
+        if slide.get('title'):
+            header += f" — {slide['title'].strip()[:100]}"
+        block = [header]
+        if slide.get('body', '').strip():
+            block.append(slide['body'].strip())
+        if slide.get('narration', '').strip():
+            block.append(f"Narration: {slide['narration'].strip()}")
+        parts.append('\n'.join(block))
+    slides_text = '\n\n'.join(parts)
+
+    source = (covered.get('source') or '').strip()
+    source_block = ''
+    if source:
+        source_block = f"""
+
+## SOURCE TEXT FOR THIS OBJECTIVE
+The course text the slides were built from. It covers the whole objective, including parts the student hasn't reached yet. Use it for formulas, figures and exact wording (formulas appear on the slides only as images).
+
+{source}"""
+
+    return f"""## LESSON CONTENT — WHAT THE STUDENT HAS COVERED SO FAR
+Lesson: {title}
+The student is on slide {len(slides)} of {total} in this objective. Below is every slide up to and including that one, in order.
+
+These slides are the authoritative wording for this course. Base every explanation on them. If your general knowledge disagrees with a slide, the slide is right and you are wrong — say what the slide says.
+
+{slides_text}{source_block}"""
+
+
+def _build_screen_question_note(state):
+    """The lesson's own practice card, as the client reports it."""
+    answered = state.get('last_answer_correct') is not None
+    status = (
+        'The student has answered it.' if answered
+        else 'The student has not answered it yet.'
+    )
+    return f"""## PRACTICE CARD ON SCREEN
+The lesson has put one of its practice cards in the chat panel, with clickable options. {status}
+- Do not repeat the question or options back to them; they can see them.""" + _build_current_question_block(state, reveal_answer=answered)
 
 
 def _build_lesson_content(lesson_context, relevant_chunks=None):
@@ -411,7 +495,19 @@ Progress through steps:
 INSTRUCTION: Generate dialogue for the CURRENT STEP ONLY. Do not reveal upcoming steps, give away the final answer prematurely, or rush through the problem. Let the student do the work — your job is to guide, not solve."""
 
 
-def _build_behaviour_rules(name, activity, session_limit_reached, near_context_limit):
+_LESSON_CHAT_RULES = """LESSON CHAT (this conversation sits beside the lesson slides):
+- You cannot put anything on the student's screen. Never say you have posted, displayed, put up or refreshed a question, and never point them to a panel "above" or "on screen", unless a PRACTICE CARD ON SCREEN block says one is there.
+- The lesson shows its own practice cards every few slides. If the student asks for more practice, write ONE exam-style multiple-choice question right in your reply (the question, then options A to D), drawn only from the slides covered so far. Then stop and wait. Do not give the answer until they have replied.
+- Answer what the student asks. Do not bring up material from later slides, later objectives or other papers on your own initiative. If they ask about something the covered slides haven't reached, answer it briefly and say it comes up later in the lesson.
+- If this is the start of the conversation, say a short hello and answer them. No menu of options."""
+
+
+def _build_behaviour_rules(name, activity, session_limit_reached, near_context_limit, lesson_mode=False):
+    if lesson_mode:
+        return f"""## BEHAVIOUR RULES
+
+{_LESSON_CHAT_RULES}
+""" + _shared_behaviour_rules(name)
     return f"""## BEHAVIOUR RULES
 
 GREETING (when activity is 'greeting'):
@@ -431,7 +527,11 @@ STAGED PROBLEMS:
 - If student is wrong: ask a guiding question that points toward the right reasoning, rather than giving the answer
 - If student is wrong twice on the same step: provide a focused hint from the lesson narration
 - Do not skip steps or reveal future steps
+""" + _shared_behaviour_rules(name)
 
+
+def _shared_behaviour_rules(name):
+    return f"""
 FEEDBACK:
 - Correct: Acknowledge specifically what they got right. Add a brief reinforcing note tied to the lesson content.
   Example: "Exactly right, {name}! The 0.005D term is the manufacturing tolerance — and as you can see in the formula, it's added on top of the pressure term, not multiplied. That's an important distinction for the exam."

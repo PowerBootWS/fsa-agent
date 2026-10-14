@@ -6,6 +6,9 @@ import os
 import re
 import requests
 
+from agents import memory
+from agents.tutor import MAX_HISTORY_ENTRIES
+
 
 # Intent labels returned by the classifier
 INTENT_SELECT_PRACTICE = 'select_practice'
@@ -73,6 +76,33 @@ def _remember_current_question(state, question):
     ]
 
 
+def _apply_screen_question(state, screen_question):
+    """
+    Put the lesson's checkpoint card — the practice question actually on the
+    student's screen, as reported by the client — into state for the prompt.
+
+    Clears it when there is none, so a card from an earlier slide can't linger
+    in the tutor's head after the student has moved on.
+    """
+    for key in ('current_question_text', 'current_question_options',
+                'current_question_correct_answer', 'last_answer_correct',
+                'last_answer_text'):
+        state.pop(key, None)
+    state['screen_question_present'] = False
+    if not isinstance(screen_question, dict) or not screen_question.get('question_text'):
+        return
+    _remember_current_question(state, screen_question)
+    state['screen_question_present'] = True
+    selected = screen_question.get('selected_index')
+    correct = screen_question.get('correct_answer')
+    options = state.get('current_question_options') or []
+    if isinstance(selected, int) and isinstance(correct, int):
+        state['current_question_correct_answer'] = correct
+        state['last_answer_correct'] = selected == correct
+        if 0 <= selected < len(options):
+            state['last_answer_text'] = options[selected]
+
+
 class Orchestrator:
     def __init__(self):
         self.conversation_state = {}
@@ -85,7 +115,8 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def process(self, user, lesson_id, message, lesson_context, progress,
-                tutor, display, researcher, exam_config=None):
+                tutor, display, researcher, exam_config=None,
+                slide_number=None, screen_question=None):
         """
         Main entry point — coordinates the full agent pipeline.
 
@@ -176,10 +207,24 @@ class Orchestrator:
                 'exam_lead_magnet': (exam_config or {}).get('lead_magnet', False),
             }
 
+            if mode == 'lesson':
+                # Resume the saved conversation for this objective. In-process
+                # state is lost on every restart and transcripts used to be
+                # write-only, so the tutor forgot everything on each deploy.
+                prior = researcher.get_chat_history(user, lesson_id)
+                self.conversation_state[state_key]['full_transcript'] = list(prior)
+                self.conversation_state[state_key]['chat_history'] = prior[-MAX_HISTORY_ENTRIES:]
+
         state = self.conversation_state[state_key]
         first_name = state['first_name']
         state['exchange_count'] = state.get('exchange_count', 0) + 1
         mode = state.get('mode', 'lesson')
+
+        if mode == 'lesson':
+            return self._process_lesson(
+                state, message, lesson_context, progress, researcher, tutor,
+                slide_number, screen_question,
+            )
 
         # Route chapter quiz and practice exam modes entirely separately
         if mode == 'chapter_quiz':
@@ -373,6 +418,130 @@ class Orchestrator:
             'first_name': first_name,
             'action': action,
         }
+
+    # ------------------------------------------------------------------
+    # Lesson-player tutoring
+    # ------------------------------------------------------------------
+
+    def _process_lesson(self, state, message, lesson_context, progress,
+                        researcher, tutor, slide_number, screen_question):
+        """
+        One tutor turn in the lesson player: plain Q&A grounded in the slides
+        the student has reached.
+
+        The old path ran an activity state machine that sent practice questions
+        as `display_update` panels. client-v2 never rendered them, so the tutor
+        told students "I've put a question up for you", they saw nothing, and
+        it then gave the answer away (first NPS response, 2026-10-13). Lesson
+        mode now never emits a display; practice questions reach the student
+        only as the lesson's own checkpoint cards, which the client reports
+        back as `screen_question`. The state machine below (`_route_activity`
+        and friends) is unreachable from here and stays only until the
+        redesign's rollout window closes — see
+        docs/superpowers/specs/2026-10-13-lesson-tutor-redesign.md.
+        """
+        user = state['user']
+        lesson_id = state['lesson_id']
+        state['activity'] = 'free_discussion'
+        state['display_is_question'] = False
+        state['is_resume'] = False
+
+        state['memory'] = researcher.get_tutor_memory(user)
+
+        if slide_number is not None:
+            state['covered'] = researcher.get_slides_through(lesson_id, slide_number)
+            state['relevant_chunks'] = []
+        else:
+            # Older client without slide position: fall back to retrieval.
+            state['covered'] = None
+            state['relevant_chunks'] = researcher.get_relevant_chunks(
+                lesson_code=lesson_id, activity='free_discussion',
+                context_hint=message, limit=4,
+            )
+
+        state['library_chunks'] = (
+            researcher.search_library(
+                context_hint=message,
+                exclude_lesson_code=lesson_id,
+                limit=3,
+                class_prefix=_class_prefix(lesson_id),
+            )
+            if self._wants_library_background(state, message)
+            else []
+        )
+
+        _apply_screen_question(state, screen_question)
+
+        tutor_result = tutor.respond(
+            user_message=message,
+            lesson_context=lesson_context,
+            progress=progress,
+            state=state,
+            first_name=state['first_name'],
+        )
+        if isinstance(tutor_result, dict):
+            tutor_response = tutor_result.get('response', '')
+            action = tutor_result.get('action')
+        else:
+            tutor_response = str(tutor_result)
+            action = None
+
+        # Every turn, not every third: the transcript is now what a restart
+        # resumes from, so a lost turn is a turn the tutor forgets.
+        researcher.save_chat_history(
+            user_email=user,
+            lesson_id=lesson_id,
+            messages=state.get('full_transcript', []),
+        )
+
+        if memory.should_extract(message, state.get('exchange_count', 0)):
+            self._update_memory(state, researcher)
+
+        return {
+            'tutor_response': tutor_response,
+            'display_update': None,
+            'progress_update': {
+                'score': state['score'],
+                'struggles': state['struggles'],
+                'complexity_level': state['complexity_level'],
+            },
+            'complexity_level': state['complexity_level'],
+            'first_name': state['first_name'],
+            'action': action,
+        }
+
+    def _update_memory(self, state, researcher):
+        """Refresh the student's tutor_memory from the latest exchanges."""
+        turns = (state.get('full_transcript') or [])[-6:]
+        if not turns or not self._api_key:
+            return
+        current = state.get('memory') or {}
+        try:
+            response = requests.post(
+                f'{self._base_url}/chat/completions',
+                headers={
+                    'Authorization': f'Bearer {self._api_key}',
+                    'Content-Type': 'application/json',
+                },
+                json={
+                    'model': self._model,
+                    'max_tokens': 600,
+                    'messages': memory.build_extract_messages(current, turns),
+                },
+                timeout=20,
+            )
+            response.raise_for_status()
+            content = response.json()['choices'][0]['message']['content']
+        except Exception as e:
+            print(f'Orchestrator._update_memory error: {e}')
+            return
+        parsed = memory.parse_reply(content)
+        if parsed is None:
+            return
+        updated = memory.normalise(parsed)
+        if updated != memory.normalise(current):
+            researcher.save_tutor_memory(state['user'], updated)
+            state['memory'] = updated
 
     # ------------------------------------------------------------------
     # Cross-paper background retrieval

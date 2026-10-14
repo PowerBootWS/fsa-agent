@@ -4,10 +4,33 @@ const axios = require('axios');
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:5000';
 
+// The checkpoint card in the student's chat panel, reported by the lesson
+// player so the tutor knows which question they are looking at. Shape-checked
+// and capped here; anything malformed is dropped rather than forwarded.
+function cleanScreenQuestion(q) {
+  if (!q || typeof q !== 'object' || typeof q.question_text !== 'string' || !q.question_text.trim()) {
+    return undefined;
+  }
+  const options = Array.isArray(q.options)
+    ? q.options.filter(o => typeof o === 'string').slice(0, 6).map(o => o.slice(0, 500))
+    : [];
+  const index = v => (Number.isInteger(v) && v >= 0 && v < options.length ? v : null);
+  return {
+    question_text: q.question_text.slice(0, 2000),
+    options,
+    selected_index: index(q.selected_index),
+    correct_answer: index(q.correct_answer),
+  };
+}
+
 // Send message to Tutor Agent
 router.post('/', async (req, res) => {
   try {
-    const { user, lessonId, message, examConfig } = req.body;
+    const { lessonId, message, examConfig, slideNumber, screenQuestion } = req.body;
+    // The session owner, never the body: the tutor now reads saved transcripts
+    // and a cross-objective memory keyed on this, so a client-chosen `user`
+    // would let one student read another's conversations.
+    const user = req.user && req.user.email;
 
     if (!user || !lessonId || !message) {
       return res.status(400).json({ error: 'Missing required parameters' });
@@ -16,6 +39,9 @@ router.post('/', async (req, res) => {
     // Forward to Python AI service — include examConfig when present
     const payload = { user, lessonId, message };
     if (examConfig) payload.examConfig = examConfig;
+    if (Number.isInteger(slideNumber) && slideNumber >= 0) payload.slideNumber = slideNumber;
+    const sq = cleanScreenQuestion(screenQuestion);
+    if (sq) payload.screenQuestion = sq;
 
     const response = await axios.post(`${PYTHON_SERVICE_URL}/agent/chat`, payload);
 
@@ -26,4 +52,5 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.cleanScreenQuestion = cleanScreenQuestion;
 module.exports = router;
