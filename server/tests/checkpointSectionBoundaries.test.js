@@ -43,22 +43,34 @@ describe('markSectionBoundaries', () => {
     expect(marked.find(s => s.slide_number === 4).checkpoint_after).toBe(false);
   });
 
-  it('handles a one-slide section', () => {
+  it('does not treat a one-slide run as a section', () => {
+    // 2A3-4-4 (student report, 2026-10-15): every slide carries its own
+    // headline, so every slide ended a "section" and the quick check opened
+    // after every one. A single slide is not a section; the interval applies.
     const marked = markSectionBoundaries([
       slide(2, 'Heat Absorption Formula'),
       slide(3, 'Worked Example'),
       slide(4, 'Summary'),
     ]);
-    // The final slide is never marked — see below; the lesson ends there.
-    expect(marked.map(s => s.checkpoint_after)).toEqual([true, true, false]);
+    expect(marked.some(s => s.checkpoint_after)).toBe(false);
   });
 
-  it('treats a repeated title after a gap as a new section', () => {
-    // Titles recur legitimately; only *consecutive* runs are one section.
+  it('gives a lesson with a unique title on every slide no boundaries', () => {
+    const titles = [
+      'First Boiler Shutdown Inspection', 'First Outage Hands-On Boiler Inspection',
+      'Baseline Inspection for Plant Life', 'Boiler Internal and External Inspection Process',
+      'Deposit Detection in Drums and Headers', 'Furnace Tube Exterior Heat Stress Signs',
+      'Proving Tube Clearance With Scaling Tool', 'Boiler Outer Shell Maintenance',
+    ];
+    const marked = markSectionBoundaries(titles.map((t, i) => slide(i + 3, t, null)));
+    expect(marked.some(s => s.checkpoint_after)).toBe(false);
+  });
+
+  it('still ends a multi-slide section next to one-slide runs', () => {
     const marked = markSectionBoundaries([
-      slide(2, 'Formula'), slide(3, 'Example'), slide(4, 'Formula'),
+      slide(2, 'Formula'), slide(3, 'Example'), slide(4, 'Example'), slide(5, 'Formula'), slide(6, 'Summary'),
     ]);
-    expect(marked.map(s => s.checkpoint_after)).toEqual([true, true, false]);
+    expect(marked.filter(s => s.checkpoint_after).map(s => s.slide_number)).toEqual([4]);
   });
 
   it('never marks the final slide — the lesson ends there anyway', () => {
@@ -116,10 +128,11 @@ describe('markSectionBoundaries', () => {
       slide(0, 'Objective 4'),
       slide(1, 'Introduction'),
       slide(2, 'Real Section'),
-      slide(3, 'Another Section'),
+      slide(3, 'Real Section'),
       slide(4, 'Another Section'),
+      slide(5, 'Another Section'),
     ]);
-    expect(marked.filter(s => s.checkpoint_after).map(s => s.slide_number)).toEqual([2]);
+    expect(marked.filter(s => s.checkpoint_after).map(s => s.slide_number)).toEqual([3]);
   });
 
   it('returns an empty array unchanged', () => {

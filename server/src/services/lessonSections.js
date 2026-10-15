@@ -29,6 +29,11 @@ const { isTeachingSlide } = require('./questionSlideMapping');
  * - A lesson whose slides share one title (or have none) gets no boundaries at
  *   all, leaving the player's interval as the fallback. That is the intended
  *   degradation — better a fixed interval than a lesson with no checkpoints.
+ * - A run of one slide is not a section. Most 2A3/2B1/2B2/2B3 lessons give
+ *   every slide its own headline, so the naive rule made every slide a
+ *   boundary and the quick check opened after every single slide (a 2A3-4-4
+ *   student report, 2026-10-15). Those lessons now fall back to the interval,
+ *   which is also where their check-in cards were generated.
  *
  * @param {Array<{slide_number:number, title:?string, checkpoint_after:?boolean}>} sections
  * @returns {Array} the same rows with `checkpoint_after` set to a boolean
@@ -42,8 +47,9 @@ function markSectionBoundaries(sections) {
     const authored = row.checkpoint_after === true;
     const isLast = i === sections.length - 1;
     const endsRun = !isLast && sectionKey(row) !== sectionKey(sections[i + 1]);
+    const runOfOne = i === 0 || sectionKey(row) !== sectionKey(sections[i - 1]);
     // An untitled run is not a section, so it never ends one.
-    const derived = endsRun && sectionKey(row) !== '' && isTeachingSlide(row);
+    const derived = endsRun && !runOfOne && sectionKey(row) !== '' && isTeachingSlide(row);
     return { ...row, checkpoint_after: authored || derived };
   });
 }
