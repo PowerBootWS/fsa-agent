@@ -1,0 +1,43 @@
+/* Non-blocking, bottom-centre, above page content but below modals. */
+.update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 12px 10px 16px;
+  background: var(--plate);
+  border: 1px solid var(--orange);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  color: var(--off-white);
+  font-size: 14px;
+}
+.update-banner-refresh {
+  background: var(--orange);
+  color: var(--white);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.update-banner-refresh:hover { background: var(--orange-glow); }
+.update-banner-close {
+  background: transparent;
+  border: none;
+  color: var(--gray-mid);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+@media (max-width: 480px) {
+  .update-banner { width: calc(100vw - 32px); font-size: 13px; }
+}
