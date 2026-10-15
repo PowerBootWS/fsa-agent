@@ -44,6 +44,11 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const sectionsSeenSinceCheckpoint = useRef(0);
+  // Furthest slide (slide_number) this student has reached in this objective
+  // by pressing Next, kept on the learner session so it survives reloads and
+  // return visits. A check-in only shows on arriving past it: going back to
+  // re-read a slide and stepping forward again doesn't repeat the card.
+  const maxSlide = useRef(null);
 
   // Lesson tutor redesign (slice 4), per-user behind TUTOR_V2_EMAILS: the
   // always-on chat panel becomes a drawer opened on demand, and checkpoints
@@ -67,13 +72,20 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   // and the checkpoint picker ran out of questions it had never actually
   // shown for that lesson.
   useEffect(() => {
+    maxSlide.current = null;
     if (!activeLessonCode || !learnerId) {
       setSessionId(null);
       return undefined;
     }
     let cancelled = false;
     postJson('/api/v2/session', { learner_id: learnerId, lesson_code: activeLessonCode })
-      .then(data => { if (!cancelled) setSessionId(data?.id || null); })
+      .then(data => {
+        if (cancelled) return;
+        setSessionId(data?.id || null);
+        if (Number.isInteger(data?.max_section)) {
+          maxSlide.current = Math.max(maxSlide.current ?? -1, data.max_section);
+        }
+      })
       .catch(() => { if (!cancelled) setSessionId(null); });
     return () => { cancelled = true; };
   }, [activeLessonCode, learnerId]);
@@ -285,18 +297,25 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
     setSectionIndex(next);
     setAutoPlay(true);
     setCheckpoint(null);
-    sectionsSeenSinceCheckpoint.current += 1;
     writeProgress(activeLessonCode, next);
+
+    const nextSection = sections[next];
+    const arrived = nextSection?.slide_number;
+    // Back over ground already covered: no check-in, and the count toward the
+    // next one picks up where it left off once they pass their furthest slide.
+    const revisit = Number.isInteger(arrived) && maxSlide.current !== null && arrived <= maxSlide.current;
+    if (Number.isInteger(arrived) && !revisit) maxSlide.current = arrived;
 
     if (sessionId) {
       fetch(`/api/v2/session/${sessionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ last_section: sections[next]?.slide_number }),
+        body: JSON.stringify({ last_section: arrived, ...(revisit ? {} : { max_section: arrived }) }),
       }).catch(() => {});
     }
 
-    const nextSection = sections[next];
+    if (revisit) return;
+    sectionsSeenSinceCheckpoint.current += 1;
     const forceCheckpoint = nextSection?.checkpoint_after === true;
     const intervalCheckpoint = sectionsSeenSinceCheckpoint.current >= CHECKPOINT_INTERVAL;
     if (forceCheckpoint || intervalCheckpoint) {
@@ -426,6 +445,17 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
         onAsk={tutorV2 && !hideTutor ? () => {
           track('feature_use', { action: 'tutor_ask_opened', props: { lesson_code: activeLessonCode } });
           openTutor();
+        } : null}
+        onExercise={tutorV2 && !hideTutor ? () => {
+          // Any time, not just at a check-in: questions on the last few slides
+          // up to and including the one on screen. Repeatable as often as wanted.
+          track('feature_use', { action: 'slide_exercise_started', props: { lesson_code: activeLessonCode } });
+          const idx = Math.min(sectionIndex, sections.length - 1);
+          openTutor({
+            from_slide: sections[Math.max(0, idx - CHECKPOINT_INTERVAL + 1)]?.slide_number ?? 0,
+            after_slide: sections[idx]?.slide_number ?? 0,
+            recap_points: [],
+          });
         } : null}
       />
       {!hideTutor && !tutorV2 && (

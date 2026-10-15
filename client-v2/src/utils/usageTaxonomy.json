@@ -26,6 +26,7 @@
     "checkin_exercise_started",
     "tutor_ask_opened",
     "exercise_question_answered",
-    "exercise_completed"
+    "exercise_completed",
+    "slide_exercise_started"
   ]
 }

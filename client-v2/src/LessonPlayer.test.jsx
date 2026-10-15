@@ -14,13 +14,13 @@ const CHECKIN = { id: 1, from_slide: 0, after_slide: 3, recap_points: ['Point on
   exercise_prompt: 'Want to try a few quick questions?' };
 const QUESTION = { id: 9, question_text: 'Which one?', options: ['A', 'B'], correct_answer: 1 };
 
-function routes(tutorV2) {
+function routes(tutorV2, session = { id: 7 }) {
   const ok = body => ({ ok: true, status: 200, text: async () => JSON.stringify(body), json: async () => body });
   return vi.fn(async (url, opts = {}) => {
     if (url.startsWith('/api/v2/course/')) return ok({ chapters: [{ chapter_num: 1, objectives: [{ lesson_code: '2B1-1-1', title: 'T' }] }] });
     if (url.startsWith('/api/platform/course-structure')) return ok(null);
     if (url.startsWith('/api/v2/lesson/')) return ok({ sections: SECTIONS });
-    if (url === '/api/v2/session') return ok({ id: 7 });
+    if (url === '/api/v2/session') return ok(session);
     if (url === '/api/platform/me') return ok({ email: 's@x', features: { tutor_v2: tutorV2 } });
     if (url === '/api/v2/checkpoint') return ok({ question: QUESTION, checkin: CHECKIN, _body: opts.body });
     if (url.startsWith('/api/chat/history/')) return ok({ messages: [] });
@@ -71,7 +71,7 @@ describe('LessonPlayer with tutor_v2', () => {
     render(<LessonPlayer lessonCode="2B1-1-1" learnerId="s@x" classCode="second" />);
     await screen.findByRole('button', { name: /ask about this slide/i });
     await advanceToCheckpoint();
-    fireEvent.click(await screen.findByRole('button', { name: /quick exercise/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /quick exercise with the tutor/i }));
 
     expect(await screen.findByText('Here is question one.')).toBeInTheDocument();
     const chat = globalThis.fetch.mock.calls.find(([u]) => u === '/api/chat');
@@ -88,7 +88,7 @@ describe('LessonPlayer with tutor_v2 — drawer closes when the student moves on
     render(<LessonPlayer lessonCode="2B1-1-1" learnerId="s@x" classCode="second" />);
     await screen.findByRole('button', { name: /ask about this slide/i });
     await advanceToCheckpoint();
-    fireEvent.click(await screen.findByRole('button', { name: /quick exercise/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /quick exercise with the tutor/i }));
     await screen.findByText('Here is question one.');
   }
 
@@ -109,6 +109,71 @@ describe('LessonPlayer with tutor_v2 — drawer closes when the student moves on
     fireEvent.click(screen.getByRole('button', { name: /ask about this slide/i }));
     fireEvent.click(screen.getByRole('button', { name: /back/i }));
     expect(screen.queryByText('AI Tutor')).not.toBeInTheDocument();
+  });
+});
+
+describe('LessonPlayer with tutor_v2 — a check-in shows once', () => {
+  const SECTIONS_10 = Array.from({ length: 10 }, (_, i) => ({
+    slide_number: i, title: `Slide ${i}`, body: `Body ${i}`, chunk_type: 'content',
+  }));
+  const checkpointCalls = () => globalThis.fetch.mock.calls.filter(([u]) => u === '/api/v2/checkpoint');
+  const click = name => fireEvent.click(screen.getByRole('button', { name }));
+
+  async function start(session) {
+    const base = routes(true, session);
+    globalThis.fetch = vi.fn((url, opts) => (url.startsWith('/api/v2/lesson/')
+      ? Promise.resolve({ ok: true, status: 200, json: async () => ({ sections: SECTIONS_10 }), text: async () => JSON.stringify({ sections: SECTIONS_10 }) })
+      : base(url, opts)));
+    render(<LessonPlayer lessonCode="2B1-1-1" learnerId="s@x" classCode="second" />);
+    await screen.findByRole('button', { name: /ask about this slide/i });
+    await waitFor(() => expect(globalThis.fetch.mock.calls.some(([u]) => u === '/api/v2/session')).toBe(true));
+  }
+
+  it('does not repeat the card after going back and stepping forward again', async () => {
+    await start();
+    await advanceToCheckpoint();
+    await screen.findByText('Point one.');
+    click(/continue the lesson/i);
+    click(/back/i);
+    click(/back/i);
+    click(/next/i);
+    click(/next/i);
+    expect(screen.getByText('Body 4')).toBeInTheDocument();
+    expect(checkpointCalls()).toHaveLength(1);
+    // Past the furthest slide, the count resumes: the next card is at slide 8.
+    for (let i = 0; i < 3; i += 1) click(/next/i);
+    expect(checkpointCalls()).toHaveLength(1);
+    click(/next/i);
+    await waitFor(() => expect(checkpointCalls()).toHaveLength(2));
+    expect(JSON.parse(checkpointCalls()[1][1].body).slide_number).toBe(8);
+  });
+
+  it('remembers the furthest slide from an earlier visit', async () => {
+    await start({ id: 7, max_section: 5 });
+    await advanceToCheckpoint();
+    expect(screen.getByText('Body 4')).toBeInTheDocument();
+    expect(checkpointCalls()).toHaveLength(0);
+  });
+
+  it('records the furthest slide only when moving past it', async () => {
+    await start({ id: 7, max_section: 1 });
+    click(/next/i);
+    click(/next/i);
+    const patches = globalThis.fetch.mock.calls
+      .filter(([u, o]) => u === '/api/v2/session/7' && o?.method === 'PATCH')
+      .map(([, o]) => JSON.parse(o.body));
+    expect(patches).toEqual([{ last_section: 1 }, { last_section: 2, max_section: 2 }]);
+  });
+
+  it('offers a quick exercise on the slides up to the current one, any time', async () => {
+    await start();
+    for (let i = 0; i < 2; i += 1) click(/next/i);
+    click(/quick exercise/i);
+    expect(await screen.findByText('Here is question one.')).toBeInTheDocument();
+    const chat = globalThis.fetch.mock.calls.find(([u]) => u === '/api/chat');
+    const body = JSON.parse(chat[1].body);
+    expect(body.exercise).toMatchObject({ from_slide: 0, after_slide: 2, asked: 0 });
+    expect(body.slideNumber).toBe(2);
   });
 });
 

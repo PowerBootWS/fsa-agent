@@ -20,12 +20,15 @@ router.post('/', async (req, res) => {
 });
 
 // PATCH /api/v2/session/:id — update progress
-// Body: { last_section?, sections_viewed?, checkpoint_entry? }
+// Body: { last_section?, max_section?, sections_viewed?, checkpoint_entry? }
+// max_section is the furthest slide reached by Next; check-ins at or before it
+// are not shown again. Ignored unless a non-negative integer.
 router.patch('/:id', async (req, res) => {
-  const { last_section, sections_viewed, checkpoint_entry } = req.body;
+  const { last_section, max_section, sections_viewed, checkpoint_entry } = req.body;
   try {
     const session = await db.updateLearnerSession(req.params.id, {
       lastSection: last_section,
+      maxSection: Number.isInteger(max_section) && max_section >= 0 ? max_section : undefined,
       sectionsViewed: sections_viewed,
       checkpointEntry: checkpoint_entry,
     });

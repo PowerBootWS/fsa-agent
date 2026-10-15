@@ -1713,6 +1713,8 @@ body {
   color: var(--steel-light);
 }
 .audio-controls .ask-tutor-btn:hover { background: var(--steel-dim); color: var(--off-white); }
+/* Only the first of the two tutor buttons pushes right; the second sits beside it. */
+.audio-controls .ask-tutor-btn + .ask-tutor-btn { margin-left: 0; }
 
 .checkin-card {
   max-width: 720px;

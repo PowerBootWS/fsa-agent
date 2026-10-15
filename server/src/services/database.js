@@ -204,7 +204,7 @@ async function upsertLearnerSession(learnerId, lessonCode) {
   return result.rows[0];
 }
 
-async function updateLearnerSession(sessionId, { lastSection, sectionsViewed, checkpointEntry }) {
+async function updateLearnerSession(sessionId, { lastSection, maxSection, sectionsViewed, checkpointEntry }) {
   const updates = [];
   const values = [];
   let idx = 1;
@@ -212,6 +212,12 @@ async function updateLearnerSession(sessionId, { lastSection, sectionsViewed, ch
   if (lastSection !== undefined) {
     updates.push(`last_section = $${idx++}`);
     values.push(lastSection);
+  }
+  // Only ever moves forward, so a late-arriving PATCH can't wind it back.
+  if (maxSection !== undefined) {
+    updates.push(`max_section = GREATEST(COALESCE(max_section, $${idx}), $${idx})`);
+    idx += 1;
+    values.push(maxSection);
   }
   if (sectionsViewed !== undefined) {
     updates.push(`sections_viewed = $${idx++}`);

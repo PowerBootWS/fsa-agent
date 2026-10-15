@@ -91,6 +91,7 @@ export function ContentPanel({
   hideNarration = false,
   overlay = null,
   onAsk = null,
+  onExercise = null,
 }) {
   const [sectionStartTime, setSectionStartTime] = useState(() => Date.now());
   const { play, pause, playing, muted, toggleMute, currentTimeMs, playbackRate, setPlaybackRate } = useAudio(
@@ -208,6 +209,9 @@ export function ContentPanel({
             </label>
             {onAsk && (
               <button className="ask-tutor-btn" onClick={onAsk}>💬 Ask about this slide</button>
+            )}
+            {onExercise && (
+              <button className="ask-tutor-btn exercise-tutor-btn" onClick={onExercise}>✏️ Quick exercise</button>
             )}
           </div>
 
