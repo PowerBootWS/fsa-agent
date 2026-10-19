@@ -495,7 +495,7 @@ router.get('/lobby-data', requireAuth, async (req, res) => {
        FROM question_responses qr
        WHERE qr.user_email = $1 AND qr.course_id = $2 AND qr.session_type = 'chapter_quiz'
        GROUP BY qr.chapter_id
-       ORDER BY qr.chapter_id`,
+       ORDER BY (substring(qr.chapter_id from '([0-9]+)$'))::int NULLS LAST, qr.chapter_id`,
       [email, active_paper]
     );
 
@@ -600,7 +600,7 @@ router.get('/quiz-lobby-data', requireAuth, async (req, res) => {
          FROM question_responses qr
          WHERE qr.user_email = $1 AND qr.course_id = $2 AND qr.session_type = 'chapter_quiz'
          GROUP BY qr.chapter_id
-         ORDER BY qr.chapter_id`,
+         ORDER BY (substring(qr.chapter_id from '([0-9]+)$'))::int NULLS LAST, qr.chapter_id`,
         [email, paper]
       );
       const chapterQuizzes = chapterQuizResult.rows.map(row => {

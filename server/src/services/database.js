@@ -323,7 +323,9 @@ async function getCourseOutline(courseId) {
   const lessonsResult = await pool.query(
     `SELECT lesson_code, title FROM lessons
      WHERE lesson_code ~ $1
-     ORDER BY lesson_code`,
+     -- Codes are '{COURSE}-{CH}-{OBJ}'; text order puts 1-10 before 1-2, so
+     -- sort on the two trailing integers. The WHERE guarantees both exist.
+     ORDER BY split_part(lesson_code, '-', 2)::int, split_part(lesson_code, '-', 3)::int`,
     [`^${courseId}-\\d+-\\d+$`]
   );
 

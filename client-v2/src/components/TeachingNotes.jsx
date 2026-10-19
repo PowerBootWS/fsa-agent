@@ -64,7 +64,7 @@ export function TeachingNotes({ objectiveBreakdowns, chapterStats, onSelectChapt
 export function NextAttemptPreview({ nextAttemptAllocation, totalCount }) {
   if (!nextAttemptAllocation) return null;
 
-  const entries = Object.entries(nextAttemptAllocation).sort(([a], [b]) => a.localeCompare(b));
+  const entries = Object.entries(nextAttemptAllocation).sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));
   if (entries.length === 0) return null;
 
   const numChapters = entries.length;
