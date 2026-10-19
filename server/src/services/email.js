@@ -3,14 +3,21 @@
 // anywhere. `FROM` picks the sending mailbox: change it to a russ@ address and
 // the mail genuinely comes from Russ, no alias or Send-As grant involved.
 const { email } = require('fsa-common');
+const { signText, signHtml } = require('./emailTemplate');
 
 const FROM = process.env.EMAIL_FROM || 'Full Steam Ahead <support@fullsteamahead.ca>';
 const BASE_URL = process.env.PLATFORM_BASE_URL || 'https://learn.fullsteamahead.ca';
 
+// Customer-facing mail from support@ carries Olivia's sign-off and the company
+// footer (emailTemplate.js). Operator mail (deactivation review, ops reports)
+// goes to Russ and stays bare.
+function sendToCustomer(msg) {
+  return email.sendEmail({ ...msg, from: FROM, html: signHtml(msg.html), text: signText(msg.text) });
+}
+
 async function sendMagicLink(email_, firstName, token) {
   const link = `${BASE_URL}/setup?token=${token}`;
-  await email.sendEmail({
-    from: FROM,
+  await sendToCustomer({
     to: email_,
     subject: 'Set up your Full Steam Ahead account',
     html: `<p>Hi ${firstName},</p><p>Welcome to Full Steam Ahead! Click the button below to set up your account password.</p><p><a href="${link}" style="background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">Set Up My Account</a></p><p>This link expires in 48 hours.</p><p>If you didn't sign up, ignore this email.</p>`,
@@ -20,8 +27,7 @@ async function sendMagicLink(email_, firstName, token) {
 
 async function sendPasswordReset(email_, firstName, token) {
   const link = `${BASE_URL}/reset-password?token=${token}`;
-  await email.sendEmail({
-    from: FROM,
+  await sendToCustomer({
     to: email_,
     subject: 'Reset your Full Steam Ahead password',
     html: `<p>Hi ${firstName},</p><p>Click below to reset your password. This link expires in 1 hour.</p><p><a href="${link}" style="background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">Reset Password</a></p><p>If you didn't request this, ignore this email.</p>`,
@@ -30,8 +36,7 @@ async function sendPasswordReset(email_, firstName, token) {
 }
 
 async function sendPracticeExamCode(email_, firstName, code) {
-  await email.sendEmail({
-    from: FROM,
+  await sendToCustomer({
     to: email_,
     subject: `Your Full Steam Ahead verification code: ${code}`,
     html: `<p>Hi ${firstName},</p><p>Your verification code for your free practice exam is:</p><p style="font-size:32px;font-weight:700;letter-spacing:0.1em;color:#1d4ed8;">${code}</p><p>Enter this code to start your exam. This code expires in 10 minutes.</p><p>If you didn't request this, ignore this email.</p>`,
@@ -101,12 +106,11 @@ async function sendAffiliateWelcome(email_, firstName, code) {
   const link = `https://fullsteamahead.ca/?am_id=${code}`;
   const dashboard = 'https://fullsteamahead.ca/affiliate-dashboard';
   const name = escapeHtml(firstName || 'there');
-  await email.sendEmail({
-    from: FROM,
+  await sendToCustomer({
     to: email_,
     subject: 'Your Full Steam Ahead referral link',
-    html: `<p>Hi ${name},</p><p>You're in. Here's your referral link:</p><p><a href="${link}">${link}</a></p><p>Share it with anyone working toward their ticket. When someone enrolls in the 2nd or 3rd Class course through it, you earn 20% of what they pay, every month they stay enrolled.</p><p>Track your referrals and earnings anytime at <a href="${dashboard}">${dashboard}</a>. Log in with this email address.</p><p>Full Steam Ahead</p>`,
-    text: `Hi ${firstName || 'there'},\n\nYou're in. Here's your referral link:\n${link}\n\nShare it with anyone working toward their ticket. When someone enrolls in the 2nd or 3rd Class course through it, you earn 20% of what they pay, every month they stay enrolled.\n\nTrack your referrals and earnings anytime at ${dashboard}. Log in with this email address.\n\nFull Steam Ahead`,
+    html: `<p>Hi ${name},</p><p>You're in. Here's your referral link:</p><p><a href="${link}">${link}</a></p><p>Share it with anyone working toward their ticket. When someone enrolls in the 2nd or 3rd Class course through it, you earn 20% of what they pay, every month they stay enrolled.</p><p>Track your referrals and earnings anytime at <a href="${dashboard}">${dashboard}</a>. Log in with this email address.</p>`,
+    text: `Hi ${firstName || 'there'},\n\nYou're in. Here's your referral link:\n${link}\n\nShare it with anyone working toward their ticket. When someone enrolls in the 2nd or 3rd Class course through it, you earn 20% of what they pay, every month they stay enrolled.\n\nTrack your referrals and earnings anytime at ${dashboard}. Log in with this email address.`,
   });
 }
 
