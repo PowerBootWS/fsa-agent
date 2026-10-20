@@ -3,16 +3,16 @@
 // anywhere. `FROM` picks the sending mailbox: change it to a russ@ address and
 // the mail genuinely comes from Russ, no alias or Send-As grant involved.
 const { email } = require('fsa-common');
-const { signText, signHtml } = require('./emailTemplate');
+const { OLIVIA_FROM, signText, signHtml } = require('./emailTemplate');
 
 const FROM = process.env.EMAIL_FROM || 'Full Steam Ahead <support@fullsteamahead.ca>';
 const BASE_URL = process.env.PLATFORM_BASE_URL || 'https://learn.fullsteamahead.ca';
 
 // Customer-facing mail from support@ carries Olivia's sign-off and the company
 // footer (emailTemplate.js). Operator mail (deactivation review, ops reports)
-// goes to Russ and stays bare.
+// goes to Russ and stays bare, from EMAIL_FROM.
 function sendToCustomer(msg) {
-  return email.sendEmail({ ...msg, from: FROM, html: signHtml(msg.html), text: signText(msg.text) });
+  return email.sendEmail({ ...msg, from: OLIVIA_FROM, html: signHtml(msg.html), text: signText(msg.text) });
 }
 
 async function sendMagicLink(email_, firstName, token) {

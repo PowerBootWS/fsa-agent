@@ -22,6 +22,7 @@ it('signs customer mail as Olivia with the company footer, once', async () => {
   await sendPracticeExamCode('x@example.com', 'Sam', '123456');
   await sendAffiliateWelcome('x@example.com', 'Sam', 'SAM1234');
   for (const [msg] of common.sendEmail.mock.calls) {
+    expect(msg.from).toBe('Olivia | Full Steam Ahead <support@fullsteamahead.ca>');
     for (const body of [msg.text, msg.html]) {
       expect(body).toMatch(/Warm regards,[\s\S]*Olivia[\s\S]*Customer Support Agent[\s\S]*Full Steam Ahead/);
       expect(body).toContain('PO Box 99900 EU 953 098 RPO SKYVIEW, EDMONTON, ALBERTA T5L2Y2');

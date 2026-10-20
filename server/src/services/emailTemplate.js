@@ -6,6 +6,8 @@
 // fsa-nurture/lib/footer.js: change all three together. No em dashes: they
 // read as machine-written, and this text goes to customers.
 
+// The From for mail signed by Olivia. One line: a display name can't break.
+const OLIVIA_FROM = 'Olivia | Full Steam Ahead <support@fullsteamahead.ca>';
 const ADDRESS = 'PO Box 99900 EU 953 098 RPO SKYVIEW, EDMONTON, ALBERTA T5L2Y2';
 const PHONE = '+1-587-412-5264';
 const CLOSING = 'Warm regards,';
@@ -32,4 +34,4 @@ function signHtml(body) {
     '<a href="https://fullsteamahead.ca" style="color:#666">fullsteamahead.ca</a></p>';
 }
 
-module.exports = { ADDRESS, PHONE, CLOSING, SIGNATURE, FOOTER_TEXT, signText, signHtml };
+module.exports = { OLIVIA_FROM, ADDRESS, PHONE, CLOSING, SIGNATURE, FOOTER_TEXT, signText, signHtml };
