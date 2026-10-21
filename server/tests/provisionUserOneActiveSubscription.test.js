@@ -48,6 +48,11 @@ describe('provision-user — one active subscription per (user, class_code)', ()
       .set('x-internal-secret', 'test-internal-secret')
       .send({ email: 'provuser1-dual-class@example.com', first_name: 'Dual', last_name: 'User', class_code: 'fourth_a' });
     expect(second.status).toBe(200);
+    // The customer has paid for this purchase and it granted nothing, so the
+    // response must say so -- the webhook listener alerts Russ on it.
+    expect(second.body.blocked).toBe(true);
+    expect(second.body.blocking_class_codes).toEqual(['second']);
+    expect(first.body.blocked).toBe(false);
 
     const rows = await pool.query(
       `SELECT s.class_code FROM subscriptions s
@@ -56,6 +61,21 @@ describe('provision-user — one active subscription per (user, class_code)', ()
     );
     expect(rows.rows).toHaveLength(1);
     expect(rows.rows[0].class_code).toBe('second');
+  });
+
+  it('flags a second paid purchase of the same class (different Stripe subscription) as a duplicate, but not a webhook re-delivery', async () => {
+    const app = buildTestApp();
+    const send = (sub) => request(app)
+      .post('/api/platform/provision-user')
+      .set('x-internal-secret', 'test-internal-secret')
+      .send({ email: 'provuser1-dup@example.com', first_name: 'Dup', last_name: 'User', class_code: 'second', stripe_subscription_id: sub });
+    const first = await send('sub_fixture_A');
+    expect(first.body.duplicate_purchase).toBe(false);
+    const redelivery = await send('sub_fixture_A');
+    expect(redelivery.body.duplicate_purchase).toBe(false);
+    expect(redelivery.body.blocked).toBe(false);
+    const second = await send('sub_fixture_B');
+    expect(second.body.duplicate_purchase).toBe(true);
   });
 
   it('DB rejects a raw duplicate active subscription (same class_code) for the same user', async () => {

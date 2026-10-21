@@ -231,6 +231,12 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
       ? blockingCodes.includes(class_code) || blockingCodes.some(c => !FOURTH_CLASS_CODES.includes(c))
       : blockingCodes.length > 0;
 
+    // Same class already active under a DIFFERENT Stripe subscription: not a webhook
+    // re-delivery but a second purchase of the same thing (double billing).
+    const sameClassRow = existingActive.rows.find(r => r.class_code === class_code && (!replaced || r.id !== replaced.id));
+    const duplicatePurchase = Boolean(blocked && sameClassRow && stripe_subscription_id
+      && sameClassRow.stripe_subscription_id && sameClassRow.stripe_subscription_id !== stripe_subscription_id);
+
     let subIsNew = false;
     if (!blocked) {
       const subInsert = await pool.query(
@@ -260,6 +266,13 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
         [user.id, token]
       );
       await sendMagicLink(normalizedEmail, first_name, token);
+    } else if (duplicatePurchase) {
+      console.error(`provision-user: DUPLICATE ${class_code} purchase for ${normalizedEmail} — already active on ${sameClassRow.stripe_subscription_id}, new ${stripe_subscription_id}; customer may be billed twice`);
+    } else if (blocked && !blockingCodes.includes(class_code)) {
+      // A paid purchase of a DIFFERENT class that the one-tier rule refused (e.g.
+      // a 4th Class student buying 3rd Class). The customer paid and got nothing;
+      // this used to be logged as an "idempotent re-delivery". Money audit 2026-10-20.
+      console.error(`provision-user: BLOCKED ${class_code} purchase for ${normalizedEmail} — already holds ${blockingCodes.join(', ')}; nothing granted`);
     } else {
       console.log(`provision-user: idempotent re-delivery for ${normalizedEmail}, skipping magic link`);
     }
@@ -270,6 +283,11 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
       ok: true,
       user_id: user.id,
       replaced_subscription_id: replaced ? replaced.stripe_subscription_id : null,
+      // True only when this purchase was refused because the student already holds
+      // a different class. A same-class re-delivery is not "blocked" in this sense.
+      blocked: Boolean(blocked && !blockingCodes.includes(class_code)),
+      blocking_class_codes: blocked && !blockingCodes.includes(class_code) ? blockingCodes : [],
+      duplicate_purchase: duplicatePurchase,
     });
   } catch (err) {
     console.error('POST /api/platform/provision-user error:', err);
