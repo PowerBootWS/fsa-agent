@@ -449,59 +449,9 @@ router.post('/deactivate-user', requireInternalSecret, async (req, res) => {
   }
 });
 
-// POST /api/platform/expire-grace-periods
-// Called daily by cloud routine — finalises deactivation for subscriptions whose cancel_at has passed.
-router.post('/expire-grace-periods', requireInternalSecret, async (req, res) => {
-  try {
-    if (DEACTIVATION_REQUIRES_CONFIRMATION) {
-      // Gate on: don't pull access. Email a digest of expired grace periods for confirmation
-      // and leave the rows active until the operator confirms.
-      const due = await pool.query(
-        `SELECT s.user_id, s.stripe_subscription_id, pu.email, pu.first_name, pu.last_name
-         FROM subscriptions s JOIN platform_users pu ON pu.id = s.user_id
-         WHERE s.status = 'active' AND s.cancel_at IS NOT NULL AND s.cancel_at <= NOW()`
-      );
-      const pending = due.rowCount;
-      if (pending > 0) {
-        try {
-          await sendDeactivationReview(
-            due.rows.map((r) => ({
-              name: [r.first_name, r.last_name].filter(Boolean).join(' ').trim(),
-              email: r.email,
-              stripeSubscriptionId: r.stripe_subscription_id,
-              reason: 'Grace period expired (subscription cancelled, paid time ended)',
-            }))
-          );
-        } catch (mailErr) {
-          console.error('expire-grace-periods: review email failed:', mailErr.message);
-        }
-        console.log(`expire-grace-periods: HELD ${pending} subscription(s) for confirmation (gate on)`);
-      }
-      return res.json({ ok: true, deactivated: 0, pending });
-    }
-
-    const result = await pool.query(
-      `UPDATE subscriptions
-       SET status = 'inactive', deactivated_at = now(), cancel_at = NULL
-       WHERE status = 'active' AND cancel_at IS NOT NULL AND cancel_at <= NOW()
-       RETURNING user_id`
-    );
-    const count = result.rowCount;
-    if (count > 0) {
-      const userIds = result.rows.map(r => r.user_id);
-      await pool.query(
-        `UPDATE platform_users pu SET current_session_token = NULL WHERE pu.id = ANY($1)
-           AND NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = pu.id AND s.status = 'active')`,
-        [userIds]
-      );
-      console.log(`expire-grace-periods: deactivated ${count} subscription(s), user_ids: ${userIds.join(', ')}`);
-    }
-    return res.json({ ok: true, deactivated: count });
-  } catch (err) {
-    console.error('POST /api/platform/expire-grace-periods error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// (POST /api/platform/expire-grace-periods removed 2026-10-21, audit O8. Nothing
+// ever called it: requireAuth already refuses a subscription once its cancel_at
+// passes, and customer.subscription.deleted plus the daily reconcile end the row.)
 
 // ── Class switcher (2026-10-21) ───────────────────────────────────────────────
 // A student may hold more than one class: 4th Class papers alongside 3rd/2nd
