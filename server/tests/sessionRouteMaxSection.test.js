@@ -6,13 +6,14 @@
 const express = require('express');
 const request = require('supertest');
 
-jest.mock('../src/services/database', () => ({ updateLearnerSession: jest.fn() }));
+jest.mock('../src/services/database', () => ({ updateLearnerSession: jest.fn(), getLearnerSession: jest.fn() }));
 const db = require('../src/services/database');
 const sessionRouter = require('../src/routes/v2/session');
 
 function app() {
   const a = express();
   a.use(express.json());
+  a.use((req, _res, next) => { req.user = { id: 1, email: 'owner@example.com' }; next(); });
   a.use('/api/v2/session', sessionRouter);
   return a;
 }
@@ -20,6 +21,7 @@ function app() {
 beforeEach(() => {
   jest.clearAllMocks();
   db.updateLearnerSession.mockResolvedValue({ id: 's1', max_section: 8 });
+  db.getLearnerSession.mockResolvedValue({ id: 's1', learner_id: 'owner@example.com' });
 });
 
 describe('PATCH /api/v2/session/:id — max_section', () => {

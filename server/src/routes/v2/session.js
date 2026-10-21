@@ -2,11 +2,18 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../../services/database');
+const { requirePaperEntitlement } = require('../../middleware/requirePaperEntitlement');
+
+// Sessions belong to the signed-in student. The learner id used to come from the
+// request body (the client sent its own email), so any subscriber could read or
+// rewrite another student's lesson session. Student-access audit, 2026-10-21.
+const sameLearner = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
 
 // POST /api/v2/session — create or resume a session
 // Body: { learner_id, lesson_code }
-router.post('/', async (req, res) => {
-  const { learner_id, lesson_code } = req.body;
+router.post('/', requirePaperEntitlement(req => req.body && req.body.lesson_code), async (req, res) => {
+  const learner_id = req.user && req.user.email;
+  const { lesson_code } = req.body;
   if (!learner_id || !lesson_code) {
     return res.status(400).json({ error: 'learner_id and lesson_code required' });
   }
@@ -26,6 +33,10 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   const { last_section, max_section, sections_viewed, checkpoint_entry } = req.body;
   try {
+    const existing = await db.getLearnerSession(req.params.id);
+    if (!existing || !sameLearner(existing.learner_id, req.user && req.user.email)) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
     const session = await db.updateLearnerSession(req.params.id, {
       lastSection: last_section,
       maxSection: Number.isInteger(max_section) && max_section >= 0 ? max_section : undefined,

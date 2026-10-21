@@ -2,17 +2,23 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../../services/database');
+const { requirePaperEntitlement } = require('../../middleware/requirePaperEntitlement');
+
+// The learner is always the signed-in student. The :learnerId path segment is kept
+// so existing clients keep working, but it is ignored: it used to let any
+// subscriber read or overwrite another student's resume position. Audit 2026-10-21.
+const me = req => (req.user && req.user.email) || '';
 
 // GET /api/v2/progress/:learnerId/:courseId
-router.get('/:learnerId/:courseId', async (req, res) => {
+router.get('/:learnerId/:courseId', requirePaperEntitlement(req => req.params.courseId), async (req, res) => {
   try {
     const progress = await db.getCourseProgress(
-      req.params.learnerId,
+      me(req),
       req.params.courseId
     );
     if (!progress) {
       return res.json({
-        learner_id: req.params.learnerId,
+        learner_id: me(req),
         course_id: req.params.courseId,
         last_lesson_code: null,
         last_slide: null,
@@ -27,14 +33,14 @@ router.get('/:learnerId/:courseId', async (req, res) => {
 
 // PATCH /api/v2/progress/:learnerId/:courseId
 // Body: { last_lesson_code, last_slide }
-router.patch('/:learnerId/:courseId', async (req, res) => {
+router.patch('/:learnerId/:courseId', requirePaperEntitlement(req => req.params.courseId), async (req, res) => {
   const { last_lesson_code, last_slide } = req.body;
   if (!last_lesson_code || !last_slide) {
     return res.status(400).json({ error: 'last_lesson_code and last_slide required' });
   }
   try {
     const progress = await db.upsertCourseProgress(
-      req.params.learnerId,
+      me(req),
       req.params.courseId,
       last_lesson_code,
       parseInt(last_slide, 10)

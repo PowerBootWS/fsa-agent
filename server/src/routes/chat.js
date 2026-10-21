@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const db = require('../services/database');
+const { requirePaperEntitlement } = require('../middleware/requirePaperEntitlement');
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:5000';
 
@@ -59,7 +60,7 @@ function cleanExercise(ex) {
 }
 
 // Send message to Tutor Agent
-router.post('/', async (req, res) => {
+router.post('/', requirePaperEntitlement(req => req.body && req.body.lessonId), async (req, res) => {
   try {
     const { lessonId, message, examConfig, slideNumber, screenQuestion, exercise } = req.body;
     // The session owner, never the body: the tutor now reads saved transcripts
@@ -91,7 +92,7 @@ router.post('/', async (req, res) => {
 
 // GET /api/chat/history/:lessonCode — the session owner's saved conversation
 // for one objective, so the tutor drawer reopens on the same conversation.
-router.get('/history/:lessonCode', async (req, res) => {
+router.get('/history/:lessonCode', requirePaperEntitlement(req => req.params.lessonCode), async (req, res) => {
   const email = req.user && req.user.email;
   if (!email) return res.status(401).json({ error: 'Not authenticated' });
   try {

@@ -99,6 +99,7 @@ app.get('/health', (req, res) => {
 // Auth middleware
 const requireAuth = require('./middleware/requireAuth');
 const requireActiveSubscription = require('./middleware/requireActiveSubscription');
+const { requirePaperEntitlement } = require('./middleware/requirePaperEntitlement');
 
 // platformAuth used to call requireAuth only when the Host header contained
 // LEARN_DOMAIN, and pass through otherwise. Because fsachat.fullsteamahead.ca
@@ -112,7 +113,6 @@ const validateRouter = require('./routes/validate');
 const lessonRouter = require('./routes/lesson');
 const chatRouter = require('./routes/chat');
 const progressRouter = require('./routes/progress');
-const demoRouter = require('./routes/demo');
 const previewRouter = require('./routes/preview');
 
 // requireLearnHost is mounted AFTER the rate limiter (fix round 1, 2026-08-16
@@ -158,7 +158,8 @@ app.use('/api/events', requireAuth, eventsRouter);
 // and was built for the retired GHL-LMS era ("called from your CRM
 // automation"). `grep -rn "/api/enroll"` across every FSA repo found no caller
 // outside the retired client/ (v1) front end.
-app.use('/api/demo', demoRouter);
+// /api/demo (unauthenticated exam-state seeding for demos) removed 2026-10-21:
+// no caller, and it let anyone overwrite any student's in-progress exam state.
 
 const diagnosticRouter = require('./routes/diagnostic');
 app.use('/api/diagnostic', diagnosticRouter);
@@ -261,6 +262,9 @@ app.use(
   '/media',
   requireAuth,
   requireActiveSubscription,
+  // Media folders are named by lesson code ('2A1-3-2/...'): a student only gets
+  // the media of papers their class includes. Audit 2026-10-21.
+  requirePaperEntitlement(req => req.path.split('/')[1]),
   express.static(MEDIA_DIR, {
     setHeaders: (res) => {
       res.setHeader('Cache-Control', 'private, max-age=300');

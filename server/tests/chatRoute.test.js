@@ -11,6 +11,8 @@ const express = require('express');
 const request = require('supertest');
 
 jest.mock('axios', () => ({ post: jest.fn() }));
+// Entitlement has its own real-DB suite (paperEntitlement.test.js); pass through here.
+jest.mock('../src/middleware/requirePaperEntitlement', () => ({ requirePaperEntitlement: () => (req, res, next) => next() }));
 jest.mock('../src/services/database', () => ({ getChatTranscript: jest.fn() }));
 const axios = require('axios');
 const db = require('../src/services/database');

@@ -14,12 +14,15 @@ jest.mock('../src/services/database', () => ({
   getCheckpointQuestionPool: jest.fn(),
   getCheckinForSlide: jest.fn(),
 }));
+// Entitlement has its own real-DB suite (paperEntitlement.test.js); pass through here.
+jest.mock('../src/middleware/requirePaperEntitlement', () => ({ requirePaperEntitlement: () => (req, res, next) => next() }));
 const db = require('../src/services/database');
 const checkpointRouter = require('../src/routes/v2/checkpoint');
 
 function app() {
   const a = express();
   a.use(express.json());
+  a.use((req, _res, next) => { req.user = { id: 1, email: 'owner@example.com' }; next(); });
   a.use('/api/v2/checkpoint', checkpointRouter);
   return a;
 }
@@ -33,7 +36,7 @@ beforeEach(() => {
 
 describe('POST /api/v2/checkpoint', () => {
   it('passes the learner\'s current slide to the question pool', async () => {
-    db.getLearnerSession.mockResolvedValue({ id: 7, checkpoint_log: [], last_section: 5 });
+    db.getLearnerSession.mockResolvedValue({ learner_id: 'owner@example.com', id: 7, checkpoint_log: [], last_section: 5 });
     db.getCheckpointQuestionPool.mockResolvedValue([QUESTION]);
 
     await request(app()).post('/api/v2/checkpoint')
@@ -45,7 +48,7 @@ describe('POST /api/v2/checkpoint', () => {
   it('passes null when the session has no recorded slide', async () => {
     // A session created but never advanced. Null means unrestricted rather
     // than "slide 0", which would filter the pool down to nothing.
-    db.getLearnerSession.mockResolvedValue({ id: 7, checkpoint_log: [] });
+    db.getLearnerSession.mockResolvedValue({ learner_id: 'owner@example.com', id: 7, checkpoint_log: [] });
     db.getCheckpointQuestionPool.mockResolvedValue([QUESTION]);
 
     await request(app()).post('/api/v2/checkpoint')
@@ -55,7 +58,7 @@ describe('POST /api/v2/checkpoint', () => {
   });
 
   it('still returns a question', async () => {
-    db.getLearnerSession.mockResolvedValue({ id: 7, checkpoint_log: [], last_section: 20 });
+    db.getLearnerSession.mockResolvedValue({ learner_id: 'owner@example.com', id: 7, checkpoint_log: [], last_section: 20 });
     db.getCheckpointQuestionPool.mockResolvedValue([QUESTION]);
 
     const res = await request(app()).post('/api/v2/checkpoint')
@@ -65,7 +68,7 @@ describe('POST /api/v2/checkpoint', () => {
   });
 
   it('returns question: null when the lesson has no questions at all', async () => {
-    db.getLearnerSession.mockResolvedValue({ id: 7, checkpoint_log: [], last_section: 5 });
+    db.getLearnerSession.mockResolvedValue({ learner_id: 'owner@example.com', id: 7, checkpoint_log: [], last_section: 5 });
     db.getCheckpointQuestionPool.mockResolvedValue([]);
 
     const res = await request(app()).post('/api/v2/checkpoint')
@@ -76,7 +79,7 @@ describe('POST /api/v2/checkpoint', () => {
 
   it('returns the check-in card for the learner\'s slide alongside the question', async () => {
     const card = { id: 3, after_slide: 3, recap_points: ['a', 'b'], exercise_prompt: 'Try some?' };
-    db.getLearnerSession.mockResolvedValue({ id: 7, checkpoint_log: [], last_section: 4 });
+    db.getLearnerSession.mockResolvedValue({ learner_id: 'owner@example.com', id: 7, checkpoint_log: [], last_section: 4 });
     db.getCheckpointQuestionPool.mockResolvedValue([QUESTION]);
     db.getCheckinForSlide.mockResolvedValue(card);
 
@@ -89,7 +92,7 @@ describe('POST /api/v2/checkpoint', () => {
   });
 
   it('still serves the question when the check-in lookup fails', async () => {
-    db.getLearnerSession.mockResolvedValue({ id: 7, checkpoint_log: [], last_section: 4 });
+    db.getLearnerSession.mockResolvedValue({ learner_id: 'owner@example.com', id: 7, checkpoint_log: [], last_section: 4 });
     db.getCheckpointQuestionPool.mockResolvedValue([QUESTION]);
     db.getCheckinForSlide.mockRejectedValue(new Error('relation "lesson_checkins" does not exist'));
 
@@ -101,7 +104,7 @@ describe('POST /api/v2/checkpoint', () => {
   });
 
   it('prefers the slide number the player sends over the session copy', async () => {
-    db.getLearnerSession.mockResolvedValue({ id: 7, checkpoint_log: [], last_section: 3 });
+    db.getLearnerSession.mockResolvedValue({ learner_id: 'owner@example.com', id: 7, checkpoint_log: [], last_section: 3 });
     db.getCheckpointQuestionPool.mockResolvedValue([QUESTION]);
 
     await request(app()).post('/api/v2/checkpoint')

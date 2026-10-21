@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../services/database');
+const { requirePaperEntitlement } = require('../middleware/requirePaperEntitlement');
 
 // Detect mode from lessonId — mirrors validate.js logic
 function detectMode(id) {
@@ -11,7 +12,7 @@ function detectMode(id) {
 }
 
 // Get lesson data by ID (returns synthetic context for quiz/exam modes)
-router.get('/:id', async (req, res) => {
+router.get('/:id', requirePaperEntitlement(req => req.params.id), async (req, res) => {
   try {
     const { id } = req.params;
     const mode = detectMode(id);
@@ -62,7 +63,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Get ordered lesson chunks for transcript view
-router.get('/:id/chunks', async (req, res) => {
+router.get('/:id/chunks', requirePaperEntitlement(req => req.params.id), async (req, res) => {
   try {
     const { id } = req.params;
     const chunks = await db.getLessonChunks(id);

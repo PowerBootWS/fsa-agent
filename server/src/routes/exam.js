@@ -4,6 +4,7 @@ const axios = require('axios');
 const { pool } = require('../services/database');
 const requireAuth = require('../middleware/requireAuth');
 const requireActiveSubscription = require('../middleware/requireActiveSubscription');
+const { requirePaperEntitlement } = require('../middleware/requirePaperEntitlement');
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:5000';
 
@@ -59,7 +60,7 @@ router.get('/:courseId/chapters', async (req, res) => {
 // the caller's perspective once the value can no longer change the answer;
 // ignoring avoids adding a second error path for a parameter that is now
 // inert. The client also no longer sends it (see PracticeExamLobby.jsx).
-router.get('/:courseId/last-results', requireAuth, requireActiveSubscription, async (req, res) => {
+router.get('/:courseId/last-results', requireAuth, requireActiveSubscription, requirePaperEntitlement(req => req.params.courseId), async (req, res) => {
   const { courseId } = req.params;
   const user = req.user.email;
   try {

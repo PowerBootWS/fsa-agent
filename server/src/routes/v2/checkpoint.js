@@ -2,6 +2,12 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../../services/database');
+const { requirePaperEntitlement } = require('../../middleware/requirePaperEntitlement');
+
+// Sessions belong to the signed-in student. The learner id used to come from the
+// request body (the client sent its own email), so any subscriber could read or
+// rewrite another student's lesson session. Student-access audit, 2026-10-21.
+const sameLearner = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
 
 // POST /api/v2/checkpoint
 // Body: { session_id, lesson_code }
@@ -13,7 +19,7 @@ const db = require('../../services/database');
 // actually available — so an exhausted question pool produced a chatty message
 // pointing at a question that never rendered. The question card introduces
 // itself; the blurb added length, latency and an OpenRouter call for nothing.
-router.post('/', async (req, res) => {
+router.post('/', requirePaperEntitlement(req => req.body && req.body.lesson_code), async (req, res) => {
   const { session_id, lesson_code } = req.body;
   if (!session_id || !lesson_code) {
     return res.status(400).json({ error: 'session_id and lesson_code required' });
@@ -21,7 +27,9 @@ router.post('/', async (req, res) => {
 
   try {
     const session = await db.getLearnerSession(session_id);
-    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (!session || !sameLearner(session.learner_id, req.user && req.user.email)) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
 
     // The learner's progress is right here on the session and used to be
     // thrown away: the pool was queried without it, so a checkpoint four

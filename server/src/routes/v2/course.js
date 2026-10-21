@@ -2,9 +2,10 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../../services/database');
+const { requirePaperEntitlement } = require('../../middleware/requirePaperEntitlement');
 
 // GET /api/v2/course/:courseId/outline
-router.get('/:courseId/outline', async (req, res) => {
+router.get('/:courseId/outline', requirePaperEntitlement(req => req.params.courseId), async (req, res) => {
   try {
     const outline = await db.getCourseOutline(req.params.courseId);
     if (!outline.chapters.length) {
