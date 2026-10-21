@@ -10,6 +10,7 @@ import { DistractorCoaching } from './components/DistractorCoaching.jsx';
 import { MathContent } from './components/MathContent.jsx';
 import { CountdownTimer } from './components/CountdownTimer.jsx';
 import { isFourthClassCode } from './utils/fourthClass';
+import FlagQuestion from './components/FlagQuestion';
 import { track } from './utils/usage';
 
 // ---------------------------------------------------------------------------
@@ -359,6 +360,14 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSele
         </div>
         {isExam && (
           <div className="quizexam-exam-note">Select your answer — feedback at the end</div>
+        )}
+        {/* Signed-in students only: the free practice exam has no account to flag from. */}
+        {!leadMagnetMode && (
+          <FlagQuestion
+            key={displayContent.question_id}
+            questionId={displayContent.question_id}
+            lessonCode={chapter_id || null}
+          />
         )}
       </div>
     );
