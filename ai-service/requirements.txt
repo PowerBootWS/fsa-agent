@@ -10,3 +10,4 @@ python-docx==1.1.2
 # attribute 'transform' in weasyprint/pdf/stream.py during write_pdf. 68.1 is confirmed
 # working against the pydyf version pip currently resolves.
 weasyprint==68.1
+gunicorn==23.0.0

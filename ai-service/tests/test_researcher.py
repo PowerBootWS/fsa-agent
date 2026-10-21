@@ -15,8 +15,8 @@ def make_researcher():
 def test_get_questions_by_ids_returns_dict_keyed_by_id():
     r = make_researcher()
     mock_rows = [
-        {'id': 1, 'lesson_code': '2B1-3-2', 'topic': 'thickness_formula', 'explanation': 'Use Barlow.'},
-        {'id': 2, 'lesson_code': '2B1-1-4', 'topic': 'pressure',          'explanation': 'Pressure rises.'},
+        {'id': 1, 'lesson_code': '2B1-3-2', 'topic': 'thickness_formula', 'explanation': 'Use Barlow.', 'earliest_slide': 4},
+        {'id': 2, 'lesson_code': '2B1-1-4', 'topic': 'pressure',          'explanation': 'Pressure rises.', 'earliest_slide': None},
     ]
     mock_cursor = MagicMock()
     mock_cursor.fetchall.return_value = mock_rows
@@ -40,7 +40,7 @@ def test_get_questions_by_ids_empty_input_returns_empty():
 def test_get_questions_by_ids_handles_null_fields():
     r = make_researcher()
     mock_rows = [
-        {'id': 5, 'lesson_code': None, 'topic': None, 'explanation': None},
+        {'id': 5, 'lesson_code': None, 'topic': None, 'explanation': None, 'earliest_slide': None},
     ]
     mock_cursor = MagicMock()
     mock_cursor.fetchall.return_value = mock_rows
