@@ -224,8 +224,26 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
       console.log(`provision-user: ${normalizedEmail} upgraded ${class_code} to annual — deactivated replaced row ${replaced.id}`);
     }
 
+    // Step-up (owner decision 2026-10-21): buying a HIGHER class than one already
+    // held ends the lower class automatically -- 4th -> 3rd, 4th -> 2nd, 3rd -> 2nd.
+    // Its Stripe subscription(s) go back to the webhook listener, which stops the
+    // billing at period end. Stepping DOWN or sideways is still refused (and the
+    // listener alerts Russ), because that is far more likely a mistake.
+    const TIER = { fourth_a: 1, fourth_b: 1, third: 2, second: 3 };
+    const stepUpRows = existingActive.rows.filter(r =>
+      (!replaced || r.id !== replaced.id) && TIER[r.class_code] && TIER[class_code]
+      && TIER[r.class_code] < TIER[class_code]);
+    for (const r of stepUpRows) {
+      await pool.query(
+        `UPDATE subscriptions SET status = 'inactive', deactivated_at = now() WHERE id = $1`,
+        [r.id]
+      );
+      console.log(`provision-user: ${normalizedEmail} stepped up ${r.class_code} -> ${class_code} — deactivated row ${r.id}`);
+    }
+    const isStepUp = stepUpRows.length > 0;
+
     const blockingCodes = existingActive.rows
-      .filter(r => !replaced || r.id !== replaced.id)
+      .filter(r => (!replaced || r.id !== replaced.id) && !stepUpRows.some(x => x.id === r.id))
       .map(r => r.class_code);
     const blocked = isFourthClassPurchase
       ? blockingCodes.includes(class_code) || blockingCodes.some(c => !FOURTH_CLASS_CODES.includes(c))
@@ -253,7 +271,7 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
 
     // Only send magic link when something was actually new — prevents duplicate emails
     // on Stripe's at-least-once re-delivery of the same checkout event.
-    if (replaced) {
+    if (replaced || isStepUp) {
       // An upgrading student already has an account and an unbroken session. Mailing a
       // fresh login link to a paying customer on a billing change is the same mistake
       // the trial-conversion path documents above.
@@ -283,6 +301,13 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
       ok: true,
       user_id: user.id,
       replaced_subscription_id: replaced ? replaced.stripe_subscription_id : null,
+      // Every Stripe subscription this purchase supersedes (annual upgrade and/or
+      // step-up). The listener stops billing on each.
+      replaced_subscription_ids: [
+        ...(replaced && replaced.stripe_subscription_id ? [replaced.stripe_subscription_id] : []),
+        ...stepUpRows.map(r => r.stripe_subscription_id).filter(Boolean),
+      ],
+      stepped_up_from: stepUpRows.map(r => r.class_code),
       // True only when this purchase was refused because the student already holds
       // a different class. A same-class re-delivery is not "blocked" in this sense.
       blocked: Boolean(blocked && !blockingCodes.includes(class_code)),

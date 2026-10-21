@@ -81,7 +81,8 @@ describe('provision-user — 4th Class split (fourth_a / fourth_b)', () => {
     expect(await activeCodes('prov4-cross-tier-1@example.com')).toEqual(['second']);
   });
 
-  it('buying second while fourth_a is active is blocked (cross-tier, reverse direction)', async () => {
+  // Owner decision 2026-10-21: buying a HIGHER class ends the lower one automatically.
+  it('buying second while fourth_a is active is a step-up: fourth_a ends, second starts', async () => {
     const app = buildTestApp();
     await request(app).post('/api/platform/provision-user')
       .set('x-internal-secret', 'test-internal-secret')
@@ -90,7 +91,7 @@ describe('provision-user — 4th Class split (fourth_a / fourth_b)', () => {
       .set('x-internal-secret', 'test-internal-secret')
       .send({ email: 'prov4-cross-tier-2@example.com', first_name: 'Cross', last_name: 'Tier', class_code: 'second' });
 
-    expect(await activeCodes('prov4-cross-tier-2@example.com')).toEqual(['fourth_a']);
+    expect(await activeCodes('prov4-cross-tier-2@example.com')).toEqual(['second']);
   });
 
   it('DB allows a raw fourth_a + fourth_b active pair for the same user', async () => {
