@@ -124,7 +124,7 @@ describe('provision-user — monthly to annual upgrade', () => {
     expect(active[0].stripe_subscription_id).toBe('sub_second_m');
   });
 
-  it('step-up from both 4th Class papers to 3rd ends both papers', async () => {
+  it('stepping up from 4th Class to 3rd KEEPS both 4th papers (study aids for jurisdictional rewrites)', async () => {
     const app = buildTestApp();
     const email = 'provann-stepup-43@example.com';
     await provision(app, { email, first_name: 'Step', last_name: 'Up', class_code: 'fourth_a', stripe_subscription_id: 'sub_4a', billing_interval: 'year' });
@@ -132,8 +132,8 @@ describe('provision-user — monthly to annual upgrade', () => {
     const res = await provision(app, { email, first_name: 'Step', last_name: 'Up', class_code: 'third', stripe_subscription_id: 'sub_third_y', billing_interval: 'year' });
 
     expect(res.body.blocked).toBe(false);
-    expect([...res.body.replaced_subscription_ids].sort()).toEqual(['sub_4a', 'sub_4b']);
-    expect((await activeRows(email)).map(r => r.class_code)).toEqual(['third']);
+    expect(res.body.replaced_subscription_ids).toEqual([]);
+    expect((await activeRows(email)).map(r => r.class_code)).toEqual(['fourth_a', 'fourth_b', 'third']);
   });
 
   it('stepping DOWN (2nd -> 3rd) is still refused and reported as blocked', async () => {

@@ -69,7 +69,8 @@ describe('provision-user — 4th Class split (fourth_a / fourth_b)', () => {
     expect(await activeCodes('prov4-repeat-buyer@example.com')).toEqual(['fourth_a']);
   });
 
-  it('buying fourth_a while second is active is blocked (cross-tier)', async () => {
+  // Owner 2026-10-21: 4th Class papers are study aids kept alongside any class.
+  it('buying fourth_a while second is active keeps both', async () => {
     const app = buildTestApp();
     await request(app).post('/api/platform/provision-user')
       .set('x-internal-secret', 'test-internal-secret')
@@ -78,11 +79,12 @@ describe('provision-user — 4th Class split (fourth_a / fourth_b)', () => {
       .set('x-internal-secret', 'test-internal-secret')
       .send({ email: 'prov4-cross-tier-1@example.com', first_name: 'Cross', last_name: 'Tier', class_code: 'fourth_a' });
 
-    expect(await activeCodes('prov4-cross-tier-1@example.com')).toEqual(['second']);
+    expect(await activeCodes('prov4-cross-tier-1@example.com')).toEqual(['fourth_a', 'second']);
   });
 
-  // Owner decision 2026-10-21: buying a HIGHER class ends the lower one automatically.
-  it('buying second while fourth_a is active is a step-up: fourth_a ends, second starts', async () => {
+  // 4th Class is not part of the step-up ladder: buying 2nd keeps the 4A a
+  // program student still needs for a jurisdictional rewrite.
+  it('buying second while fourth_a is active keeps fourth_a and adds second', async () => {
     const app = buildTestApp();
     await request(app).post('/api/platform/provision-user')
       .set('x-internal-secret', 'test-internal-secret')
@@ -91,7 +93,7 @@ describe('provision-user — 4th Class split (fourth_a / fourth_b)', () => {
       .set('x-internal-secret', 'test-internal-secret')
       .send({ email: 'prov4-cross-tier-2@example.com', first_name: 'Cross', last_name: 'Tier', class_code: 'second' });
 
-    expect(await activeCodes('prov4-cross-tier-2@example.com')).toEqual(['second']);
+    expect(await activeCodes('prov4-cross-tier-2@example.com')).toEqual(['fourth_a', 'second']);
   });
 
   it('DB allows a raw fourth_a + fourth_b active pair for the same user', async () => {

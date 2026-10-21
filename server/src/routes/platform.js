@@ -229,7 +229,12 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
     // Its Stripe subscription(s) go back to the webhook listener, which stops the
     // billing at period end. Stepping DOWN or sideways is still refused (and the
     // listener alerts Russ), because that is far more likely a mistake.
-    const TIER = { fourth_a: 1, fourth_b: 1, third: 2, second: 3 };
+    //
+    // 4th Class papers are NOT part of the ladder (owner, 2026-10-21): they are
+    // prepaid study aids that a program student keeps for a jurisdictional
+    // (re)write while moving on, so they neither get ended by a step-up nor block
+    // one. The class switcher lets a student holding both move between them.
+    const TIER = { third: 2, second: 3 };
     const stepUpRows = existingActive.rows.filter(r =>
       (!replaced || r.id !== replaced.id) && TIER[r.class_code] && TIER[class_code]
       && TIER[r.class_code] < TIER[class_code]);
@@ -245,9 +250,12 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
     const blockingCodes = existingActive.rows
       .filter(r => (!replaced || r.id !== replaced.id) && !stepUpRows.some(x => x.id === r.id))
       .map(r => r.class_code);
+    // 4th Class: only the same paper blocks (a re-delivery or a duplicate).
+    // 2nd/3rd: blocked by any remaining 2nd/3rd row (same class = re-delivery or
+    // duplicate; a higher class = a step DOWN). 4th Class rows never block.
     const blocked = isFourthClassPurchase
-      ? blockingCodes.includes(class_code) || blockingCodes.some(c => !FOURTH_CLASS_CODES.includes(c))
-      : blockingCodes.length > 0;
+      ? blockingCodes.includes(class_code)
+      : blockingCodes.some(c => !FOURTH_CLASS_CODES.includes(c));
 
     // Same class already active under a DIFFERENT Stripe subscription: not a webhook
     // re-delivery but a second purchase of the same thing (double billing).
@@ -267,6 +275,10 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
         [user.id, class_code, replaced ? replaced.active_paper : null, stripe_subscription_id || null, trialBackstop]
       );
       subIsNew = subInsert.rowCount > 0;
+      // Land the student on what they just bought.
+      if (subIsNew) {
+        await pool.query(`UPDATE platform_users SET selected_class_code = $2 WHERE id = $1`, [user.id, class_code]);
+      }
     }
 
     // Only send magic link when something was actually new — prevents duplicate emails
@@ -311,7 +323,8 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
       // True only when this purchase was refused because the student already holds
       // a different class. A same-class re-delivery is not "blocked" in this sense.
       blocked: Boolean(blocked && !blockingCodes.includes(class_code)),
-      blocking_class_codes: blocked && !blockingCodes.includes(class_code) ? blockingCodes : [],
+      blocking_class_codes: blocked && !blockingCodes.includes(class_code)
+        ? blockingCodes.filter(c => !FOURTH_CLASS_CODES.includes(c)) : [],
       duplicate_purchase: duplicatePurchase,
     });
   } catch (err) {
@@ -326,7 +339,7 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
 // at that time rather than deactivating immediately. Access continues until cancel_at.
 router.post('/deactivate-user', requireInternalSecret, async (req, res) => {
   try {
-    const { email, cancel_at, stripe_subscription_id, force_immediate } = req.body;
+    const { email, cancel_at, stripe_subscription_id, force_immediate, only_if_matched } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: 'email is required' });
@@ -343,9 +356,30 @@ router.post('/deactivate-user', requireInternalSecret, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Scope to the one subscription that ended when we can identify it. A student
+    // can hold several (4th Class papers alongside 3rd/2nd, or 4A + 4B): the end
+    // of a 4A year must not touch their 3rd Class, and the end of 3rd Class must
+    // not touch a 4A they still need for a rewrite. Class switcher work, 2026-10-21.
+    let scopedIds = null;
+    if (stripe_subscription_id) {
+      const m = await pool.query(
+        `SELECT id FROM subscriptions WHERE user_id = $1 AND status = 'active' AND stripe_subscription_id = $2`,
+        [user.id, stripe_subscription_id]
+      );
+      if (m.rowCount > 0) scopedIds = m.rows.map(r => r.id);
+    }
+    if (!scopedIds && only_if_matched) {
+      // The caller knows this customer still has other live subscriptions and only
+      // wants the row tied to THIS one. Nothing matches it, so there is nothing to end.
+      console.log(`deactivate-user: no active row for ${stripe_subscription_id} (${email}) — nothing to end`);
+      return res.json({ ok: true, matched: false });
+    }
+    const scopeSql = scopedIds ? 'AND id = ANY($2)' : '';
+    const scopeArgs = scopedIds ? [scopedIds] : [];
+
     // Record the cancelled subscription id on the affected active row for traceability,
     // without changing access. (No-op if it was already linked.)
-    if (stripe_subscription_id) {
+    if (stripe_subscription_id && !scopedIds) {
       await pool.query(
         `UPDATE subscriptions SET stripe_subscription_id = $2
          WHERE user_id = $1 AND status = 'active'
@@ -361,8 +395,8 @@ router.post('/deactivate-user', requireInternalSecret, async (req, res) => {
       // Subscription canceled but paid through cancel_at — keep status active, set cancel_at.
       // Access is not pulled here, so this path is not gated; the eventual expiry is.
       await pool.query(
-        `UPDATE subscriptions SET cancel_at = $2 WHERE user_id = $1 AND status = 'active'`,
-        [user.id, cancelAt]
+        `UPDATE subscriptions SET cancel_at = $${scopedIds ? 3 : 2} WHERE user_id = $1 AND status = 'active' ${scopeSql}`,
+        [user.id, ...scopeArgs, cancelAt]
       );
       console.log(`deactivate-user: grace period set for ${email} until ${cancelAt.toISOString()}`);
       return res.json({ ok: true, grace_period: true, cancel_at: cancelAt });
@@ -396,11 +430,14 @@ router.post('/deactivate-user', requireInternalSecret, async (req, res) => {
 
     await pool.query(
       `UPDATE subscriptions SET status = 'inactive', deactivated_at = now(), cancel_at = NULL
-       WHERE user_id = $1 AND status = 'active'`,
-      [user.id]
+       WHERE user_id = $1 AND status = 'active' ${scopeSql}`,
+      [user.id, ...scopeArgs]
     );
+    // Sign them out only when nothing is left; a student who still holds another
+    // class keeps their session and simply lands on that class.
     await pool.query(
-      `UPDATE platform_users SET current_session_token = NULL WHERE id = $1`,
+      `UPDATE platform_users SET current_session_token = NULL
+        WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM subscriptions WHERE user_id = $1 AND status = 'active')`,
       [user.id]
     );
     console.log(`deactivate-user: immediate deactivation for ${email}`);
@@ -453,7 +490,8 @@ router.post('/expire-grace-periods', requireInternalSecret, async (req, res) => 
     if (count > 0) {
       const userIds = result.rows.map(r => r.user_id);
       await pool.query(
-        `UPDATE platform_users SET current_session_token = NULL WHERE id = ANY($1)`,
+        `UPDATE platform_users pu SET current_session_token = NULL WHERE pu.id = ANY($1)
+           AND NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = pu.id AND s.status = 'active')`,
         [userIds]
       );
       console.log(`expire-grace-periods: deactivated ${count} subscription(s), user_ids: ${userIds.join(', ')}`);
@@ -461,6 +499,56 @@ router.post('/expire-grace-periods', requireInternalSecret, async (req, res) => 
     return res.json({ ok: true, deactivated: count });
   } catch (err) {
     console.error('POST /api/platform/expire-grace-periods error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── Class switcher (2026-10-21) ───────────────────────────────────────────────
+// A student may hold more than one class: 4th Class papers alongside 3rd/2nd
+// (program students keep 4A for a jurisdictional rewrite), or 4A + 4B. The 4th
+// Class screens already show every 4th paper owned, so 4A/4B are ONE choice here.
+const CLASS_CHOICE_LABELS = { second: '2nd Class', third: '3rd Class', fourth: '4th Class' };
+const choiceKey = (code) => (FOURTH_CLASS_CODES.includes(code) ? 'fourth' : code);
+
+async function liveClassCodes(userId) {
+  const { rows } = await pool.query(
+    `SELECT class_code FROM subscriptions
+      WHERE user_id = $1 AND status = 'active' AND (cancel_at IS NULL OR cancel_at > NOW())
+      ORDER BY class_code`,
+    [userId]
+  );
+  return rows.map(r => r.class_code);
+}
+
+// GET /api/platform/classes -> { classes: [{ key, label }], current }
+router.get('/classes', requireAuth, async (req, res) => {
+  try {
+    const codes = await liveClassCodes(req.user.id);
+    const keys = [...new Set(codes.map(choiceKey))]
+      .sort((a, b) => ['second', 'third', 'fourth'].indexOf(a) - ['second', 'third', 'fourth'].indexOf(b));
+    return res.json({
+      classes: keys.map(key => ({ key, label: CLASS_CHOICE_LABELS[key] || key })),
+      current: req.user.class_code ? choiceKey(req.user.class_code) : null,
+    });
+  } catch (err) {
+    console.error('GET /api/platform/classes error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/platform/active-class { key: 'second' | 'third' | 'fourth' }
+router.post('/active-class', requireAuth, async (req, res) => {
+  try {
+    const key = String((req.body && req.body.key) || '');
+    const codes = await liveClassCodes(req.user.id);
+    const code = key === 'fourth'
+      ? ['fourth_a', 'fourth_b'].find(c => codes.includes(c))
+      : codes.find(c => c === key);
+    if (!code) return res.status(403).json({ error: 'That class is not part of your account.' });
+    await pool.query(`UPDATE platform_users SET selected_class_code = $2 WHERE id = $1`, [req.user.id, code]);
+    return res.json({ ok: true, key: choiceKey(code) });
+  } catch (err) {
+    console.error('POST /api/platform/active-class error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

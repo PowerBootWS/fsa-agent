@@ -34,7 +34,7 @@ describe('provision-user — one active subscription per (user, class_code)', ()
     await pool.end();
   });
 
-  it('does not create a second active subscription row under a different class_code for the same user (cross-tier, application-enforced)', async () => {
+  it('a 4th Class paper bought by a 2nd Class student sits alongside it (4th Class is a study aid, owner 2026-10-21)', async () => {
     const app = buildTestApp();
 
     const first = await request(app)
@@ -50,8 +50,7 @@ describe('provision-user — one active subscription per (user, class_code)', ()
     expect(second.status).toBe(200);
     // The customer has paid for this purchase and it granted nothing, so the
     // response must say so -- the webhook listener alerts Russ on it.
-    expect(second.body.blocked).toBe(true);
-    expect(second.body.blocking_class_codes).toEqual(['second']);
+    expect(second.body.blocked).toBe(false);
     expect(first.body.blocked).toBe(false);
 
     const rows = await pool.query(
@@ -59,8 +58,7 @@ describe('provision-user — one active subscription per (user, class_code)', ()
        JOIN platform_users u ON u.id = s.user_id
        WHERE u.email = 'provuser1-dual-class@example.com' AND s.status = 'active'`
     );
-    expect(rows.rows).toHaveLength(1);
-    expect(rows.rows[0].class_code).toBe('second');
+    expect(rows.rows.map(r => r.class_code).sort()).toEqual(['fourth_a', 'second']);
   });
 
   it('flags a second paid purchase of the same class (different Stripe subscription) as a duplicate, but not a webhook re-delivery', async () => {

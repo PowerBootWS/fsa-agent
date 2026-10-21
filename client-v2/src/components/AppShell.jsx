@@ -5,6 +5,7 @@ import './AppShell.css';
 import AnnouncementModal from './AnnouncementModal';
 import ContactSupportModal from './ContactSupportModal';
 import NpsPrompt from './NpsPrompt';
+import ClassSwitcher from './ClassSwitcher';
 
 export default function AppShell({ children }) {
   const navigate = useNavigate();
@@ -93,6 +94,7 @@ export default function AppShell({ children }) {
     <div className="as-shell">
       <nav className="as-sidebar">
         <div className="as-brand">Full Steam Ahead</div>
+        <ClassSwitcher />
         <NavLink to="/home" className={({ isActive }) => `as-nav-item${isActive ? ' as-nav-item--active' : ''}`}>
           🏠 Home
         </NavLink>

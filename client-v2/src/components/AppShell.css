@@ -232,6 +232,10 @@
   .as-brand {
     display: none;
   }
+  /* No room in the bottom bar; on phones the class switcher is on the Home course card. */
+  .as-sidebar .as-class-switcher {
+    display: none;
+  }
   /* No room in the bottom bar; on phones it lives in the user menu. */
   .as-nav-contact {
     display: none;
@@ -266,3 +270,11 @@
     min-width: 200px;
   }
 }
+
+/* Class switcher — only rendered for students holding more than one class. */
+.as-class-switcher { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 12px; }
+.as-class-switcher-label { width: 100%; font-size: 12px; opacity: 0.7; }
+.as-class-option { border: 1px solid currentColor; background: transparent; color: inherit; border-radius: 999px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+.as-class-option--active { background: #E8720C; border-color: #E8720C; color: #fff; }
+.as-class-option:disabled { opacity: 0.6; cursor: default; }
+.as-class-switcher-error { width: 100%; font-size: 12px; color: #c0392b; }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { track } from '../utils/usage';
 import './HomePage.css';
+import ClassSwitcher from '../components/ClassSwitcher';
 
 const CLASS_LABELS = { second: '2nd Class', third: '3rd Class', fourth_a: '4th Class', fourth_b: '4th Class' };
 const ENROLL_URL = 'https://fullsteamahead.ca/enroll';
@@ -44,6 +45,7 @@ function CourseCard({ course, firstName }) {
   return (
     <section className="hm-card">
       <h2 className="hm-card-title">Your course</h2>
+      <ClassSwitcher />
       {course.subscriptions.map(s => (
         <div className="hm-course-line" key={`${s.class_code}-${s.paper}`}>
           <div className="hm-course-name">

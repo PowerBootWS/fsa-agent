@@ -1,4 +1,5 @@
 const express = require('express');
+const { primarySubscriptionLateral } = require('../services/primarySubscription');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { pool } = require('../services/database');
@@ -66,8 +67,7 @@ router.post('/login', async (req, res) => {
               u.current_session_token AS prior_session_token,
               s.active_paper, s.class_code
        FROM platform_users u
-       LEFT JOIN subscriptions s ON s.user_id = u.id AND s.status = 'active'
-         AND (s.cancel_at IS NULL OR s.cancel_at > NOW())
+       LEFT JOIN LATERAL (${primarySubscriptionLateral('u')}) s ON true
        WHERE u.email = $1
        LIMIT 1`,
       [email.toLowerCase().trim()]
@@ -319,7 +319,7 @@ router.post('/setup', async (req, res) => {
               s.active_paper, s.class_code
        FROM auth_tokens t
        JOIN platform_users u ON u.id = t.user_id
-       LEFT JOIN subscriptions s ON s.user_id = t.user_id AND s.status = 'active'
+       LEFT JOIN LATERAL (${primarySubscriptionLateral('u')}) s ON true
        WHERE t.token = $1
          AND t.type = 'magic_link'
          AND t.expires_at > now()
