@@ -48,6 +48,12 @@ describe('class switcher', () => {
     expect((await request(app).get('/api/v2/course/3A1/outline').set('Host', LEARN).set('Cookie', s.cookie)).status).not.toBe(403);
   });
 
+  // Audit A5: a 4A + 4B holder used to get whichever row the JOIN returned first.
+  it('a 4A + 4B holder always sees 4A first, whatever order the rows were created in', async () => {
+    const s = await student('clsw-ab@example.com', [['fourth_b', 'sub_4b_ab'], ['fourth_a', 'sub_4a_ab']]);
+    for (let i = 0; i < 3; i++) expect((await me(s.cookie)).body.class_code).toBe('fourth_a');
+  });
+
   it('refuses to switch to a class the student does not hold', async () => {
     const s = await student('clsw-b@example.com', [['third', 'sub_3b']]);
     const sw = await request(app).post('/api/platform/active-class').set('Host', LEARN).set('Cookie', s.cookie).send({ key: 'second' });
