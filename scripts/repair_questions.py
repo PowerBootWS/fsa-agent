@@ -25,6 +25,7 @@ from pathlib import Path
 
 import psycopg2
 from openai import OpenAI
+from option_order import shuffle_options  # noqa: E402
 
 SCRIPT_DIR = Path(__file__).parent
 DOTENV_PATHS = [SCRIPT_DIR.parent.parent / ".env.shared",
@@ -184,6 +185,9 @@ def insert_question(lesson_code: str, q: dict) -> None:
     paper = lesson_code.split("-")[0]
     chapter = lesson_code.split("-")[1]
     chapter_id = f"{paper}-{chapter}"
+    q = dict(q)
+    q["options"], q["correct_answer"] = shuffle_options(
+        q["options"], int(q["correct_answer"]), q["question_text"], q.get("explanation", ""))
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(

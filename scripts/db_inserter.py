@@ -9,6 +9,7 @@ import os
 import json
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from option_order import shuffle_options  # noqa: E402
 
 
 def get_connection():
@@ -197,6 +198,8 @@ def insert_question(lesson_code, chapter_id, course_id, q, dry_run=False, standa
     difficulty = int(q.get('difficulty', 3))
     topic = q.get('topic', '')
     question_type = q.get('question_type', 'objective_practice')
+    # Don't let the generator's habit (correct answer usually B) leak into the bank.
+    options, correct_answer = shuffle_options(options, correct_answer, question_text, explanation)
 
     if dry_run:
         print(f'[DRY RUN] insert_question: lesson_code={lesson_code!r} type={question_type!r} difficulty={difficulty}')
