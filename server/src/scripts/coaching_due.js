@@ -99,7 +99,13 @@ async function handleAsk(pool, c) {
 
 async function handleRussReminder(pool, c, u, notify) {
   const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email;
-  await notify(`Follow up with ${name}: ${c.detail}\n${u.email}\n${CRM_URL}/customer/${u.id}`);
+  await notify(`Follow up with ${name}: ${c.detail}\n${u.email}\n${CRM_URL}/customer/${u.id}`, {
+    buttons: [[
+      { text: 'Done', data: `cf:done:${c.id}` },
+      { text: '+3 days', data: `cf:s3:${c.id}` },
+      { text: '+1 week', data: `cf:s7:${c.id}` },
+    ]],
+  });
   await pool.query(
     `UPDATE coaching_commitments SET status = 'closed', resolved_at = now(),
             meta = meta || jsonb_build_object('reminded_at', now()) WHERE id = $1`, [c.id]);

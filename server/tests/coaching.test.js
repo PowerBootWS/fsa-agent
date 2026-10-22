@@ -199,8 +199,33 @@ describe('coaching', () => {
       `INSERT INTO coaching_commitments (user_id, kind, detail, due_at, check_type, source, created_by)
        VALUES ($1, 'custom', 'Did he book 4B?', now() - interval '1 minute', 'ask', 'russ', 'russ@fullsteamahead.ca')`, [s.id]);
     expect((await runDue({ pool })).reminded).toBe(1);
-    expect(coachBot.notify).toHaveBeenCalledWith(expect.stringMatching(/Follow up with Pat Goal: Did he book 4B\?/));
+    expect(coachBot.notify).toHaveBeenCalledWith(expect.stringMatching(/Follow up with Pat Goal: Did he book 4B\?/), expect.objectContaining({ buttons: expect.any(Array) }));
     expect((await commitments(s.id))[0].status).toBe('closed');
+  });
+
+  it('reminder buttons: snooze reopens Russ\'s follow-up, done closes it; needs the internal secret', async () => {
+    process.env.INTERNAL_SECRET = 'test-internal';
+    const s = await student(app, 'btn');
+    await pool.query(
+      `INSERT INTO coaching_commitments (user_id, kind, detail, due_at, check_type, source)
+       VALUES ($1, 'custom', 'Check on 4B', now() - interval '1 minute', 'ask', 'russ')`, [s.id]);
+    await runDue({ pool });
+    const sent = coachBot.notify.mock.calls.find(c => /Check on 4B/.test(c[0]));
+    const [[done, s3]] = sent[1].buttons;
+    const id = Number(done.data.split(':')[2]);
+    const hit = (body, secret = 'test-internal') => request(app).post('/api/platform/coaching/internal/followup').set('x-internal-secret', secret).send(body);
+
+    expect((await hit({ action: 's3', id }, 'wrong')).status).toBe(401);
+    const snoozed = await hit({ action: s3.data.split(':')[1], id });
+    expect(snoozed.body.text).toMatch(/^Snoozed to /);
+    let [c] = await commitments(s.id);
+    expect(c.status).toBe('open');
+    expect(new Date(c.due_at).getTime()).toBeGreaterThan(Date.now() + 2 * 86400000);
+
+    await hit({ action: 'done', id }).expect(200);
+    [c] = await commitments(s.id);
+    expect(c.status).toBe('closed');
+    expect(c.meta.done).toBe(true);
   });
 
   it('a student whose subscription ended has their goal follow-ups closed, not asked', async () => {
