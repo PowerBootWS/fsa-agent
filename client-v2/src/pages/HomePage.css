@@ -58,6 +58,15 @@
   background: #0D1117; border: 1px solid #252F42; border-radius: 3px; padding: 6px 8px; font-size: 13px;
 }
 
+/* Goal card (components/CoachingCard.jsx, backlog #139). */
+.cc-card { margin-bottom: 20px; }
+.cc-note { background: #0D1117; border: 1px solid #252F42; border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.cc-from { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #E8720C; }
+.cc-plan { display: flex; flex-direction: column; gap: 8px; }
+.cc-countdown { font-size: 20px; font-weight: 700; }
+.cc-quiet { background: none; border: 0; color: #9AA4B5; font: inherit; font-size: 14px; cursor: pointer; padding: 6px 0; }
+.cc-quiet:hover { text-decoration: underline; }
+
 @media (max-width: 768px) {
   .hm-page { padding: 20px 16px; }
   .hm-grid--main, .hm-grid--small { grid-template-columns: 1fr; }

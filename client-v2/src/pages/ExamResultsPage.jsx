@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { InlineLessonPlayer } from '../components/InlineLessonPlayer';
 import { ResultsPanel, QuizExamChatSection } from '../ExamRouter';
+import { GoalNudge } from '../components/CoachingCard';
 import { isFourthClassCode } from '../utils/fourthClass';
 import { postJson } from '../utils/api';
 import { track } from '../utils/usage';
@@ -223,6 +224,7 @@ export default function ExamResultsPage() {
             onSelectChapter={null}
             user={user.email}
           />
+          <GoalNudge />
         </div>
 
         {/* Floating tutor chat — same as the in-exam debrief. Hidden for 4th

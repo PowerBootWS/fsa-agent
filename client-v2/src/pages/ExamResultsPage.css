@@ -323,3 +323,12 @@
   color: var(--orange, #E8720C);
 }
 .er-weakness-obj-title { flex: 1 1 auto; }
+
+/* "Set a goal" nudge under results (backlog #139). */
+.er-goal-nudge {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  margin: 16px 0; padding: 12px 16px; border: 1px solid #252F42; border-radius: 4px; font-size: 15px;
+}
+.er-goal-nudge a { color: #E8720C; font-weight: 700; text-decoration: none; }
+.er-goal-nudge a:hover { text-decoration: underline; }
+.er-goal-nudge button { background: none; border: 0; color: #9AA4B5; font: inherit; font-size: 14px; cursor: pointer; padding: 0; }

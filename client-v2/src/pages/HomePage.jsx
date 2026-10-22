@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { track } from '../utils/usage';
 import './HomePage.css';
 import ClassSwitcher from '../components/ClassSwitcher';
+import CoachingCard from '../components/CoachingCard';
 
 const CLASS_LABELS = { second: '2nd Class', third: '3rd Class', fourth_a: '4th Class', fourth_b: '4th Class' };
 const ENROLL_URL = 'https://fullsteamahead.ca/enroll';
@@ -206,6 +207,7 @@ export default function HomePage() {
   return (
     <div className="hm-page">
       <h1 className="hm-greeting">Hi {data.first_name}</h1>
+      <CoachingCard />
       <div className="hm-grid hm-grid--main">
         <CourseCard course={data.course} firstName={data.first_name} />
         <JobsCard jobs={data.jobs} />
