@@ -14,6 +14,7 @@
 // 3 days goes out by email from fsa-nurture (study check-in sweep), not here.
 
 const coachBot = require('../services/coachBot');
+const coachTexts = require('../services/coachTexts');
 
 const PASS_PCT = 65;
 const CRM_URL = process.env.CRM_BASE_URL || 'https://crm.fullsteamahead.ca';
@@ -77,8 +78,21 @@ async function handleWeekly(pool, c) {
   }
 }
 
-async function handleAsk(pool, c) {
-  if (c.meta.asked_at) return; // already waiting on an answer
+async function handleAsk(pool, c, deps = {}) {
+  if (c.meta.asked_at || c.meta.texted_at) return; // already waiting on an answer
+  // Students on text check-ins get it as a drafted text for Russ to approve
+  // (backlog #139 phase 4), not a Home note and email.
+  if (await coachTexts.isTexting(pool, c.user_id)) {
+    await coachTexts.draftForCommitment(pool, c, deps);
+    return;
+  }
+  // A follow-up that came out of a text conversation, for someone who has since
+  // turned texts off: hand it to Russ rather than invent a Home note for it.
+  if (c.source === 'text') {
+    const u = await activeStudent(pool, c.user_id);
+    await handleRussReminder(pool, c, u, deps.notify || coachBot.notify);
+    return;
+  }
   const paper = c.meta.paper || (c.detail.match(/\b[234][AB]\d?\b/) || [''])[0];
   let body;
   let answers;
@@ -158,7 +172,7 @@ async function checkWins(pool, now) {
   return wins;
 }
 
-async function runDue({ pool, now = new Date(), notify = coachBot.notify } = {}) {
+async function runDue({ pool, now = new Date(), notify = coachBot.notify, draft } = {}) {
   const out = { weekly: 0, asked: 0, reminded: 0, closed: 0, wins: 0, errors: 0 };
   const { rows: due } = await pool.query(
     `SELECT * FROM coaching_commitments WHERE status = 'open' AND due_at <= $1 ORDER BY due_at LIMIT 500`, [now]);
@@ -178,7 +192,7 @@ async function runDue({ pool, now = new Date(), notify = coachBot.notify } = {})
         continue;
       }
       if (c.kind === 'weekly_sessions') { await handleWeekly(pool, c); out.weekly += 1; }
-      else if (c.check_type === 'ask') { await handleAsk(pool, c); out.asked += 1; }
+      else if (c.check_type === 'ask') { await handleAsk(pool, c, { notify, ...(draft ? { draft } : {}) }); out.asked += 1; }
     } catch (err) {
       out.errors += 1;
       console.error(`[coaching_due] commitment ${c.id} failed:`, err.message);

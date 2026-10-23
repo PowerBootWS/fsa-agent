@@ -1,5 +1,5 @@
 // Backlog #139 phase 2: goal setting, the commitment memory, and the hourly job.
-jest.mock('../src/services/coachBot', () => ({ notify: jest.fn().mockResolvedValue(true) }));
+jest.mock('../src/services/coachBot', () => ({ notify: jest.fn().mockResolvedValue(true), edit: jest.fn().mockResolvedValue(true) }));
 
 const request = require('supertest');
 const express = require('express');

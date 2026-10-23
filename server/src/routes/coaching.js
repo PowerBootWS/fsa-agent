@@ -4,6 +4,7 @@ const { pool } = require('../services/database');
 const requireAuth = require('../middleware/requireAuth');
 const { createRateLimiter } = require('../utils/rateLimit');
 const coaching = require('../services/coaching');
+const coachTexts = require('../services/coachTexts');
 
 const router = express.Router();
 const writeLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 30 });
@@ -33,7 +34,9 @@ function limited(req, res) {
 // Read path never errors the page: a failure means "nothing to show".
 router.get('/coaching', requireAuth, async (req, res) => {
   try {
-    return res.json(await coaching.getState(pool, req.user));
+    const state = await coaching.getState(pool, req.user);
+    if (state.eligible && state.goal) state.texting = await coachTexts.textingState(pool, req.user.id);
+    return res.json(state);
   } catch (err) {
     console.error('GET /api/platform/coaching error:', err);
     return res.json({ eligible: false });
@@ -82,6 +85,35 @@ router.post('/coaching/messages/:id/answer', requireAuth, async (req, res) => {
   }
 });
 
+// Text check-ins (backlog #139 phase 4).
+router.post('/coaching/texting', requireAuth, async (req, res) => {
+  if (!eligibleOr403(req, res) || limited(req, res)) return undefined;
+  try {
+    return res.json(await coachTexts.optIn(pool, req.user, { phone: req.body?.phone, agree: req.body?.agree }));
+  } catch (err) {
+    if (err.status === 502 || err.status === 403) return res.status(err.status).json({ error: err.message });
+    return fail(res, err, 'POST /api/platform/coaching/texting');
+  }
+});
+
+router.post('/coaching/texting/off', requireAuth, async (req, res) => {
+  try {
+    await coachTexts.optOut(pool, req.user.id, 'turned off on the platform');
+    return res.status(204).end();
+  } catch (err) {
+    return fail(res, err, 'POST /api/platform/coaching/texting/off');
+  }
+});
+
+router.post('/coaching/texting/decline', requireAuth, async (req, res) => {
+  try {
+    await coachTexts.declineOffer(pool, req.user.id);
+    return res.status(204).end();
+  } catch (err) {
+    return fail(res, err, 'POST /api/platform/coaching/texting/decline');
+  }
+});
+
 // Buttons under Russ's follow-up reminders on the coach bot (backlog #139
 // phase 3). fsa-webhook-listener receives the tap and calls this with the
 // shared internal secret. Russ's own follow-ups only.
@@ -114,6 +146,20 @@ router.post('/coaching/internal/followup', requireInternalSecret, async (req, re
     return rows.length ? res.json({ ok: true, text: `Snoozed to ${rows[0].due}.` }) : res.status(404).json({ error: 'Not found' });
   } catch (err) {
     console.error('POST /api/platform/coaching/internal/followup error:', err);
+    return res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// Send / Skip under a drafted text on the coach bot.
+router.post('/coaching/internal/draft', requireInternalSecret, async (req, res) => {
+  const id = parseId(req.body?.id);
+  const action = req.body?.action;
+  if (id === null || !['send', 'skip'].includes(action)) return res.status(400).json({ error: 'action must be send or skip with a numeric id' });
+  try {
+    const out = await coachTexts.decide(pool, id, action);
+    return res.status(out.status).json({ ok: out.status === 200, text: out.text });
+  } catch (err) {
+    console.error('POST /api/platform/coaching/internal/draft error:', err);
     return res.status(500).json({ error: 'Internal error' });
   }
 });

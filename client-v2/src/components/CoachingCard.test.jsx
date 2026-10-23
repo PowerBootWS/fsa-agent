@@ -55,3 +55,33 @@ describe('examCountdown', () => {
     expect(examCountdown({ paper: '3B1', target_date: '2027-02-01', date_is_exact: false }, today)).toBe('3B1 exam in February 2027');
   });
 });
+
+describe('TextOptIn', () => {
+  const texting = { on: false, offer: true, consent_text: 'Russ from Full Steam Ahead can text you about your studying. Reply STOP anytime to stop.' };
+
+  it('needs a number and the consent box before it will set up texts', async () => {
+    renderCard({
+      eligible: true, show_invite: false, options, texting,
+      goal: { paper: '2A1', target_date: '2099-01-15', date_is_exact: true, exam_booked: true, weekly_sessions: 3 },
+      plan: { sessions_this_week: 0, weekly_target: 3 }, message: null,
+    });
+    expect(await screen.findByText(/want me to text you now and then/i)).toBeInTheDocument();
+    expect(screen.queryByText(/SMS/)).not.toBeInTheDocument();
+    const yes = screen.getByRole('button', { name: /yes, text me/i });
+    expect(yes).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/mobile number/i), { target: { value: '780 555 0123' } });
+    expect(yes).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(yes).not.toBeDisabled();
+  });
+
+  it('shows when texts are on, with a way to turn them off', async () => {
+    renderCard({
+      eligible: true, show_invite: false, options, texting: { on: true, phone_last4: '0123', offer: false },
+      goal: { paper: '2A1', target_date: '2099-01-15', date_is_exact: true, exam_booked: true, weekly_sessions: 3 },
+      plan: { sessions_this_week: 0, weekly_target: 3 }, message: null,
+    });
+    expect(await screen.findByText(/Text check-ins are on \(number ending 0123\)/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /turn off/i })).toBeInTheDocument();
+  });
+});

@@ -80,6 +80,72 @@ function Note({ message, onDone }) {
   );
 }
 
+// Text check-ins (backlog #139 phase 4). Offered to students with a goal.
+// Never called SMS to students, always "text".
+export function TextOptIn({ texting, onChange }) {
+  const [phone, setPhone] = useState('');
+  const [agree, setAgree] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!texting) return null;
+  if (texting.on) {
+    const off = async () => {
+      if (!window.confirm('Turn off text check-ins?')) return;
+      await post('/api/platform/coaching/texting/off').catch(() => {});
+      track('feature_use', { action: 'texting_off' });
+      onChange({ ...texting, on: false, offer: false });
+    };
+    return (
+      <p className="hm-muted cc-text-status">
+        Text check-ins are on (number ending {texting.phone_last4}).{' '}
+        <button type="button" className="cc-quiet" onClick={off}>Turn off</button>
+      </p>
+    );
+  }
+  if (!texting.offer) return null;
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const res = await post('/api/platform/coaching/texting', { phone, agree });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Couldn't set that up. Try again in a few minutes.");
+      track('feature_use', { action: 'texting_on' });
+      onChange({ ...texting, on: true, offer: false, phone_last4: d.phone_last4 });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  function decline() {
+    post('/api/platform/coaching/texting/decline').catch(() => {});
+    track('feature_use', { action: 'texting_declined' });
+    onChange({ ...texting, offer: false });
+  }
+
+  return (
+    <form className="cc-text" onSubmit={submit}>
+      <p><strong>Want me to text you now and then?</strong> Quick check-ins on your goal, a nudge when it's been quiet, and you can text me back. Studying only, never sales.</p>
+      <label className="cc-text-field">Mobile number
+        <input type="tel" inputMode="tel" autoComplete="tel" placeholder="780 555 0123" value={phone} onChange={e => setPhone(e.target.value)} />
+      </label>
+      <label className="cc-text-agree">
+        <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} />
+        <span>{texting.consent_text}</span>
+      </label>
+      {error && <p className="hm-error" role="alert">{error}</p>}
+      <div className="hm-actions">
+        <button type="submit" className="hm-btn hm-btn--small" disabled={busy || !agree || phone.replace(/\D/g, '').length < 10}>{busy ? 'Setting up…' : 'Yes, text me'}</button>
+        <button type="button" className="cc-quiet" onClick={decline}>No thanks</button>
+      </div>
+    </form>
+  );
+}
+
 export default function CoachingCard() {
   const [state, setState] = useState(null);
   const [hidden, setHidden] = useState(false);
@@ -133,6 +199,7 @@ export default function CoachingCard() {
         )}
         <Link className="hm-link" to="/goals">Edit your goal</Link>
       </div>
+      <TextOptIn texting={state.texting} onChange={t => setState(st => ({ ...st, texting: t }))} />
     </section>
   );
 }

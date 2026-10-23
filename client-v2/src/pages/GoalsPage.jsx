@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { track } from '../utils/usage';
-import { examCountdown } from '../components/CoachingCard';
+import { examCountdown, TextOptIn } from '../components/CoachingCard';
 import './GoalsPage.css';
 
 // Goal setting (backlog #139): four short steps, then the plan. Every answer
@@ -38,6 +38,7 @@ export default function GoalsPage() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(null);
+  const [texting, setTexting] = useState(null);
 
   useEffect(() => {
     fetch('/api/platform/coaching', { credentials: 'include' })
@@ -98,6 +99,9 @@ export default function GoalsPage() {
       if (!res.ok) throw new Error(d.error || "Couldn't save your goal. Try again in a minute.");
       track('feature_use', { action: state.goal ? 'goal_updated' : 'goal_set' });
       setSaved(d.goal);
+      // Offer text check-ins on the plan screen (the goal now exists).
+      fetch('/api/platform/coaching', { credentials: 'include' })
+        .then(r => (r.ok ? r.json() : null)).then(st => { if (st?.texting) setTexting(st.texting); }).catch(() => {});
     } catch (err) {
       setError(err.message);
     } finally {
@@ -118,6 +122,7 @@ export default function GoalsPage() {
             <li>{saved.exam_booked ? "It's booked. That's the hardest part done." : "Next step: book it. I'll check in about that in two weeks."}</li>
           </ul>
           <p className="gl-muted">You'll see a short note from me on your Home page each week on how you're tracking, and the day after your exam I'll ask how it went.</p>
+          {texting && <div className="gl-text"><TextOptIn texting={texting} onChange={setTexting} /></div>}
           <div className="gl-actions">
             <Link className="gl-btn" to="/lobby">Start a session</Link>
             <Link className="gl-link" to="/home">Back to Home</Link>
