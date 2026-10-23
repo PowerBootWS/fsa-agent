@@ -1,7 +1,7 @@
 // One-off backfill (2026-10-22): record cancellations students already
 // scheduled in the Stripe portal before fsa-webhook-listener started recording
-// them. Same rule as the listener (scheduledCancellation): Stripe's cancel_at,
-// else the period end when cancel_at_period_end is set, for live subscriptions.
+// them. Same rule as the listener: monthly live subscriptions only, Stripe's
+// cancel_at, else the period end when cancel_at_period_end is set.
 // Writes subscriptions.cancel_scheduled_at only; access is untouched.
 //
 //   docker exec fsa-agent-api-1 node src/scripts/backfill_cancel_scheduled.js           (dry run)
@@ -24,6 +24,9 @@ async function main() {
       continue;
     }
     if (!['active', 'past_due'].includes(sub.status)) continue;
+    // Monthly only, as in the listener: annual prepays and 4th Class papers are
+    // set to end after their year by our own checkout, not by the student.
+    if (sub.items?.data?.[0]?.price?.recurring?.interval !== 'month') continue;
     const periodEnd = sub.items?.data?.[0]?.current_period_end || sub.current_period_end || null;
     const at = sub.cancel_at || (sub.cancel_at_period_end ? periodEnd : null);
     const want = at ? new Date(at * 1000) : null;
