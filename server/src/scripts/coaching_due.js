@@ -15,6 +15,7 @@
 
 const coachBot = require('../services/coachBot');
 const coachTexts = require('../services/coachTexts');
+const { TWO_WEEKS_OUT_URL } = require('../services/coaching');
 
 const PASS_PCT = 65;
 const CRM_URL = process.env.CRM_BASE_URL || 'https://crm.fullsteamahead.ca';
@@ -40,11 +41,11 @@ async function activeStudent(pool, userId) {
   return u;
 }
 
-async function addMessage(pool, { userId, kind, body, answers = null, commitmentId = null, dedupeKey }) {
+async function addMessage(pool, { userId, kind, body, answers = null, commitmentId = null, dedupeKey, linkUrl = null, linkLabel = null }) {
   const { rowCount } = await pool.query(
-    `INSERT INTO coaching_messages (user_id, kind, body, answers, commitment_id, dedupe_key)
-     VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (dedupe_key) DO NOTHING`,
-    [userId, kind, body, answers ? JSON.stringify(answers) : null, commitmentId, dedupeKey]);
+    `INSERT INTO coaching_messages (user_id, kind, body, answers, commitment_id, dedupe_key, link_url, link_label)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (dedupe_key) DO NOTHING`,
+    [userId, kind, body, answers ? JSON.stringify(answers) : null, commitmentId, dedupeKey, linkUrl, linkLabel]);
   return rowCount > 0;
 }
 
@@ -125,6 +126,33 @@ async function handleRussReminder(pool, c, u, notify) {
             meta = meta || jsonb_build_object('reminded_at', now()) WHERE id = $1`, [c.id]);
 }
 
+// Two weeks before an exact exam date: Russ's final-stretch plan. A note on
+// Home for everyone; texting students also get it as a drafted text for Russ
+// to approve; everyone else gets it by email from fsa-nurture, which picks up
+// the open commitment once the note exists (meta.noted_at).
+async function handleTwoWeeks(pool, c, deps = {}) {
+  if (c.meta.noted_at) return;
+  const paper = c.meta.paper || 'your exam';
+  await addMessage(pool, {
+    userId: c.user_id, kind: 'commitment', commitmentId: c.id, dedupeKey: `twoweeks:${c.id}`,
+    body: `Two weeks to go until ${paper}. This is the plan I want you to follow for the final stretch: about an hour a day, no cramming, and how to make sure you don't leave marks on the table you've already earned.`,
+    linkUrl: TWO_WEEKS_OUT_URL, linkLabel: 'Open the two-weeks-out plan',
+  });
+  await pool.query(`UPDATE coaching_commitments SET meta = meta || jsonb_build_object('noted_at', now()) WHERE id = $1`, [c.id]);
+  if (await coachTexts.isTexting(pool, c.user_id)) {
+    const { rows: [u] } = await pool.query(`SELECT first_name FROM platform_users WHERE id = $1`, [c.user_id]);
+    await coachTexts.sendDraftToRuss(pool, {
+      userId: c.user_id, reason: 'commitment', commitmentId: c.id, notify: deps.notify || coachBot.notify,
+      header: `Two weeks until ${u?.first_name || 'their'} ${paper} exam (${c.meta.when || 'date set in their goal'}):`,
+      d: {
+        reply: `Two weeks to go on ${paper}, ${u?.first_name || 'you'}! Here's the plan I want you to follow for the final stretch: ${TWO_WEEKS_OUT_URL} About an hour a day, no cramming. You've got this.`,
+        needsRuss: false, why: '', followups: [], resolve: [],
+      },
+    });
+    await pool.query(`UPDATE coaching_commitments SET status = 'kept', resolved_at = now() WHERE id = $1`, [c.id]);
+  }
+}
+
 function weakestChapter(stats = []) {
   const usable = stats.filter(s => Number(s.total) >= 2);
   if (!usable.length) return null;
@@ -192,6 +220,7 @@ async function runDue({ pool, now = new Date(), notify = coachBot.notify, draft 
         continue;
       }
       if (c.kind === 'weekly_sessions') { await handleWeekly(pool, c); out.weekly += 1; }
+      else if (c.kind === 'two_weeks_out') { await handleTwoWeeks(pool, c, { notify }); out.asked += 1; }
       else if (c.check_type === 'ask') { await handleAsk(pool, c, { notify, ...(draft ? { draft } : {}) }); out.asked += 1; }
     } catch (err) {
       out.errors += 1;

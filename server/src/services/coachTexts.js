@@ -446,5 +446,5 @@ async function sendScheduled(pool, { ghl = ghlDefault, now = new Date(), edit = 
 
 module.exports = {
   CONSENT_TEXT, normalizePhone, inSendingHours, optIn, optOut, declineOffer, textingState,
-  pollOnce, draftDue, draftForCommitment, isTexting, decide, sendScheduled, recordText, getState,
+  pollOnce, draftDue, draftForCommitment, isTexting, sendDraftToRuss, decide, sendScheduled, recordText, getState,
 };

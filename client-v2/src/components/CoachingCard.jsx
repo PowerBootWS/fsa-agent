@@ -70,6 +70,9 @@ function Note({ message, onDone }) {
       <div className="cc-from">From Russ</div>
       <p>{message.body}</p>
       <div className="hm-actions">
+        {message.link_url && (
+          <a className="hm-btn hm-btn--small" href={message.link_url} target="_blank" rel="noopener noreferrer">{message.link_label || 'Open'}</a>
+        )}
         {message.answers
           ? message.answers.map(a => (
             <button key={a.key} type="button" className="hm-btn hm-btn--small" disabled={busy} onClick={() => answer(a.key)}>{a.label}</button>

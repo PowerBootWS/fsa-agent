@@ -94,12 +94,14 @@ describe('coaching', () => {
     expect((await saveGoal(s, { ...GOAL, target_date: '2020-01-01' })).body.error).toMatch(/ahead/);
   });
 
-  it('saving a goal writes the three commitments and tells Russ on the coach bot', async () => {
+  it('saving a goal writes its commitments and tells Russ on the coach bot', async () => {
     const s = await student(app, 'save');
     const res = await saveGoal(s, GOAL);
     expect(res.status).toBe(200);
     const rows = await commitments(s.id);
-    expect(rows.map(r => r.kind).sort()).toEqual(['book_exam', 'exam_date', 'weekly_sessions']);
+    expect(rows.map(r => r.kind).sort()).toEqual(['book_exam', 'exam_date', 'two_weeks_out', 'weekly_sessions']);
+    const tw = rows.find(r => r.kind === 'two_weeks_out');
+    expect(new Date(tw.due_at).getTime()).toBeLessThan(Date.parse(`${GOAL.target_date}T12:00:00Z`) - 13 * 86400000);
     expect(rows.find(r => r.kind === 'book_exam').check_type).toBe('ask');
     expect(rows.find(r => r.kind === 'weekly_sessions').meta.target).toBe(3);
     // Exam follow-up lands the morning after the exam date.
@@ -121,7 +123,7 @@ describe('coaching', () => {
     const rows = await commitments(s.id);
     const open = rows.filter(r => r.status === 'open');
     expect(open.map(r => r.kind).sort()).toEqual(['custom', 'exam_date', 'weekly_sessions']);
-    expect(rows.filter(r => r.status === 'closed')).toHaveLength(3);
+    expect(rows.filter(r => r.status === 'closed')).toHaveLength(4); // month-only now: no two-weeks-out
     expect(coachBot.notify).toHaveBeenLastCalledWith(expect.stringMatching(/^Goal updated/));
   });
 
@@ -193,6 +195,29 @@ describe('coaching', () => {
     expect(weekly.map(r => r.status).sort()).toEqual(['missed', 'open']);
   });
 
+  it('two weeks out: an exam 10 days away is due now; Home gets a note with the plan link', async () => {
+    const s = await student(app, 'twoweeks');
+    const soon = new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10);
+    await saveGoal(s, { ...GOAL, target_date: soon });
+    const tw = (await commitments(s.id)).find(r => r.kind === 'two_weeks_out');
+    expect(new Date(tw.due_at).getTime()).toBeLessThanOrEqual(Date.now() + 1000);
+    await runDue({ pool });
+    const st = (await state(s)).body;
+    expect(st.message).toMatchObject({ link_url: 'https://fullsteamahead.ca/two-weeks-out', link_label: 'Open the two-weeks-out plan' });
+    expect(st.message.body).toMatch(/^Two weeks to go until 2A1/);
+    const after = (await commitments(s.id)).find(r => r.kind === 'two_weeks_out');
+    expect(after.status).toBe('open'); // left for fsa-nurture to email
+    expect(after.meta.noted_at).toBeTruthy();
+    await runDue({ pool });
+    expect((await pool.query(`SELECT 1 FROM coaching_messages WHERE user_id = $1 AND link_url IS NOT NULL`, [s.id])).rows).toHaveLength(1);
+  });
+
+  it('no two-weeks-out for a month-only goal or an exam date already past', async () => {
+    const s = await student(app, 'twnone');
+    await saveGoal(s, { ...GOAL, date_is_exact: false, target_date: inMonths(2).slice(0, 7) });
+    expect((await commitments(s.id)).some(r => r.kind === 'two_weeks_out')).toBe(false);
+  });
+
   it('Russ\'s own follow-up reminds him on the coach bot and closes', async () => {
     const s = await student(app, 'russ');
     await pool.query(
@@ -234,7 +259,7 @@ describe('coaching', () => {
     await pool.query(`UPDATE subscriptions SET status = 'inactive' WHERE user_id = $1`, [s.id]);
     await pool.query(`UPDATE coaching_commitments SET due_at = now() - interval '1 minute' WHERE user_id = $1`, [s.id]);
     const out = await runDue({ pool });
-    expect(out.closed).toBe(3);
+    expect(out.closed).toBe(4); // book_exam, exam_date, two_weeks_out, weekly_sessions
     expect((await pool.query(`SELECT 1 FROM coaching_messages WHERE user_id = $1`, [s.id])).rows).toHaveLength(0);
   });
 

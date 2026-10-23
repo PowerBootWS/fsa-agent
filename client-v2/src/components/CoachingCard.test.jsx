@@ -45,6 +45,19 @@ describe('CoachingCard', () => {
   });
 });
 
+describe('a note with a link', () => {
+  it('shows the link as a button', async () => {
+    renderCard({
+      eligible: true, show_invite: false, options,
+      goal: { paper: '2A1', target_date: '2099-01-15', date_is_exact: true, exam_booked: true, weekly_sessions: 3 },
+      plan: { sessions_this_week: 0, weekly_target: 3 },
+      message: { id: 9, kind: 'commitment', body: 'Two weeks to go until 2A1.', answers: null, link_url: 'https://fullsteamahead.ca/two-weeks-out', link_label: 'Open the two-weeks-out plan' },
+    });
+    expect(await screen.findByRole('link', { name: 'Open the two-weeks-out plan' })).toHaveAttribute('href', 'https://fullsteamahead.ca/two-weeks-out');
+    expect(screen.getByRole('button', { name: /got it/i })).toBeInTheDocument();
+  });
+});
+
 describe('examCountdown', () => {
   const today = new Date(2026, 9, 22);
   it('counts days to an exact date', () => {

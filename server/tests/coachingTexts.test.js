@@ -253,6 +253,19 @@ describe('text check-ins', () => {
     expect(draft).toHaveBeenCalledTimes(1);
   });
 
+  it('two weeks out for a texting student: a fixed draft with the plan link, and the commitment is done', async () => {
+    const { s } = await optedIn('twotext');
+    await pool.query(
+      `INSERT INTO coaching_commitments (user_id, kind, detail, due_at, check_type, source, meta)
+       VALUES ($1, 'two_weeks_out', 'Send the plan', now() - interval '1 minute', 'platform', 'goal_form', '{"paper":"2A1","when":"December 10"}')`, [s.id]);
+    await runDue({ pool, notify: coachBot.notify });
+    const { rows: [d] } = await pool.query(`SELECT reason, body FROM coaching_text_drafts WHERE user_id = $1`, [s.id]);
+    expect(d.reason).toBe('commitment');
+    expect(d.body).toMatch(/^Two weeks to go on 2A1, Fred! .*https:\/\/fullsteamahead\.ca\/two-weeks-out/);
+    const { rows: [c] } = await pool.query(`SELECT status FROM coaching_commitments WHERE user_id = $1 AND kind = 'two_weeks_out'`, [s.id]);
+    expect(c.status).toBe('kept');
+  });
+
   it('GET /coaching shows the texting offer to a student with a goal', async () => {
     const s = await student(app, 'offer');
     const res = await request(app).get('/api/platform/coaching').set('Cookie', s.cookie);

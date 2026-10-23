@@ -15,6 +15,7 @@ const TZ = 'America/Edmonton';
 const ELIGIBLE_CLASSES = ['second', 'third'];
 const SNOOZE_DAYS = 30;
 const BOOK_EXAM_FOLLOWUP_DAYS = 14;
+const TWO_WEEKS_OUT_URL = 'https://fullsteamahead.ca/two-weeks-out';
 
 const SHIFT_PATTERNS = {
   days: 'Straight days',
@@ -101,7 +102,7 @@ function publicProfile(p) {
 
 async function nextMessage(pool, userId) {
   const { rows } = await pool.query(
-    `SELECT id, kind, body, answers, created_at FROM coaching_messages
+    `SELECT id, kind, body, answers, link_url, link_label, created_at FROM coaching_messages
       WHERE user_id = $1 AND seen_at IS NULL AND expires_at > now()
       ORDER BY (answers IS NOT NULL) DESC, created_at ASC LIMIT 1`,
     [userId]
@@ -253,6 +254,18 @@ async function saveGoal(pool, user, body, { notify = coachBot.notify } = {}) {
                  + interval '10 hours') AT TIME ZONE $5,
                'ask', 'goal_form', 'student', jsonb_build_object('paper', $6::text, 'when', $7::text))`,
       [user.id, `Write ${g.paper} (${when})`, g.target_date, g.date_is_exact, TZ, g.paper, when]);
+    // The final-stretch plan, fourteen days before an exact exam date (or now,
+    // if the exam is already closer than that). Month-only goals get it once
+    // they add the exact date.
+    if (g.date_is_exact) {
+      await client.query(
+        `INSERT INTO coaching_commitments (user_id, kind, detail, due_at, check_type, source, created_by, meta)
+         SELECT $1, 'two_weeks_out', $2,
+                GREATEST(now(), (($3::date - 14) + interval '9 hours') AT TIME ZONE $4),
+                'platform', 'goal_form', 'student', jsonb_build_object('paper', $5::text, 'when', $6::text)
+          WHERE $3::date > (now() AT TIME ZONE $4)::date`,
+        [user.id, `Send the two-weeks-out plan before ${g.paper} (${when})`, g.target_date, TZ, g.paper, when]);
+    }
     await client.query(
       `INSERT INTO coaching_commitments (user_id, kind, detail, due_at, check_type, source, created_by, meta)
        VALUES ($1, 'weekly_sessions', $2,
@@ -337,7 +350,7 @@ async function answerMessage(pool, user, messageId, answer, { notify = coachBot.
 }
 
 module.exports = {
-  TZ, ELIGIBLE_CLASSES, SHIFT_PATTERNS, STUDY_PLACES, WEEKLY_CHOICES, ANSWERS,
+  TZ, TWO_WEEKS_OUT_URL, ELIGIBLE_CLASSES, SHIFT_PATTERNS, STUDY_PLACES, WEEKLY_CHOICES, ANSWERS,
   isEligible, getState, answerInvite, saveGoal, validateGoal, markSeen, answerMessage,
   sessionsSince, showInvite, whenText,
 };
