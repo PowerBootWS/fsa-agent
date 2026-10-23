@@ -96,6 +96,27 @@ router.post('/tutor-selftest', requireInternalSecret, async (req, res) => {
 //     trial converts would email a paying customer a fresh login link.
 //   * deactivate-user changes `status`, and a converted trial must stay active.
 // Narrow surface, one column, easy to reason about at 2am.
+// POST /api/platform/cancellation-scheduled — a student scheduled (or undid) a
+// cancellation in the Stripe billing portal. Records the date for the CRM only:
+// it does not touch cancel_at, so access and the deactivation confirmation gate
+// are unchanged. Called by fsa-webhook-listener on customer.subscription.updated.
+router.post('/cancellation-scheduled', requireInternalSecret, async (req, res) => {
+  try {
+    const { stripe_subscription_id, cancel_at } = req.body || {};
+    if (!stripe_subscription_id) return res.status(400).json({ error: 'stripe_subscription_id is required' });
+    const at = cancel_at ? new Date(typeof cancel_at === 'number' ? cancel_at * 1000 : cancel_at) : null;
+    if (at && Number.isNaN(at.getTime())) return res.status(400).json({ error: 'cancel_at is not a valid time' });
+    const result = await pool.query(
+      `UPDATE subscriptions SET cancel_scheduled_at = $1
+        WHERE stripe_subscription_id = $2 AND cancel_scheduled_at IS DISTINCT FROM $1`,
+      [at, stripe_subscription_id]);
+    return res.json({ ok: true, updated: result.rowCount || 0, cancel_scheduled_at: at });
+  } catch (err) {
+    console.error('cancellation-scheduled error:', err.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.post('/trial-backstop', requireInternalSecret, async (req, res) => {
   try {
     const { stripe_subscription_id, cancel_at } = req.body;
