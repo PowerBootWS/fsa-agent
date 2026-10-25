@@ -89,4 +89,20 @@ router.post('/affiliate/join', requireAuth, async (req, res) => {
   }
 });
 
+router.get('/affiliate', requireAuth, async (req, res) => {
+  const dashboard = await affiliateClient.getDashboard(req.user.email);
+  if (!dashboard) return res.status(503).json({ error: "Couldn't load your referral dashboard right now." });
+  return res.json(dashboard);
+});
+
+router.post('/affiliate/discount-codes', requireAuth, async (req, res) => {
+  try {
+    const { status, body } = await affiliateClient.createDiscountCode(req.user.email);
+    return res.status(status).json(body);
+  } catch (err) {
+    console.error('POST /api/platform/affiliate/discount-codes error:', err.message);
+    return res.status(502).json({ error: "Couldn't create a code right now. Try again in a minute." });
+  }
+});
+
 module.exports = router;

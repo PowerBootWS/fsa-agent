@@ -47,4 +47,38 @@ describe('affiliateClient', () => {
     global.fetch = jest.fn(async () => ({ ok: false, status: 400, text: async () => 'bad' }));
     await expect(affiliateClient.join({ name: 'X', email: 'x@example.com' })).rejects.toThrow(/400/);
   });
+  it('getDashboard returns null when the service times out', async () => {
+    global.fetch = jest.fn((url, opts) => new Promise((resolve, reject) => {
+      opts.signal.addEventListener('abort', () => reject(new Error('aborted')));
+    }));
+    expect(await affiliateClient.getDashboard('slow@example.com')).toBeNull();
+  });
+
+  it('getDashboard returns null on a 500', async () => {
+    global.fetch = jest.fn(async () => ({ ok: false, status: 500, json: async () => ({}) }));
+    expect(await affiliateClient.getDashboard('x@example.com')).toBeNull();
+  });
+
+  it('getDashboard sends the secret and the encoded email', async () => {
+    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ is_affiliate: false }) }));
+    expect(await affiliateClient.getDashboard('a+b@example.com')).toEqual({ is_affiliate: false });
+    const [url, opts] = global.fetch.mock.calls[0];
+    expect(url).toBe('http://aff.test/internal/affiliates/dashboard?email=a%2Bb%40example.com');
+    expect(opts.headers['x-affiliate-secret']).toBe('s3cret');
+  });
+
+  it('createDiscountCode returns status and body for a 429', async () => {
+    const body = { error: 'You can generate up to 3 codes a day. Try again tomorrow.' };
+    global.fetch = jest.fn(async () => ({ ok: false, status: 429, json: async () => body }));
+    expect(await affiliateClient.createDiscountCode('x@example.com')).toEqual({ status: 429, body });
+    const [url, opts] = global.fetch.mock.calls[0];
+    expect(url).toBe('http://aff.test/internal/affiliates/discount-codes');
+    expect(opts.method).toBe('POST');
+    expect(JSON.parse(opts.body)).toEqual({ email: 'x@example.com' });
+  });
+
+  it('createDiscountCode throws on a network failure', async () => {
+    global.fetch = jest.fn(async () => { throw new Error('ECONNREFUSED'); });
+    await expect(affiliateClient.createDiscountCode('x@example.com')).rejects.toThrow(/ECONNREFUSED/);
+  });
 });

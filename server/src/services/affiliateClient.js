@@ -47,4 +47,38 @@ async function join({ name, email }) {
   return res.json();
 }
 
-module.exports = { getSummary, join };
+// Full dashboard payload for the portal's Referrals page. Display-only like
+// getSummary: null on timeout, non-2xx or missing config.
+async function getDashboard(email) {
+  const c = config();
+  if (!c) return null;
+  try {
+    const res = await fetch(
+      `${c.url}/internal/affiliates/dashboard?email=${encodeURIComponent(email)}`,
+      { headers: { 'x-affiliate-secret': c.secret }, signal: AbortSignal.timeout(TIMEOUT_MS) }
+    );
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.error('[affiliate-client] dashboard failed:', err.message);
+    return null;
+  }
+}
+
+// An action: resolves with the service's status and body as-is (403, 404 and
+// 429 carry messages the student should see); throws only on network/timeout.
+async function createDiscountCode(email) {
+  const c = config();
+  if (!c) throw new Error('AFFILIATE_INTERNAL_URL or AFFILIATE_INTERNAL_SECRET not set');
+  const res = await fetch(`${c.url}/internal/affiliates/discount-codes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-affiliate-secret': c.secret },
+    body: JSON.stringify({ email }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  let body = {};
+  try { body = await res.json(); } catch (_) { /* non-JSON body */ }
+  return { status: res.status, body };
+}
+
+module.exports = { getSummary, join, getDashboard, createDiscountCode };

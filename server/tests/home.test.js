@@ -208,3 +208,65 @@ describe('POST /api/platform/affiliate/join', () => {
     expect(res.body.affiliate).toEqual(stats);
   });
 });
+
+describe('/api/platform/affiliate dashboard', () => {
+  afterEach(async () => {
+    jest.resetAllMocks();
+    await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
+  });
+
+  it('GET /affiliate uses the session user\'s email, ignoring ?email=', async () => {
+    const body = { is_affiliate: true, status: 'active', summary: {} };
+    affiliateClient.getDashboard.mockResolvedValue(body);
+    const app = buildTestApp();
+    await createUser('homepage-dash@example.com');
+    const cookie = await login(app, 'homepage-dash@example.com');
+    const res = await request(app).get('/api/platform/affiliate?email=victim@example.com').set('Cookie', cookie);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(body);
+    expect(affiliateClient.getDashboard).toHaveBeenCalledWith('homepage-dash@example.com');
+  });
+
+  it('GET /affiliate is 503 when the service is unavailable', async () => {
+    affiliateClient.getDashboard.mockResolvedValue(null);
+    const app = buildTestApp();
+    await createUser('homepage-dash503@example.com');
+    const cookie = await login(app, 'homepage-dash503@example.com');
+    const res = await request(app).get('/api/platform/affiliate').set('Cookie', cookie);
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe("Couldn't load your referral dashboard right now.");
+  });
+
+  it('GET /affiliate requires auth', async () => {
+    const res = await request(buildTestApp()).get('/api/platform/affiliate');
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /affiliate/discount-codes passes 429 and its message through', async () => {
+    const body = { error: 'You can generate up to 3 codes a day. Try again tomorrow.' };
+    affiliateClient.createDiscountCode.mockResolvedValue({ status: 429, body });
+    const app = buildTestApp();
+    await createUser('homepage-code@example.com');
+    const cookie = await login(app, 'homepage-code@example.com');
+    const res = await request(app).post('/api/platform/affiliate/discount-codes')
+      .set('Cookie', cookie).send({ email: 'victim@example.com' });
+    expect(res.status).toBe(429);
+    expect(res.body).toEqual(body);
+    expect(affiliateClient.createDiscountCode).toHaveBeenCalledWith('homepage-code@example.com');
+  });
+
+  it('POST /affiliate/discount-codes is 502 when the service throws', async () => {
+    affiliateClient.createDiscountCode.mockRejectedValue(new Error('down'));
+    const app = buildTestApp();
+    await createUser('homepage-code502@example.com');
+    const cookie = await login(app, 'homepage-code502@example.com');
+    const res = await request(app).post('/api/platform/affiliate/discount-codes').set('Cookie', cookie);
+    expect(res.status).toBe(502);
+    expect(res.body.error).toBe("Couldn't create a code right now. Try again in a minute.");
+  });
+
+  it('POST /affiliate/discount-codes requires auth', async () => {
+    const res = await request(buildTestApp()).post('/api/platform/affiliate/discount-codes');
+    expect(res.status).toBe(401);
+  });
+});
