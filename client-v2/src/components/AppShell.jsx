@@ -104,6 +104,9 @@ export default function AppShell({ children }) {
         <NavLink to="/jobs" className={({ isActive }) => `as-nav-item${isActive ? ' as-nav-item--active' : ''}`}>
           💼 Jobs
         </NavLink>
+        <NavLink to="/affiliate" className={({ isActive }) => `as-nav-item${isActive ? ' as-nav-item--active' : ''}`}>
+          🤝 Referrals
+        </NavLink>
         <NavLink to="/profile" className={({ isActive }) => `as-nav-item${isActive ? ' as-nav-item--active' : ''}`}>
           👤 Profile
         </NavLink>

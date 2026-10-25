@@ -1,0 +1,34 @@
+/* AffiliatePage styles — prefix af-. Cards reuse hm-* from HomePage.css. */
+.af-page { max-width: 900px; }
+.af-stack { display: flex; flex-direction: column; gap: 20px; }
+.af-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+.af-label { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #9AA4B5; }
+.af-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; line-height: 1.5; }
+.af-deeplinks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.af-result { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #252F42; padding-top: 12px; }
+.af-code { font-size: 24px; font-weight: 700; letter-spacing: 0.05em; overflow-wrap: anywhere; }
+.af-message {
+  width: 100%; box-sizing: border-box; min-height: 110px; resize: vertical;
+  background: #0D1117; color: #F4F5F7; border: 1px solid #252F42; border-radius: 4px; padding: 10px; font: inherit; font-size: 14px;
+}
+.af-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.af-media { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.af-media-item {
+  display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; text-decoration: none; color: #F4F5F7;
+  background: #0D1117; border: 1px solid #252F42; border-radius: 4px;
+}
+.af-media-item:hover { border-color: #E8720C; }
+.af-media-item span { font-size: 13px; color: #9AA4B5; }
+.af-table-wrap { overflow-x: auto; max-width: 100%; }
+.af-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.af-table th { text-align: left; font-size: 12px; color: #9AA4B5; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #252F42; white-space: nowrap; }
+.af-table td { padding: 8px 10px; border-bottom: 1px solid #252F42; white-space: nowrap; }
+.af-num { text-align: right; font-variant-numeric: tabular-nums; }
+.af-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 600; }
+.af-badge--good { background: rgba(63, 185, 80, 0.15); color: #56D364; }
+.af-badge--muted { background: #252F42; color: #9AA4B5; }
+
+@media (max-width: 768px) {
+  .af-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .af-media { grid-template-columns: 1fr; }
+}

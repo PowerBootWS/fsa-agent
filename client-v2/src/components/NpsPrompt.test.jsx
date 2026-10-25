@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import NpsPrompt, { _resetNpsCheck } from './NpsPrompt';
 import { _resetAnnouncementCheck } from './AnnouncementModal';
 
@@ -13,7 +14,7 @@ function setup({ ask = true, answer = { id: 5, promoter: true, affiliate: { code
     if (u.endsWith('/api/platform/nps')) return respond(answer, 201);
     return respond({}, 204);
   });
-  return render(<NpsPrompt waitMs={0} />);
+  return render(<MemoryRouter><NpsPrompt waitMs={0} /></MemoryRouter>);
 }
 
 beforeEach(() => { _resetNpsCheck(); _resetAnnouncementCheck(); });
@@ -32,6 +33,7 @@ describe('NpsPrompt', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));
     fireEvent.click(await screen.findByRole('button', { name: 'No, show me' }));
     expect(await screen.findByText('https://fullsteamahead.ca/?am_id=PAT')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Your referral dashboard' }).getAttribute('href')).toBe('/affiliate');
     const [, opts] = calls('/nps/5/affiliate-link')[0];
     expect(JSON.parse(opts.body)).toEqual({ had_link: false });
     expect(JSON.parse(calls('/api/platform/nps')[0][1].body)).toEqual({ score: 10, reason: '' });

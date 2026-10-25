@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { track } from '../utils/usage';
 import { isAnnouncementShowing } from './AnnouncementModal';
 import './AnnouncementModal.css';
@@ -129,7 +130,7 @@ export default function NpsPrompt({ waitMs = WAIT_MS }) {
             <code className="nps-link">{result.affiliate.referral_url}</code>
             <div className="nps-choices">
               <button className="an-cta" onClick={copyLink}>{copied ? 'Copied' : 'Copy link'}</button>
-              <a className="an-send nps-dash" href="https://fullsteamahead.ca/affiliate-dashboard" target="_blank" rel="noopener">Your referral dashboard</a>
+              <Link className="an-send nps-dash" to="/affiliate" onClick={() => setStep(null)}>Your referral dashboard</Link>
             </div>
             <button className="an-done" onClick={() => setStep(null)}>Done</button>
           </>

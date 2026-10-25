@@ -96,6 +96,7 @@ describe('HomePage', () => {
       referred_count: 4, enrolled_count: 2, earned_cents: 5960 } });
     expect(await screen.findByText('$59.60')).toBeInTheDocument();
     expect(screen.getByText('https://fullsteamahead.ca/?am_id=TAY1')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Full dashboard' })).toHaveAttribute('href', '/affiliate');
   });
 
   it('affiliate section failed: shows the fallback line', async () => {

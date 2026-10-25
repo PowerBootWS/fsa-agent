@@ -25,6 +25,7 @@ import CreditsPage from './pages/CreditsPage';
 import FreePracticeExamPage from './pages/FreePracticeExamPage';
 import AdminUsagePage from './pages/AdminUsagePage';
 import HomePage from './pages/HomePage';
+import AffiliatePage from './pages/AffiliatePage';
 import { LessonPlayer } from './LessonPlayer';
 import { ExamRouter } from './ExamRouter';
 import { isFourthClassCode } from './utils/fourthClass';
@@ -98,6 +99,16 @@ export default function App() {
           <ProtectedRoute requirePaper={false}>
             <AppShell>
               <JobsPage />
+            </AppShell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/affiliate"
+        element={
+          <ProtectedRoute requirePaper={false}>
+            <AppShell>
+              <AffiliatePage />
             </AppShell>
           </ProtectedRoute>
         }

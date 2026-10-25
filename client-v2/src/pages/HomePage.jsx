@@ -8,7 +8,6 @@ import CoachingCard from '../components/CoachingCard';
 const CLASS_LABELS = { second: '2nd Class', third: '3rd Class', fourth_a: '4th Class', fourth_b: '4th Class' };
 const ENROLL_URL = 'https://fullsteamahead.ca/enroll';
 const JOB_BOARD_URL = 'https://fullsteamahead.ca/jobs';
-const AFFILIATE_DASHBOARD_URL = 'https://fullsteamahead.ca/affiliate-dashboard';
 
 const dollars = cents => `$${(cents / 100).toFixed(2)}`;
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
@@ -121,7 +120,7 @@ function AffiliateCard({ affiliate, onJoin, joining, joinError }) {
         <code className="hm-referral-url">{affiliate.referral_url}</code>
         <button className="hm-btn hm-btn--small" onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
       </div>
-      <a className="hm-link" href={AFFILIATE_DASHBOARD_URL}>Full dashboard</a>
+      <Link className="hm-link" to="/affiliate">Full dashboard</Link>
     </section>
   );
 }
