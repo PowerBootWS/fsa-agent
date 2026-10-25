@@ -10,7 +10,7 @@ const { requirePaperEntitlement } = require('../../middleware/requirePaperEntitl
 const sameLearner = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
 
 // POST /api/v2/checkpoint
-// Body: { session_id, lesson_code }
+// Body: { session_id, lesson_code, slide_number?, unseen_only? }
 //
 // Returns a practice question, plus the check-in recap card for this point in
 // the lesson when one exists (`checkin`, else null). There used to be an
@@ -60,7 +60,11 @@ router.post('/', requirePaperEntitlement(req => req.body && req.body.lesson_code
 
     // Prefer one they have never seen; otherwise recycle the one asked longest
     // ago (position in the log is the ordering — it is append-only).
+    // `unseen_only` (the optional in-slide prompt) skips the recycling: a
+    // 53-slide objective with a five-question pool used to show each question
+    // two or three times, and an optional prompt is not worth a repeat.
     let question = questions.find(q => !askedIds.includes(q.id));
+    if (!question && req.body.unseen_only === true) return res.json({ question: null, checkin });
     if (!question) {
       const lastAskedAt = new Map(questions.map(q => [q.id, -1]));
       askedIds.forEach((id, i) => {

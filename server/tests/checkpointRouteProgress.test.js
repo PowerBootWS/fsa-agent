@@ -113,4 +113,30 @@ describe('POST /api/v2/checkpoint', () => {
     expect(db.getCheckinForSlide).toHaveBeenCalledWith('2A2-1-1', 8);
     expect(db.getCheckpointQuestionPool).toHaveBeenCalledWith('2A2-1-1', 8);
   });
+  it('unseen_only returns no question once every pool question has been answered', async () => {
+    const Q2 = { ...QUESTION, id: 2 };
+    db.getLearnerSession.mockResolvedValue({ learner_id: 'owner@example.com', id: 7, last_section: 9,
+      checkpoint_log: [{ question_id: 1 }, { question_id: 2 }] });
+    db.getCheckpointQuestionPool.mockResolvedValue([QUESTION, Q2]);
+
+    const fresh = await request(app()).post('/api/v2/checkpoint')
+      .send({ session_id: 7, lesson_code: '2A2-1-1', unseen_only: true }).expect(200);
+    expect(fresh.body.question).toBeNull();
+
+    // Without the flag (older clients) it still recycles the oldest.
+    const recycled = await request(app()).post('/api/v2/checkpoint')
+      .send({ session_id: 7, lesson_code: '2A2-1-1' }).expect(200);
+    expect(recycled.body.question.id).toBe(1);
+  });
+
+  it('unseen_only still serves a question not yet answered', async () => {
+    const Q2 = { ...QUESTION, id: 2 };
+    db.getLearnerSession.mockResolvedValue({ learner_id: 'owner@example.com', id: 7, last_section: 9,
+      checkpoint_log: [{ question_id: 1 }] });
+    db.getCheckpointQuestionPool.mockResolvedValue([QUESTION, Q2]);
+
+    const res = await request(app()).post('/api/v2/checkpoint')
+      .send({ session_id: 7, lesson_code: '2A2-1-1', unseen_only: true }).expect(200);
+    expect(res.body.question.id).toBe(2);
+  });
 });

@@ -34,6 +34,11 @@ async function advanceToCheckpoint() {
   for (let i = 0; i < 4; i += 1) fireEvent.click(screen.getByRole('button', { name: /next/i }));
 }
 
+// tutor_v2: the checkpoint is an optional prompt on the slide; open its card.
+async function openCheckin() {
+  fireEvent.click(await screen.findByRole('button', { name: /practice question available/i }));
+}
+
 beforeEach(() => {
   window.HTMLMediaElement.prototype.pause = () => {};
   window.HTMLMediaElement.prototype.play = () => Promise.resolve();
@@ -51,16 +56,22 @@ describe('LessonPlayer with tutor_v2', () => {
     expect(screen.queryByText('AI Tutor')).not.toBeInTheDocument();
   });
 
-  it('shows the check-in card in place of the slide, then continues', async () => {
+  it('offers the check-in as a prompt on the slide, opens it on click, then continues', async () => {
     globalThis.fetch = routes(true);
     render(<LessonPlayer lessonCode="2B1-1-1" learnerId="s@x" classCode="second" />);
     await screen.findByRole('button', { name: /ask about this slide/i });
     await advanceToCheckpoint();
 
-    expect(await screen.findByText('Point one.')).toBeInTheDocument();
-    expect(screen.queryByText('Body 4')).not.toBeInTheDocument();
+    // The slide stays on screen; the card waits behind the prompt.
+    await screen.findByRole('button', { name: /practice question available/i });
+    expect(screen.getByText('Body 4')).toBeInTheDocument();
+    expect(screen.queryByText('Point one.')).not.toBeInTheDocument();
     const call = globalThis.fetch.mock.calls.find(([u]) => u === '/api/v2/checkpoint');
-    expect(JSON.parse(call[1].body)).toMatchObject({ lesson_code: '2B1-1-1', slide_number: 4 });
+    expect(JSON.parse(call[1].body)).toMatchObject({ lesson_code: '2B1-1-1', slide_number: 4, unseen_only: true });
+
+    await openCheckin();
+    expect(screen.getByText('Point one.')).toBeInTheDocument();
+    expect(screen.queryByText('Body 4')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /continue the lesson/i }));
     expect(screen.getByText('Body 4')).toBeInTheDocument();
@@ -71,6 +82,7 @@ describe('LessonPlayer with tutor_v2', () => {
     render(<LessonPlayer lessonCode="2B1-1-1" learnerId="s@x" classCode="second" />);
     await screen.findByRole('button', { name: /ask about this slide/i });
     await advanceToCheckpoint();
+    await openCheckin();
     fireEvent.click(await screen.findByRole('button', { name: /quick exercise with the tutor/i }));
 
     expect(await screen.findByText('Here is question one.')).toBeInTheDocument();
@@ -88,6 +100,7 @@ describe('LessonPlayer with tutor_v2 — drawer closes when the student moves on
     render(<LessonPlayer lessonCode="2B1-1-1" learnerId="s@x" classCode="second" />);
     await screen.findByRole('button', { name: /ask about this slide/i });
     await advanceToCheckpoint();
+    await openCheckin();
     fireEvent.click(await screen.findByRole('button', { name: /quick exercise with the tutor/i }));
     await screen.findByText('Here is question one.');
   }
@@ -132,6 +145,7 @@ describe('LessonPlayer with tutor_v2 — a check-in shows once', () => {
   it('does not repeat the card after going back and stepping forward again', async () => {
     await start();
     await advanceToCheckpoint();
+    await openCheckin();
     await screen.findByText('Point one.');
     click(/continue the lesson/i);
     click(/back/i);
@@ -174,6 +188,95 @@ describe('LessonPlayer with tutor_v2 — a check-in shows once', () => {
     const body = JSON.parse(chat[1].body);
     expect(body.exercise).toMatchObject({ from_slide: 0, after_slide: 2, asked: 0 });
     expect(body.slideNumber).toBe(2);
+  });
+});
+
+describe('LessonPlayer with tutor_v2 — practice prompt', () => {
+  it('drops the prompt when the student moves on without opening it', async () => {
+    globalThis.fetch = routes(true);
+    render(<LessonPlayer lessonCode="2B1-1-1" learnerId="s@x" classCode="second" />);
+    await screen.findByRole('button', { name: /ask about this slide/i });
+    await advanceToCheckpoint();
+    await screen.findByRole('button', { name: /practice question available/i });
+    fireEvent.click(screen.getByRole('button', { name: /next/i }));
+    expect(screen.getByText('Body 5')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /practice question available/i })).not.toBeInTheDocument();
+  });
+
+  it('shows nothing when the route has no unseen question', async () => {
+    const base = routes(true);
+    globalThis.fetch = vi.fn((url, opts) => (url === '/api/v2/checkpoint'
+      ? Promise.resolve({ ok: true, status: 200, json: async () => ({ question: null, checkin: CHECKIN }), text: async () => JSON.stringify({ question: null, checkin: CHECKIN }) })
+      : base(url, opts)));
+    render(<LessonPlayer lessonCode="2B1-1-1" learnerId="s@x" classCode="second" />);
+    await screen.findByRole('button', { name: /ask about this slide/i });
+    await advanceToCheckpoint();
+    await waitFor(() => expect(globalThis.fetch.mock.calls.some(([u]) => u === '/api/v2/checkpoint')).toBe(true));
+    expect(screen.queryByRole('button', { name: /practice question available/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Point one.')).not.toBeInTheDocument();
+  });
+});
+
+describe('LessonPlayer autoplay', () => {
+  const AUDIO_SECTIONS = Array.from({ length: 6 }, (_, i) => ({
+    slide_number: i, title: `Slide ${i}`, body: `Body ${i}`, chunk_type: 'content', audio_url: `/a/${i}.mp3`,
+  }));
+  let lastPlayed;
+
+  function audioRoutes() {
+    const base = routes(true);
+    return vi.fn((url, opts) => (url.startsWith('/api/v2/lesson/')
+      ? Promise.resolve({ ok: true, status: 200, json: async () => ({ sections: AUDIO_SECTIONS }), text: async () => JSON.stringify({ sections: AUDIO_SECTIONS }) })
+      : base(url, opts)));
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    lastPlayed = null;
+    window.HTMLMediaElement.prototype.play = function play() { lastPlayed = this; return Promise.resolve(); };
+  });
+
+  it('is off by default, and turning it on is remembered', async () => {
+    globalThis.fetch = audioRoutes();
+    render(<LessonPlayer lessonCode="2B1-1-1" learnerId="s@x" classCode="second" />);
+    const toggle = await screen.findByRole('checkbox', { name: /autoplay/i });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    expect(toggle).toBeChecked();
+    expect(localStorage.getItem('fsa_lesson_autoplay')).toBe('1');
+  });
+
+  it('advances to the next slide shortly after the narration ends', async () => {
+    localStorage.setItem('fsa_lesson_autoplay', '1');
+    globalThis.fetch = audioRoutes();
+    render(<LessonPlayer lessonCode="2B1-1-1" learnerId="s@x" classCode="second" />);
+    await screen.findByText('Body 0');
+    await waitFor(() => expect(lastPlayed).not.toBeNull());
+    fireEvent(lastPlayed, new Event('ended'));
+    expect(screen.getByText('Body 0')).toBeInTheDocument();
+    expect(await screen.findByText('Body 1', {}, { timeout: 3000 })).toBeInTheDocument();
+  });
+
+  it('does not advance when autoplay is off', async () => {
+    globalThis.fetch = audioRoutes();
+    render(<LessonPlayer lessonCode="2B1-1-1" learnerId="s@x" classCode="second" />);
+    await screen.findByText('Body 0');
+    fireEvent.click(screen.getByRole('button', { name: /play/i }));
+    await waitFor(() => expect(lastPlayed).not.toBeNull());
+    fireEvent(lastPlayed, new Event('ended'));
+    await new Promise(r => setTimeout(r, 1800));
+    expect(screen.getByText('Body 0')).toBeInTheDocument();
+  });
+
+  it('holds while the tutor is open', async () => {
+    localStorage.setItem('fsa_lesson_autoplay', '1');
+    globalThis.fetch = audioRoutes();
+    render(<LessonPlayer lessonCode="2B1-1-1" learnerId="s@x" classCode="second" />);
+    fireEvent.click(await screen.findByRole('button', { name: /ask about this slide/i }));
+    await waitFor(() => expect(lastPlayed).not.toBeNull());
+    fireEvent(lastPlayed, new Event('ended'));
+    await new Promise(r => setTimeout(r, 1800));
+    expect(screen.getByText('Body 0')).toBeInTheDocument();
   });
 });
 

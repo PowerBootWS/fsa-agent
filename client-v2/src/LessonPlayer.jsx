@@ -8,6 +8,11 @@ import { isFourthClassCode } from './utils/fourthClass';
 import { getJson, postJson } from './utils/api';
 
 const CHECKPOINT_INTERVAL = 4;
+const AUTOPLAY_KEY = 'fsa_lesson_autoplay';
+
+function initialAutoAdvance() {
+  try { return localStorage.getItem(AUTOPLAY_KEY) === '1'; } catch { return false; }
+}
 
 function parseCourseId(lessonCode) {
   return lessonCode ? lessonCode.split('-')[0] : null;
@@ -36,7 +41,19 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   const [sessionId, setSessionId] = useState(null);
   const [sectionIndex, setSectionIndex] = useState(0);
   const [autoPlay, setAutoPlay] = useState(false);
+  // Student's autoplay toggle: narration plays on every slide and the next
+  // slide follows when it ends. Remembered on this device across lessons.
+  const [autoAdvance, setAutoAdvanceState] = useState(initialAutoAdvance);
+  const setAutoAdvance = useCallback((on) => {
+    setAutoAdvanceState(on);
+    try { localStorage.setItem(AUTOPLAY_KEY, on ? '1' : '0'); } catch { /* ignore */ }
+    track('feature_use', { action: on ? 'lesson_autoplay_on' : 'lesson_autoplay_off' });
+  }, []);
   const [checkpoint, setCheckpoint] = useState(null);
+  // tutor_v2: a checkpoint no longer interrupts the lesson. It shows as a small
+  // "practice question available" prompt on the slide, and the card opens only
+  // if the student clicks it. Moving to another slide drops the prompt.
+  const [checkinOpen, setCheckinOpen] = useState(false);
   // lesson_codes this student has marked (or been credited) complete. Free
   // navigation (2026-06-16) means this gates nothing — it is progress tracking
   // only, so it lives here as display state rather than in the outline.
@@ -252,26 +269,31 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
       // slide_number travels with the request because the last_section PATCH
       // that goNext fires just before this is not awaited, and the route would
       // otherwise sometimes read the previous slide.
+      // unseen_only: an optional prompt is only worth showing for a question
+      // this student hasn't already answered in this objective.
       const data = await postJson('/api/v2/checkpoint', {
         session_id: sessionId, lesson_code: activeLessonCode, slide_number: slideNumber,
+        ...(tutorV2 ? { unseen_only: true } : {}),
       });
-      if (data?.question || (tutorV2 && data?.checkin)) {
+      if (data?.question) {
         setCheckpointAnswer(null);
-        setCheckpoint(data);
+        setCheckinOpen(false);
+        setCheckpoint({ ...data, slide_number: slideNumber });
       }
     } catch {
       // checkpoint failure is non-fatal
     }
   }, [sessionId, activeLessonCode, tutorV2]);
 
+  // checkin_offered: the prompt appeared. checkin_shown: the student opened it.
   useEffect(() => {
     if (!tutorV2 || !checkpoint) return;
     track('feature_use', {
-      action: 'checkin_shown',
+      action: checkinOpen ? 'checkin_shown' : 'checkin_offered',
       props: { lesson_code: activeLessonCode, has_recap: Boolean(checkpoint.checkin) },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkpoint]);
+  }, [checkpoint, checkinOpen]);
 
   // The drawer is for when the student has asked for the tutor. Moving on
   // through the lesson in any other way (Next, Back, Continue, another
@@ -352,7 +374,7 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
   // While a check-in card stands in for the slide just arrived at, the student
   // hasn't seen that slide yet, so the tutor's "covered so far" stops at the
   // one before it. Otherwise a quick exercise could quiz them on it.
-  const showingCheckin = tutorV2 && Boolean(checkpoint) && !isComplete;
+  const showingCheckin = tutorV2 && Boolean(checkpoint) && checkinOpen && !isComplete;
   const currentSlideNumber = showingCheckin && sectionIndex > 0
     ? sections[sectionIndex - 1]?.slide_number
     : sections[Math.min(sectionIndex, sections.length - 1)]?.slide_number;
@@ -373,7 +395,15 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
     correct_answer: answered ? cardQuestion.correct_answer : null,
   } : undefined;
 
-  const checkinOverlay = tutorV2 && checkpoint && !isComplete ? (
+  const checkpointHere = Boolean(checkpoint) && !isComplete
+    && checkpoint.slide_number === sections[sectionIndex]?.slide_number;
+  const practicePrompt = tutorV2 && checkpointHere && !checkinOpen ? (
+    <button className="practice-prompt" onClick={() => setCheckinOpen(true)}>
+      ✏️ Practice question available. Click to try it
+    </button>
+  ) : null;
+
+  const checkinOverlay = tutorV2 && checkpointHere && checkinOpen ? (
     <CheckInCard
       key={`${activeLessonCode}-${sectionIndex}`}
       checkin={checkpoint.checkin}
@@ -429,7 +459,11 @@ export function LessonPlayer({ lessonCode: initialLessonCode, learnerId, classCo
         section={sections[sectionIndex] || null}
         sectionIndex={sectionIndex}
         totalSections={sections.length}
-        autoPlay={autoPlay}
+        autoPlay={autoPlay || autoAdvance}
+        autoAdvance={autoAdvance}
+        onToggleAutoAdvance={setAutoAdvance}
+        holdAutoAdvance={tutorOpen}
+        practicePrompt={practicePrompt}
         onNext={goNext}
         onBack={goBack}
         courseOutline={courseOutline}

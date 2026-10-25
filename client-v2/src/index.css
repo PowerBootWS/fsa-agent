@@ -1851,3 +1851,30 @@ body {
   cursor: pointer;
 }
 .checkin-continue-from-tutor:hover { background: var(--orange-glow); }
+
+/* Optional practice question on a checkpoint slide: a small prompt that slides
+   in while the slide plays and goes away when the slide changes. */
+.practice-prompt-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 32px 8px;
+  flex-shrink: 0;
+}
+.practice-prompt {
+  background: var(--iron);
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  animation: practice-prompt-in 0.35s var(--ease);
+}
+.practice-prompt:hover { background: var(--amber); color: var(--carbon); }
+@keyframes practice-prompt-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .practice-prompt { animation: none; } }
+@media (max-width: 768px) { .practice-prompt-row { padding: 0 16px 8px; } }

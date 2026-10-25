@@ -8,6 +8,10 @@ import { track } from '../utils/usage';
 import { NavigationHeader } from './NavigationHeader';
 import { ObjectiveComplete } from './ObjectiveComplete';
 
+// Pause between the end of a slide's narration and the next slide under
+// autoplay. Short on purpose: any longer and students think they need to click.
+export const AUTO_ADVANCE_DELAY_MS = 1500;
+
 function renderInline(text, keyPrefix) {
   const mathParts = text.split(/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g);
   return mathParts.flatMap((part, i) => {
@@ -92,9 +96,13 @@ export function ContentPanel({
   overlay = null,
   onAsk = null,
   onExercise = null,
+  autoAdvance = false,
+  onToggleAutoAdvance = null,
+  holdAutoAdvance = false,
+  practicePrompt = null,
 }) {
   const [sectionStartTime, setSectionStartTime] = useState(() => Date.now());
-  const { play, pause, playing, muted, toggleMute, currentTimeMs, playbackRate, setPlaybackRate } = useAudio(
+  const { play, pause, playing, ended, muted, toggleMute, currentTimeMs, playbackRate, setPlaybackRate } = useAudio(
     section?.audio_url || null
   );
   const { visibleText } = useNarrationSync(
@@ -119,14 +127,32 @@ export function ContentPanel({
   // slide it arrived on. Hold that slide's narration while the card is up, and
   // start it when the student continues — otherwise the audio for a slide they
   // can't see plays under the card.
+  // The card can also be opened mid-slide (from the practice-question prompt):
+  // then it resumes only if the narration was playing when the card opened.
   const holdAudio = Boolean(overlay);
   const wasHeld = useRef(holdAudio);
+  const resumeAfterHold = useRef(false);
   useEffect(() => {
-    if (holdAudio) pause();
-    else if (wasHeld.current && autoPlay && section?.audio_url && !muted) play();
+    if (holdAudio) {
+      resumeAfterHold.current = playing;
+      pause();
+    } else if (wasHeld.current && section?.audio_url && !muted
+      && (resumeAfterHold.current || (autoPlay && currentTimeMs === 0 && !ended))) {
+      play();
+    }
     wasHeld.current = holdAudio;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [holdAudio]);
+
+  // Autoplay: once a slide's narration finishes, move on by itself. Held while
+  // a card or the tutor is open, and stops at the end-of-objective screen.
+  const onNextRef = useRef(onNext);
+  useEffect(() => { onNextRef.current = onNext; });
+  useEffect(() => {
+    if (!autoAdvance || !ended || holdAutoAdvance || overlay || isComplete) return undefined;
+    const t = setTimeout(() => onNextRef.current?.(), AUTO_ADVANCE_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [autoAdvance, ended, holdAutoAdvance, overlay, isComplete]);
 
   if (!section && !isComplete) return null;
 
@@ -168,6 +194,8 @@ export function ContentPanel({
             />
           </div>
 
+          {practicePrompt && <div className="practice-prompt-row">{practicePrompt}</div>}
+
           {!hideNarration && section?.narration_timing && (
             <div className="narration-box">{visibleText || ' '}</div>
           )}
@@ -201,6 +229,21 @@ export function ContentPanel({
                   <option value={1.25}>1.25×</option>
                   <option value={1.5}>1.5×</option>
                 </select>
+              </label>
+            )}
+            {onToggleAutoAdvance && (
+              <label className="toggle-label autoplay-control">
+                <input
+                  type="checkbox"
+                  checked={autoAdvance}
+                  onChange={() => {
+                    const on = !autoAdvance;
+                    onToggleAutoAdvance(on);
+                    // Turning it on mid-slide starts this slide's narration too.
+                    if (on && !playing && !ended && currentTimeMs === 0 && section?.audio_url && !muted) play();
+                  }}
+                />
+                Autoplay
               </label>
             )}
             <label className="toggle-label">
