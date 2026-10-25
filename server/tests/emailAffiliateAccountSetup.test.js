@@ -33,3 +33,14 @@ it('escapes the name in html and uses no em dash anywhere', async () => {
   expect(msg.html).not.toContain('<b>Sam</b>');
   expect(msg.html + msg.text + msg.subject).not.toContain('—');
 });
+
+it('signs once, with the support@ signature and no "Russ" sign-off line', async () => {
+  await sendAffiliateAccountSetup('x@example.com', 'Sam', 'tok');
+  const msg = common.sendEmail.mock.calls[0][0];
+  expect(msg.text.split('\n').map((l) => l.trim())).not.toContain('Russ');
+  expect(msg.html).not.toContain('<p>Russ</p>');
+  for (const body of [msg.text, msg.html]) {
+    expect(body.split('Warm regards,')).toHaveLength(2);
+    expect(body.split('Customer Support Agent')).toHaveLength(2);
+  }
+});

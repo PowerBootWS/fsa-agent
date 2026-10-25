@@ -13,25 +13,39 @@
  *   node scripts/provision-affiliate-accounts.js --skip=c@z.com
  *   node scripts/provision-affiliate-accounts.js --apply
  *
- * Host-run: POSTGRES_HOST=localhost POSTGRES_PORT=5434 POSTGRES_DB=<db>
- * POSTGRES_PASSWORD=... (POSTGRES_DB is required; there is no default).
- * --apply runs only against fsa_agent (production) or a scratch copy
- * (_scratch_meta present). Against scratch, set EMAIL_REDIRECT_TO.
+ * Recovery: --resend=<email>[,...] issues a fresh 48h setup link and resends
+ * the email to an existing account that has never set a password (e.g. the
+ * account was created but the send failed). It creates nothing. Dry run by
+ * default too; add --apply to write and send.
+ *
+ * Environment (host-run):
+ *   POSTGRES_HOST=localhost POSTGRES_PORT=5434 POSTGRES_PASSWORD=...
+ *   POSTGRES_DB=<db>   required, no default
+ *   --apply also needs mail configured, checked before any write:
+ *     SUPPORT_GMAIL_SA=/home/debian/.secrets/support_gmail_sa.json
+ *     EMAIL_MAILBOXES  only if not the fsa-common default (support@ must be allowed)
+ *   --apply runs only against fsa_agent (production) or a scratch copy
+ *   (_scratch_meta present). Against scratch, EMAIL_REDIRECT_TO is required.
  */
 const crypto = require('crypto');
+const fs = require('fs');
 const { Pool } = require('pg');
 const { grantSignupCredit } = require('../src/services/signupCredit');
 const { sendAffiliateAccountSetup, affiliateAccountSetupMessage } = require('../src/services/email');
 const { signText } = require('../src/services/emailTemplate');
 
 function parseArgs(argv) {
-  const opts = { apply: false, only: null, skip: [] };
+  const opts = { apply: false, only: null, skip: [], resend: null };
   const list = (v) => v.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
   for (const arg of argv) {
     if (arg === '--apply') opts.apply = true;
     else if (arg.startsWith('--only=')) opts.only = list(arg.slice(7));
     else if (arg.startsWith('--skip=')) opts.skip = list(arg.slice(7));
+    else if (arg.startsWith('--resend=')) opts.resend = list(arg.slice(9));
     else throw new Error(`unknown argument: ${arg}`);
+  }
+  if (opts.resend && (opts.only || opts.skip.length)) {
+    throw new Error('--resend cannot be combined with --only or --skip');
   }
   return opts;
 }
@@ -43,6 +57,33 @@ function splitName(name) {
   return { first: parts[0] || '', last: parts.slice(1).join(' ') };
 }
 
+function filterSelection(rows, opts) {
+  return rows.filter((r) => {
+    const e = String(r.email || '').toLowerCase().trim();
+    if (opts.only && !opts.only.includes(e)) return false;
+    return !opts.skip.includes(e);
+  });
+}
+
+// Everything --apply needs that would otherwise only fail after a commit.
+// Returns a list of problems; empty means good to go.
+function applyPreflight(env, db) {
+  const problems = [];
+  if (!env.SUPPORT_GMAIL_SA) {
+    problems.push('SUPPORT_GMAIL_SA is not set (use /home/debian/.secrets/support_gmail_sa.json)');
+  } else {
+    try {
+      fs.accessSync(env.SUPPORT_GMAIL_SA, fs.constants.R_OK);
+    } catch {
+      problems.push(`SUPPORT_GMAIL_SA key file is not readable: ${env.SUPPORT_GMAIL_SA}`);
+    }
+  }
+  if (db !== 'fsa_agent' && !env.EMAIL_REDIRECT_TO) {
+    problems.push(`EMAIL_REDIRECT_TO must be set when applying to ${db} (not production)`);
+  }
+  return problems;
+}
+
 async function selectAffiliates(pool, opts) {
   const { rows } = await pool.query(
     `SELECT a.id, a.name, a.email
@@ -51,11 +92,18 @@ async function selectAffiliates(pool, opts) {
       WHERE a.status = 'active' AND pu.id IS NULL
       ORDER BY a.id`
   );
-  return rows.filter((r) => {
-    const e = String(r.email || '').toLowerCase();
-    if (opts.only && !opts.only.includes(e)) return false;
-    return !opts.skip.includes(e);
-  });
+  return filterSelection(rows, opts);
+}
+
+// Same insert as POST /provision-user in src/routes/platform.js.
+async function insertMagicLink(queryable, userId) {
+  const token = crypto.randomUUID();
+  await queryable.query(
+    `INSERT INTO auth_tokens (user_id, token, type, expires_at)
+     VALUES ($1, $2, 'magic_link', now() + interval '48 hours')`,
+    [userId, token]
+  );
+  return token;
 }
 
 // Mirrors the NEW-user branch of POST /provision-user in src/routes/platform.js
@@ -94,12 +142,7 @@ async function createAccount(pool, email, first, last) {
       await client.query('ROLLBACK TO SAVEPOINT credit');
       console.error(`  signup credit grant failed for ${email}: ${err.message}`);
     }
-    const token = crypto.randomUUID();
-    await client.query(
-      `INSERT INTO auth_tokens (user_id, token, type, expires_at)
-       VALUES ($1, $2, 'magic_link', now() + interval '48 hours')`,
-      [userId, token]
-    );
+    const token = await insertMagicLink(client, userId);
     await client.query('COMMIT');
     return token;
   } catch (err) {
@@ -110,10 +153,105 @@ async function createAccount(pool, email, first, last) {
   }
 }
 
+async function findAccount(pool, email) {
+  const { rows } = await pool.query(
+    `SELECT id, first_name, password_hash IS NOT NULL AS has_password
+       FROM platform_users WHERE lower(email) = $1`, [email]);
+  return rows[0] || null;
+}
+
+function printEmail(email, firstName) {
+  const msg = affiliateAccountSetupMessage(email, firstName, '<TOKEN>');
+  console.log(`\n--- email for ${msg.to} (plain text, as sent) ---`);
+  console.log(`Subject: ${msg.subject}\n`);
+  console.log(signText(msg.text));
+  console.log('--- end ---');
+}
+
+async function runResend(pool, opts) {
+  let sent = 0, skipped = 0, failed = 0;
+  for (const email of opts.resend) {
+    try {
+      const acct = await findAccount(pool, email);
+      if (!acct) { console.log(`skipped ${email} (no account)`); skipped++; continue; }
+      if (acct.has_password) { console.log(`skipped ${email} (already has a password)`); skipped++; continue; }
+      if (!opts.apply) {
+        console.log(`would resend ${email} (${acct.first_name || 'no name'})`);
+        sent++;
+        continue;
+      }
+      const token = await insertMagicLink(pool, acct.id);
+      await sendAffiliateAccountSetup(email, acct.first_name, token);
+      console.log(`resent ${email}`);
+      sent++;
+    } catch (err) {
+      console.log(`failed ${email}: ${err.message}`);
+      failed++;
+    }
+  }
+  if (opts.apply) {
+    console.log(`\nresent ${sent}, skipped ${skipped}, failed ${failed} (of ${opts.resend.length})`);
+  } else {
+    console.log(`\nwould resend ${sent}, skip ${skipped}. Nothing written or sent. Re-run with --apply to do it.`);
+  }
+}
+
+async function runCreate(pool, opts) {
+  const people = await selectAffiliates(pool, opts);
+  let done = 0, skipped = 0, failed = 0;
+
+  for (const p of people) {
+    const email = String(p.email).toLowerCase().trim();
+    const { first, last } = splitName(p.name);
+    if (!opts.apply) {
+      console.log(`would create ${email} (${first || 'no name'})`);
+      done++;
+      continue;
+    }
+    try {
+      const token = await createAccount(pool, email, first, last);
+      if (!token) {
+        console.log(`skipped ${email} (account exists)`);
+        skipped++;
+        continue;
+      }
+      // Mail only after commit. If the send fails, the account stays and
+      // --resend=<email> issues a fresh link and retries the email.
+      try {
+        await sendAffiliateAccountSetup(email, first, token);
+      } catch (err) {
+        console.log(`failed ${email}: account created but email not sent (${err.message}); retry with --resend=${email}`);
+        failed++;
+        continue;
+      }
+      console.log(`created ${email}`);
+      done++;
+    } catch (err) {
+      console.log(`failed ${email}: ${err.message}`);
+      failed++;
+    }
+  }
+
+  if (opts.apply) {
+    console.log(`\ncreated ${done}, skipped ${skipped}, failed ${failed} (of ${people.length})`);
+  } else {
+    console.log(`\nwould create ${done} account(s). Nothing written or sent. Re-run with --apply to do it.`);
+    if (people.length) {
+      const p = people[0];
+      printEmail(String(p.email).toLowerCase().trim(), splitName(p.name).first);
+    }
+  }
+}
+
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
   const db = process.env.POSTGRES_DB;
   if (!db) throw new Error('POSTGRES_DB is not set. Pass it explicitly (fsa_agent or fsa_agent_scratch).');
+
+  if (opts.apply) {
+    const problems = applyPreflight(process.env, db);
+    if (problems.length) throw new Error(`--apply refused:\n  ${problems.join('\n  ')}`);
+  }
 
   const pool = new Pool({
     host: process.env.POSTGRES_HOST || 'localhost',
@@ -131,57 +269,19 @@ async function main() {
         throw new Error(`--apply refused: ${db} is neither fsa_agent nor a scratch copy (_scratch_meta missing)`);
       }
     }
-
-    console.log(`database: ${db}  mode: ${opts.apply ? 'APPLY' : 'dry-run'}`);
-    const people = await selectAffiliates(pool, opts);
-    let done = 0, skipped = 0, failed = 0;
-
-    for (const p of people) {
-      const email = String(p.email).toLowerCase().trim();
-      const { first, last } = splitName(p.name);
-      if (!opts.apply) {
-        console.log(`would create ${email} (${first || 'no name'})`);
-        done++;
-        continue;
-      }
-      try {
-        const token = await createAccount(pool, email, first, last);
-        if (!token) {
-          console.log(`skipped ${email} (account exists)`);
-          skipped++;
-          continue;
-        }
-        // Mail only after commit. A send failure leaves the account in place;
-        // "Forgot password" on the login page recovers it.
-        await sendAffiliateAccountSetup(email, first, token);
-        console.log(`created ${email}`);
-        done++;
-      } catch (err) {
-        console.log(`failed ${email}: ${err.message}`);
-        failed++;
-      }
-    }
-
-    if (opts.apply) {
-      console.log(`\ncreated ${done}, skipped ${skipped}, failed ${failed} (of ${people.length})`);
-    } else {
-      console.log(`\nwould create ${done} account(s). Nothing written or sent. Re-run with --apply to do it.`);
-      if (people.length) {
-        const p = people[0];
-        const msg = affiliateAccountSetupMessage(String(p.email).toLowerCase().trim(),
-          splitName(p.name).first, '<TOKEN>');
-        console.log(`\n--- email for ${msg.to} (plain text, as sent) ---`);
-        console.log(`Subject: ${msg.subject}\n`);
-        console.log(signText(msg.text));
-        console.log('--- end ---');
-      }
-    }
+    console.log(`database: ${db}  mode: ${opts.apply ? 'APPLY' : 'dry-run'}${opts.resend ? '  (resend)' : ''}`);
+    if (opts.resend) await runResend(pool, opts);
+    else await runCreate(pool, opts);
   } finally {
     await pool.end();
   }
 }
 
-main().catch((err) => {
-  console.error(err.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { parseArgs, splitName, filterSelection, applyPreflight };

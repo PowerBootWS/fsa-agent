@@ -130,8 +130,8 @@ function affiliateAccountSetupMessage(email_, firstName, token) {
   return {
     to: email_,
     subject: 'Your referral dashboard has moved',
-    html: `<p>Hi ${greetHtml},</p><p>${escapeHtml(intro)}</p><p>${escapeHtml(setup)}</p><p><a href="${hrefLink}" style="background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">Set Up My Account</a></p><p>${escapeHtml(expiry)}</p><p>${escapeHtml(after)}</p><p>Russ</p>`,
-    text: `Hi ${greetText},\n\n${intro}\n\n${setup}\n${link}\n\n${expiry}\n\n${after}\n\nRuss`,
+    html: `<p>Hi ${greetHtml},</p><p>${escapeHtml(intro)}</p><p>${escapeHtml(setup)}</p><p><a href="${hrefLink}" style="background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">Set Up My Account</a></p><p>${escapeHtml(expiry)}</p><p>${escapeHtml(after)}</p>`,
+    text: `Hi ${greetText},\n\n${intro}\n\n${setup}\n${link}\n\n${expiry}\n\n${after}`,
   };
 }
 
