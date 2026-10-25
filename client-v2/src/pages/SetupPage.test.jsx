@@ -12,8 +12,8 @@
  * These tests pin the recovery affordance for each failure reason.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import SetupPage from './SetupPage';
 
 const respond = (body, status = 200) => ({
@@ -91,5 +91,41 @@ describe('SetupPage — a link that did not work', () => {
 
     expect(await screen.findByText(/Welcome, Allison/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /create account/i })).toBeInTheDocument();
+  });
+});
+
+describe('SetupPage: where a finished setup lands', () => {
+  function renderSetupThenSubmit(url) {
+    globalThis.fetch
+      .mockResolvedValueOnce(respond({ ok: true, first_name: 'Sam' }))
+      .mockResolvedValueOnce(respond({ user: { id: 1, class_code: null } }));
+    render(
+      <MemoryRouter initialEntries={[url]}>
+        <Routes>
+          <Route path="/setup" element={<SetupPage />} />
+          <Route path="/affiliate" element={<div>Referrals page</div>} />
+          <Route path="/home" element={<div>Home page</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+
+  async function submit() {
+    await screen.findByText(/Welcome, Sam/i);
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'longenough1' } });
+    fireEvent.change(screen.getByLabelText('Confirm Password'), { target: { value: 'longenough1' } });
+    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
+  }
+
+  it('honours a same-origin next, e.g. the affiliate setup email', async () => {
+    renderSetupThenSubmit('/setup?token=t&next=%2Faffiliate');
+    await submit();
+    expect(await screen.findByText('Referrals page')).toBeInTheDocument();
+  });
+
+  it('ignores an off-site next', async () => {
+    renderSetupThenSubmit('/setup?token=t&next=%2F%2Fevil.example');
+    await submit();
+    expect(await screen.findByText('Home page')).toBeInTheDocument();
   });
 });

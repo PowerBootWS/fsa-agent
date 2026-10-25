@@ -114,4 +114,29 @@ async function sendAffiliateWelcome(email_, firstName, code) {
   });
 }
 
-module.exports = { sendMagicLink, sendPasswordReset, sendPracticeExamCode, sendDeactivationReview, sendOpsEmail, sendAffiliateWelcome, escapeHtml };
+// Sent by scripts/provision-affiliate-accounts.js to an active affiliate who
+// had no portal account when the referral dashboard moved into the portal.
+// Built separately from the send so the script's dry run can print the exact
+// message for approval. The name comes from the affiliate record, so it is escaped.
+function affiliateAccountSetupMessage(email_, firstName, token) {
+  const link = `${BASE_URL}/setup?token=${token}&next=%2Faffiliate`;
+  const hrefLink = escapeHtml(link);
+  const greetHtml = escapeHtml(firstName || 'there');
+  const greetText = firstName || 'there';
+  const intro = 'Your Full Steam Ahead referral dashboard now lives inside a free Full Steam Ahead account. Your link, clicks, leads, discount codes and earnings are all in one place.';
+  const setup = "We've set up an account for you with this email address. Click below to choose your password:";
+  const expiry = 'This link expires in 48 hours. After that, use "Forgot password" on the login page with this email address.';
+  const after = "Once you're in, open Referrals in the menu.";
+  return {
+    to: email_,
+    subject: 'Your referral dashboard has moved',
+    html: `<p>Hi ${greetHtml},</p><p>${escapeHtml(intro)}</p><p>${escapeHtml(setup)}</p><p><a href="${hrefLink}" style="background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">Set Up My Account</a></p><p>${escapeHtml(expiry)}</p><p>${escapeHtml(after)}</p><p>Russ</p>`,
+    text: `Hi ${greetText},\n\n${intro}\n\n${setup}\n${link}\n\n${expiry}\n\n${after}\n\nRuss`,
+  };
+}
+
+async function sendAffiliateAccountSetup(email_, firstName, token) {
+  await sendToCustomer(affiliateAccountSetupMessage(email_, firstName, token));
+}
+
+module.exports = { sendMagicLink, sendPasswordReset, sendPracticeExamCode, sendDeactivationReview, sendOpsEmail, sendAffiliateWelcome, sendAffiliateAccountSetup, affiliateAccountSetupMessage, escapeHtml };

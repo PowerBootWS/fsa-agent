@@ -215,7 +215,7 @@ export default function SetupPage() {
         return;
       }
       localStorage.setItem('fsa_user', JSON.stringify(data.user));
-      navigate(postLoginPath(data.user, null), { replace: true });
+      navigate(postLoginPath(data.user, searchParams.get('next')), { replace: true });
     } catch {
       setError('Network error. Please try again.');
     } finally {
