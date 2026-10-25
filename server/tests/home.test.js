@@ -303,6 +303,16 @@ describe('/api/platform/affiliate dashboard', () => {
     expect(affiliateClient.createDiscountCode).toHaveBeenCalledWith('homepage-code@example.com');
   });
 
+  it.each([[500, 'internal error'], [401, 'unauthorized']])('POST /affiliate/discount-codes maps upstream %i to a friendly 502', async (status, msg) => {
+    affiliateClient.createDiscountCode.mockResolvedValue({ status, body: { error: msg } });
+    const app = buildTestApp();
+    await createUser(`homepage-code-up${status}@example.com`);
+    const cookie = await login(app, `homepage-code-up${status}@example.com`);
+    const res = await request(app).post('/api/platform/affiliate/discount-codes').set('Cookie', cookie);
+    expect(res.status).toBe(502);
+    expect(res.body).toEqual({ error: "Couldn't create a code right now. Try again in a minute." });
+  });
+
   it('POST /affiliate/discount-codes is 502 when the service throws', async () => {
     affiliateClient.createDiscountCode.mockRejectedValue(new Error('down'));
     const app = buildTestApp();

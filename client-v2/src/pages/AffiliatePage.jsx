@@ -16,6 +16,12 @@ const MEDIA_KIT = [
   { href: 'https://affiliates.fullsteamahead.ca/media/documents/sms-templates/fsa-affiliate-sms.pdf', title: 'Text Message Templates', note: '25 texts for 2nd, 3rd and 4th Class (PDF)' },
   { href: 'https://affiliates.fullsteamahead.ca/', title: 'Social Media Images', note: 'Facebook, Instagram, LinkedIn and Stories sizes' },
 ];
+const CLASS_LABELS = {
+  second: '2nd Class',
+  third: '3rd Class',
+  fourth_a: '4th Class 4A',
+  fourth_b: '4th Class 4B',
+};
 const CODE_STATUS = {
   active: { label: 'Active', tone: 'good' },
   used: { label: 'Used', tone: 'good' },
@@ -32,6 +38,11 @@ function formatDateTime(iso) {
   return new Date(iso).toLocaleString('en-CA', {
     weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
   });
+}
+
+function enrolledLabel(status) {
+  const code = status.replace('enrolled:', '');
+  return `Enrolled – ${CLASS_LABELS[code] || code}`;
 }
 
 function Badge({ tone, children }) {
@@ -207,7 +218,7 @@ function Dashboard({ data, onGenerated }) {
                 <td>{l.firstName || '–'}</td>
                 <td>{l.email}</td>
                 <td>{formatDate(l.attributedAt)}</td>
-                <td><Badge tone={enrolled ? 'good' : 'muted'}>{enrolled ? l.enrollmentStatus.replace('enrolled:', 'Enrolled – ') : 'Not Enrolled'}</Badge></td>
+                <td><Badge tone={enrolled ? 'good' : 'muted'}>{enrolled ? enrolledLabel(l.enrollmentStatus) : 'Not Enrolled'}</Badge></td>
               </tr>
             );
           })}
@@ -278,7 +289,8 @@ export default function AffiliatePage() {
       if (!res.ok) throw new Error('load');
       setData(await res.json());
     } catch {
-      setData(null);
+      // Only the first load shows the error; a refresh keeps what is on screen.
+      setData(prev => (prev === undefined ? null : prev));
     }
   }, []);
 

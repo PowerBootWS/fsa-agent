@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AffiliatePage from './AffiliatePage';
 import AppShell from '../components/AppShell';
@@ -60,6 +60,27 @@ describe('AffiliatePage', () => {
     const msg = screen.getByLabelText(/message to send/i);
     expect(msg.value).toContain('Enter code FSA-ABC123');
     expect(msg.value).toContain('https://fullsteamahead.ca/?am_id=TAY1');
+  });
+
+  it('keeps the dashboard and new code when the refresh after Generate fails', async () => {
+    let gets = 0;
+    renderPage((url, init) => {
+      if (init?.method === 'POST') return Promise.resolve(respond({ code: 'FSA-KEEP99', expiresAt: '2026-10-27T18:00:00Z' }, 201));
+      gets += 1;
+      return Promise.resolve(gets === 1 ? respond(active) : respond({ error: 'down' }, 503));
+    });
+    fireEvent.click(await screen.findByRole('button', { name: /generate a code/i }));
+    expect(await screen.findByText('FSA-KEEP99')).toBeInTheDocument();
+    await waitFor(() => expect(gets).toBeGreaterThan(1));
+    expect(screen.getByText('FSA-KEEP99')).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load your referral dashboard right now.")).toBeNull();
+  });
+
+  it('labels an enrolled lead with the class name, not the raw code', async () => {
+    const lead = { email: 'f@example.com', firstName: 'Fay', attributedAt: '2026-10-01T12:00:00Z', enrollmentStatus: 'enrolled:fourth_a' };
+    renderPage(() => Promise.resolve(respond({ ...active, leads: [lead] })));
+    expect(await screen.findByText('Enrolled – 4th Class 4A')).toBeInTheDocument();
+    expect(screen.queryByText(/fourth_a/)).toBeNull();
   });
 
   it("shows the service's 429 message verbatim", async () => {

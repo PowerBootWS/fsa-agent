@@ -110,7 +110,9 @@ router.get('/affiliate', requireAuth, async (req, res) => {
 router.post('/affiliate/discount-codes', requireAuth, async (req, res) => {
   try {
     const { status, body } = await affiliateClient.createDiscountCode(req.user.email);
-    return res.status(status).json(body);
+    if (status < 500 && status !== 401) return res.status(status).json(body);
+    console.error('POST /api/platform/affiliate/discount-codes upstream status:', status);
+    return res.status(502).json({ error: "Couldn't create a code right now. Try again in a minute." });
   } catch (err) {
     console.error('POST /api/platform/affiliate/discount-codes error:', err.message);
     return res.status(502).json({ error: "Couldn't create a code right now. Try again in a minute." });
