@@ -189,6 +189,7 @@ async function runResend(pool, opts) {
       failed++;
     }
   }
+  if (failed) process.exitCode = 1;
   if (opts.apply) {
     console.log(`\nresent ${sent}, skipped ${skipped}, failed ${failed} (of ${opts.resend.length})`);
   } else {
@@ -232,6 +233,7 @@ async function runCreate(pool, opts) {
     }
   }
 
+  if (failed) process.exitCode = 1;
   if (opts.apply) {
     console.log(`\ncreated ${done}, skipped ${skipped}, failed ${failed} (of ${people.length})`);
   } else {

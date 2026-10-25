@@ -11,8 +11,11 @@ it('escapes HTML in the first name and includes the referral link', async () => 
   expect(msg.text).toContain('https://learn.fullsteamahead.ca/affiliate');
   expect(msg.html).toContain('https://learn.fullsteamahead.ca/affiliate');
   expect(msg.text).toContain('Referrals page in your Full Steam Ahead account');
-  expect(msg.html).toContain('enrolls in the 2nd or 3rd Class course through it');
-  expect(msg.text).toContain('enrolls in the 2nd or 3rd Class course through it');
+  for (const body of [msg.html, msg.text]) {
+    expect(body).toContain('20% of every payment a person you refer makes, on 2nd Class, 3rd Class and 4th Class');
+    expect(body).toContain('a 4th Class paper pays 20% of the whole payment once');
+    expect(body).not.toMatch(/recurring/i);
+  }
   expect(msg.html + msg.text + msg.subject).not.toMatch(/—|tailor/i);
 });
 
@@ -40,4 +43,16 @@ it('leaves operator mail unsigned', async () => {
   common.sendEmail.mockClear();
   await sendOpsEmail('ops@example.com', 'Report', 'numbers');
   expect(common.sendEmail.mock.calls[0][0].text).toBe('numbers');
+});
+
+it('greets nameless recipients as "there" in reset and magic-link mail', async () => {
+  const { sendMagicLink, sendPasswordReset } = require('../src/services/email');
+  common.sendEmail.mockClear();
+  await sendMagicLink('x@example.com', '', 'tok');
+  await sendPasswordReset('x@example.com', null, 'tok');
+  for (const [msg] of common.sendEmail.mock.calls) {
+    expect(msg.text).toContain('Hi there,');
+    expect(msg.html).toContain('<p>Hi there,</p>');
+    expect(msg.text).not.toMatch(/Hi (undefined|null|),/);
+  }
 });

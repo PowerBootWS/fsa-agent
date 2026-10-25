@@ -20,8 +20,8 @@ async function sendMagicLink(email_, firstName, token) {
   await sendToCustomer({
     to: email_,
     subject: 'Set up your Full Steam Ahead account',
-    html: `<p>Hi ${firstName},</p><p>Welcome to Full Steam Ahead! Click the button below to set up your account password.</p><p><a href="${link}" style="background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">Set Up My Account</a></p><p>This link expires in 48 hours.</p><p>If you didn't sign up, ignore this email.</p>`,
-    text: `Hi ${firstName},\n\nWelcome to Full Steam Ahead! Set up your account here:\n${link}\n\nThis link expires in 48 hours.`,
+    html: `<p>Hi ${firstName || 'there'},</p><p>Welcome to Full Steam Ahead! Click the button below to set up your account password.</p><p><a href="${link}" style="background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">Set Up My Account</a></p><p>This link expires in 48 hours.</p><p>If you didn't sign up, ignore this email.</p>`,
+    text: `Hi ${firstName || 'there'},\n\nWelcome to Full Steam Ahead! Set up your account here:\n${link}\n\nThis link expires in 48 hours.`,
   });
 }
 
@@ -30,8 +30,8 @@ async function sendPasswordReset(email_, firstName, token) {
   await sendToCustomer({
     to: email_,
     subject: 'Reset your Full Steam Ahead password',
-    html: `<p>Hi ${firstName},</p><p>Click below to reset your password. This link expires in 1 hour.</p><p><a href="${link}" style="background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">Reset Password</a></p><p>If you didn't request this, ignore this email.</p>`,
-    text: `Hi ${firstName},\n\nReset your password here:\n${link}\n\nThis link expires in 1 hour.`,
+    html: `<p>Hi ${firstName || 'there'},</p><p>Click below to reset your password. This link expires in 1 hour.</p><p><a href="${link}" style="background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">Reset Password</a></p><p>If you didn't request this, ignore this email.</p>`,
+    text: `Hi ${firstName || 'there'},\n\nReset your password here:\n${link}\n\nThis link expires in 1 hour.`,
   });
 }
 
@@ -109,8 +109,8 @@ async function sendAffiliateWelcome(email_, firstName, code) {
   await sendToCustomer({
     to: email_,
     subject: 'Your Full Steam Ahead referral link',
-    html: `<p>Hi ${name},</p><p>You're in. Here's your referral link:</p><p><a href="${link}">${link}</a></p><p>Share it with anyone working toward their ticket. When someone enrolls in the 2nd or 3rd Class course through it, you earn 20% of what they pay, every month they stay enrolled.</p><p>Track your referrals and earnings anytime on the Referrals page in your Full Steam Ahead account: <a href="${dashboard}">${dashboard}</a></p>`,
-    text: `Hi ${firstName || 'there'},\n\nYou're in. Here's your referral link:\n${link}\n\nShare it with anyone working toward their ticket. When someone enrolls in the 2nd or 3rd Class course through it, you earn 20% of what they pay, every month they stay enrolled.\n\nTrack your referrals and earnings anytime on the Referrals page in your Full Steam Ahead account: ${dashboard}`,
+    html: `<p>Hi ${name},</p><p>You're in. Here's your referral link:</p><p><a href="${link}">${link}</a></p><p>Share it with anyone working toward their ticket. You earn 20% of every payment a person you refer makes, on 2nd Class, 3rd Class and 4th Class. For a monthly plan that is 20% of each month's payment while they stay subscribed. A prepaid year or a 4th Class paper pays 20% of the whole payment once.</p><p>Track your referrals and earnings anytime on the Referrals page in your Full Steam Ahead account: <a href="${dashboard}">${dashboard}</a></p>`,
+    text: `Hi ${firstName || 'there'},\n\nYou're in. Here's your referral link:\n${link}\n\nShare it with anyone working toward their ticket. You earn 20% of every payment a person you refer makes, on 2nd Class, 3rd Class and 4th Class. For a monthly plan that is 20% of each month's payment while they stay subscribed. A prepaid year or a 4th Class paper pays 20% of the whole payment once.\n\nTrack your referrals and earnings anytime on the Referrals page in your Full Steam Ahead account: ${dashboard}`,
   });
 }
 
@@ -123,13 +123,13 @@ function affiliateAccountSetupMessage(email_, firstName, token) {
   const hrefLink = escapeHtml(link);
   const greetHtml = escapeHtml(firstName || 'there');
   const greetText = firstName || 'there';
-  const intro = 'Your Full Steam Ahead referral dashboard now lives inside a free Full Steam Ahead account. Your link, clicks, leads, discount codes and earnings are all in one place.';
+  const intro = 'Your Full Steam Ahead referral dashboard lives inside a free Full Steam Ahead account. Your link, clicks, leads, discount codes and earnings are all in one place.';
   const setup = "We've set up an account for you with this email address. Click below to choose your password:";
   const expiry = 'This link expires in 48 hours. After that, use "Forgot password" on the login page with this email address.';
   const after = "Once you're in, open Referrals in the menu.";
   return {
     to: email_,
-    subject: 'Your referral dashboard has moved',
+    subject: 'Set up your Full Steam Ahead account',
     html: `<p>Hi ${greetHtml},</p><p>${escapeHtml(intro)}</p><p>${escapeHtml(setup)}</p><p><a href="${hrefLink}" style="background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">Set Up My Account</a></p><p>${escapeHtml(expiry)}</p><p>${escapeHtml(after)}</p>`,
     text: `Hi ${greetText},\n\n${intro}\n\n${setup}\n${link}\n\n${expiry}\n\n${after}`,
   };

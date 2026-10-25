@@ -8,13 +8,14 @@ it('sends the setup link that lands on the referrals page', async () => {
   await sendAffiliateAccountSetup('x@example.com', 'Sam', 'tok-123');
   const msg = common.sendEmail.mock.calls[0][0];
   expect(msg.to).toBe('x@example.com');
-  expect(msg.subject).toBe('Your referral dashboard has moved');
+  expect(msg.subject).toBe('Set up your Full Steam Ahead account');
   const link = 'https://learn.fullsteamahead.ca/setup?token=tok-123&next=%2Faffiliate';
   expect(msg.text).toContain(link);
   expect(msg.html).toContain(`href="${link.replace(/&/g, '&amp;')}"`);
   expect(msg.html).toContain('Set Up My Account');
   expect(msg.text).toMatch(/^Hi Sam,/);
   expect(msg.text).toContain('open Referrals in the menu');
+  expect(msg.text).toContain('Your Full Steam Ahead referral dashboard lives inside a free Full Steam Ahead account. Your link, clicks, leads, discount codes and earnings are all in one place.');
   expect(msg.text).toContain('This link expires in 48 hours.');
   expect(msg.from).toBe('Olivia | Full Steam Ahead <support@fullsteamahead.ca>');
 });
