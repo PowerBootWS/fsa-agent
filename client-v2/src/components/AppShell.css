@@ -243,7 +243,8 @@
   .as-nav-item {
     border-left: none;
     border-top: 3px solid transparent;
-    padding: 6px 12px;
+    padding: 6px 6px;
+    font-size: 12px;
     text-align: center;
   }
   .as-nav-item--active {
@@ -260,6 +261,11 @@
     align-self: center;
   }
   .as-user-menu-btn {
+    display: block;
+    max-width: 72px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     border: none;
     padding: 6px 8px;
     font-size: 12px;
