@@ -70,6 +70,13 @@ describe('getCheckpointQuestionPool', () => {
     expect(pooled.map(q => q.id)).toEqual([990002]);
   });
 
+  it('strict: returns nothing rather than a question from further ahead', async () => {
+    await insertQuestion({ id: 990002, earliestSlide: 15 });
+
+    expect(await db.getCheckpointQuestionPool(LESSON, 3, { strict: true })).toEqual([]);
+    expect((await db.getCheckpointQuestionPool(LESSON, 15, { strict: true })).map(q => q.id)).toEqual([990002]);
+  });
+
   it('still returns everything when no slide is given', async () => {
     await insertQuestion({ id: 990001, earliestSlide: 2 });
     await insertQuestion({ id: 990002, earliestSlide: 15 });

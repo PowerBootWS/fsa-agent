@@ -139,4 +139,14 @@ describe('POST /api/v2/checkpoint', () => {
       .send({ session_id: 7, lesson_code: '2A2-1-1', unseen_only: true }).expect(200);
     expect(res.body.question.id).toBe(2);
   });
+  it('unseen_only asks the pool for reached material only', async () => {
+    db.getLearnerSession.mockResolvedValue({ learner_id: 'owner@example.com', id: 7, checkpoint_log: [] });
+    db.getCheckpointQuestionPool.mockResolvedValue([]);
+
+    const res = await request(app()).post('/api/v2/checkpoint')
+      .send({ session_id: 7, lesson_code: '2A2-1-1', slide_number: 7, unseen_only: true }).expect(200);
+
+    expect(db.getCheckpointQuestionPool).toHaveBeenCalledWith('2A2-1-1', 7, { strict: true });
+    expect(res.body.question).toBeNull();
+  });
 });

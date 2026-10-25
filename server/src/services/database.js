@@ -267,7 +267,10 @@ const CHECKPOINT_POOL_SELECT = `
     AND question_type = 'objective_practice'
     AND standalone = true`;
 
-async function getCheckpointQuestionPool(lessonCode, lastSection = null) {
+// `strict` (the optional in-slide prompt) skips the whole-pool fallback: an
+// opt-in prompt can simply not appear, so it never needs to offer a question on
+// material the student hasn't reached.
+async function getCheckpointQuestionPool(lessonCode, lastSection = null, { strict = false } = {}) {
   if (lastSection !== null && lastSection !== undefined) {
     const filtered = await pool.query(
       `${CHECKPOINT_POOL_SELECT}
@@ -278,7 +281,7 @@ async function getCheckpointQuestionPool(lessonCode, lastSection = null) {
     // Only narrow the pool if narrowing leaves something to ask. A checkpoint
     // that renders no question is its own bad experience — that failure was
     // fixed on 2026-08-25 and must not return in the name of better timing.
-    if (filtered.rows.length > 0) return filtered.rows;
+    if (filtered.rows.length > 0 || strict) return filtered.rows;
   }
 
   const all = await pool.query(`${CHECKPOINT_POOL_SELECT} ORDER BY id`, [lessonCode]);

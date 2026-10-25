@@ -51,7 +51,10 @@ router.post('/', requirePaperEntitlement(req => req.body && req.body.lesson_code
       console.error('checkpoint checkin lookup failed:', err.message);
     }
 
-    const questions = await db.getCheckpointQuestionPool(lesson_code, lastSection);
+    const unseenOnly = req.body.unseen_only === true;
+    const questions = unseenOnly
+      ? await db.getCheckpointQuestionPool(lesson_code, lastSection, { strict: true })
+      : await db.getCheckpointQuestionPool(lesson_code, lastSection);
     if (questions.length === 0) return res.json({ question: null, checkin });
 
     const askedIds = (session.checkpoint_log || [])
@@ -62,9 +65,10 @@ router.post('/', requirePaperEntitlement(req => req.body && req.body.lesson_code
     // ago (position in the log is the ordering — it is append-only).
     // `unseen_only` (the optional in-slide prompt) skips the recycling: a
     // 53-slide objective with a five-question pool used to show each question
-    // two or three times, and an optional prompt is not worth a repeat.
+    // two or three times, and an optional prompt is not worth a repeat. It also
+    // asks the pool for reached material only (no whole-pool fallback).
     let question = questions.find(q => !askedIds.includes(q.id));
-    if (!question && req.body.unseen_only === true) return res.json({ question: null, checkin });
+    if (!question && unseenOnly) return res.json({ question: null, checkin });
     if (!question) {
       const lastAskedAt = new Map(questions.map(q => [q.id, -1]));
       askedIds.forEach((id, i) => {
