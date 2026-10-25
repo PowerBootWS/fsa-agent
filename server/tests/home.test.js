@@ -1,5 +1,6 @@
 jest.mock('../src/services/email');
 jest.mock('../src/services/affiliateClient');
+jest.mock('../src/services/nurture', () => ({ enroll: jest.fn() }));
 jest.mock('../src/services/newJobsCount');
 
 const request = require('supertest');
@@ -10,6 +11,7 @@ const { pool } = require('./testPool');
 const { deleteFixtureUsersByEmailLike } = require('./fixtureCleanup');
 const email = require('../src/services/email');
 const affiliateClient = require('../src/services/affiliateClient');
+const nurture = require('../src/services/nurture');
 const { getNewJobsCount } = require('../src/services/newJobsCount');
 const authRouter = require('../src/routes/auth');
 const homeRouter = require('../src/routes/home');
@@ -165,6 +167,52 @@ describe('POST /api/platform/affiliate/join', () => {
     const res = await request(app).post('/api/platform/affiliate/join').set('Cookie', cookie);
     expect(res.status).toBe(200);
     expect(email.sendAffiliateWelcome).not.toHaveBeenCalled();
+  });
+
+  it('join enrols a newly created affiliate in the affiliate sequence at step 1', async () => {
+    affiliateClient.join.mockResolvedValue({ affiliate: { code: 'TAYLOR1234', status: 'active' }, created: true });
+    affiliateClient.getSummary.mockResolvedValue(stats);
+    nurture.enroll.mockResolvedValue({});
+    const app = buildTestApp();
+    await createUser('homepage-enrol@example.com');
+    const cookie = await login(app, 'homepage-enrol@example.com');
+    const res = await request(app).post('/api/platform/affiliate/join').set('Cookie', cookie);
+    expect(res.status).toBe(200);
+    expect(nurture.enroll).toHaveBeenCalledTimes(1);
+    expect(nurture.enroll).toHaveBeenCalledWith({
+      email: 'homepage-enrol@example.com',
+      firstName: 'Taylor',
+      sequence: 'affiliate',
+      source: 'portal-affiliate-join',
+      startStep: 1,
+    });
+  });
+
+  it('join does not enrol when the affiliate already existed', async () => {
+    affiliateClient.join.mockResolvedValue({ affiliate: { code: 'TAYLOR1234', status: 'active' }, created: false });
+    affiliateClient.getSummary.mockResolvedValue(stats);
+    const app = buildTestApp();
+    await createUser('homepage-noenrol@example.com');
+    const cookie = await login(app, 'homepage-noenrol@example.com');
+    const res = await request(app).post('/api/platform/affiliate/join').set('Cookie', cookie);
+    expect(res.status).toBe(200);
+    expect(nurture.enroll).not.toHaveBeenCalled();
+  });
+
+  it('join still returns 200 when nurture intake fails', async () => {
+    affiliateClient.join.mockResolvedValue({ affiliate: { code: 'TAYLOR1234', status: 'active' }, created: true });
+    affiliateClient.getSummary.mockResolvedValue(stats);
+    nurture.enroll.mockRejectedValue(new Error('nurture down'));
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const app = buildTestApp();
+    await createUser('homepage-nurturefail@example.com');
+    const cookie = await login(app, 'homepage-nurturefail@example.com');
+    const res = await request(app).post('/api/platform/affiliate/join').set('Cookie', cookie);
+    await new Promise((r) => setImmediate(r));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ affiliate: stats });
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('affiliate nurture enrol failed'), expect.anything(), '-', 'nurture down');
+    errSpy.mockRestore();
   });
 
   it('a paused affiliate gets a 409 with a clear message', async () => {

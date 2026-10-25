@@ -9,6 +9,7 @@ const affiliateClient = require('../services/affiliateClient');
 const { getNewJobsCount } = require('../services/newJobsCount');
 const { getCourseSection, getJobsSection, hasResumeOnFile } = require('../services/homeSummary');
 const { sendAffiliateWelcome } = require('../services/email');
+const nurture = require('../services/nurture');
 
 const router = express.Router();
 
@@ -71,6 +72,17 @@ router.post('/affiliate/join', requireAuth, async (req, res) => {
       } catch (err) {
         console.error('affiliate welcome email failed for user', u.id, '-', err.message);
       }
+      // Fire-and-forget: startStep 1 skips the sequence's d0 welcome, which the
+      // email above already covers. Same call shape as fsa-affiliate-program.
+      Promise.resolve()
+        .then(() => nurture.enroll({
+          email: u.email,
+          firstName: u.first_name || '',
+          sequence: 'affiliate',
+          source: 'portal-affiliate-join',
+          startStep: 1,
+        }))
+        .catch((err) => console.error('affiliate nurture enrol failed for user', u.id, '-', err.message));
     }
 
     const summary = await affiliateClient.getSummary(u.email);

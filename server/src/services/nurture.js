@@ -14,7 +14,7 @@ function retryDelays() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function enroll({ email, firstName, sequence, source, attrs, delayMinutes }) {
+async function enroll({ email, firstName, sequence, source, attrs, delayMinutes, startStep }) {
   const nurtureUrl = process.env.NURTURE_URL;
   const intakeKey = process.env.NURTURE_INTAKE_KEY;
 
@@ -36,7 +36,7 @@ async function enroll({ email, firstName, sequence, source, attrs, delayMinutes 
           'Content-Type': 'application/json',
           'x-intake-key': intakeKey,
         },
-        body: JSON.stringify({ email, firstName, sequence, source, attrs, delayMinutes }),
+        body: JSON.stringify({ email, firstName, sequence, source, attrs, delayMinutes, startStep }),
       });
     } catch (err) {
       lastErr = err;
