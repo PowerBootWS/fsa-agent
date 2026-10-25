@@ -74,6 +74,18 @@ describe('paid enrollment gets the free custom-resume credit', () => {
     }
   });
 
+  it('provisions a buyer with a one-word name (empty last_name)', async () => {
+    const app = buildTestApp();
+    const email = 'provcredit-oneword@example.com';
+    const res = await request(app)
+      .post('/api/platform/provision-user')
+      .set('x-internal-secret', 'test-internal-secret')
+      .send({ email, first_name: 'Cher', last_name: '', class_code: 'second' });
+    expect(res.status).toBe(200);
+    const { rows: [u] } = await pool.query(`SELECT last_name FROM platform_users WHERE email = $1`, [email]);
+    expect(u.last_name).toBe('');
+  });
+
   it('backfill migration grants only accounts that never had a signup_grant', async () => {
     const { rows: [bare] } = await pool.query(
       `INSERT INTO platform_users (email, first_name, last_name) VALUES ('provcredit-bare@example.com', 'Bare', 'Fixture') RETURNING id`);

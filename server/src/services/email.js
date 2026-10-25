@@ -104,13 +104,13 @@ function escapeHtml(s) {
 // first name is whatever the account holder typed at signup, so it is escaped.
 async function sendAffiliateWelcome(email_, firstName, code) {
   const link = `https://fullsteamahead.ca/?am_id=${code}`;
-  const dashboard = 'https://fullsteamahead.ca/affiliate-dashboard';
+  const dashboard = 'https://learn.fullsteamahead.ca/affiliate';
   const name = escapeHtml(firstName || 'there');
   await sendToCustomer({
     to: email_,
     subject: 'Your Full Steam Ahead referral link',
-    html: `<p>Hi ${name},</p><p>You're in. Here's your referral link:</p><p><a href="${link}">${link}</a></p><p>Share it with anyone working toward their ticket. When someone enrolls in the 2nd or 3rd Class course through it, you earn 20% of what they pay, every month they stay enrolled.</p><p>Track your referrals and earnings anytime at <a href="${dashboard}">${dashboard}</a>. Log in with this email address.</p>`,
-    text: `Hi ${firstName || 'there'},\n\nYou're in. Here's your referral link:\n${link}\n\nShare it with anyone working toward their ticket. When someone enrolls in the 2nd or 3rd Class course through it, you earn 20% of what they pay, every month they stay enrolled.\n\nTrack your referrals and earnings anytime at ${dashboard}. Log in with this email address.`,
+    html: `<p>Hi ${name},</p><p>You're in. Here's your referral link:</p><p><a href="${link}">${link}</a></p><p>Share it with anyone working toward their ticket. When someone enrolls in the 2nd or 3rd Class course through it, you earn 20% of what they pay, every month they stay enrolled.</p><p>Track your referrals and earnings anytime on the Referrals page in your Full Steam Ahead account: <a href="${dashboard}">${dashboard}</a></p>`,
+    text: `Hi ${firstName || 'there'},\n\nYou're in. Here's your referral link:\n${link}\n\nShare it with anyone working toward their ticket. When someone enrolls in the 2nd or 3rd Class course through it, you earn 20% of what they pay, every month they stay enrolled.\n\nTrack your referrals and earnings anytime on the Referrals page in your Full Steam Ahead account: ${dashboard}`,
   });
 }
 

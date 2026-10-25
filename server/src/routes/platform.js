@@ -164,7 +164,7 @@ router.post('/provision-user', requireInternalSecret, async (req, res) => {
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (email) DO NOTHING
        RETURNING id`,
-      [normalizedEmail, first_name, last_name || null, phone || null, address || null]
+      [normalizedEmail, first_name, last_name || '', phone || null, address || null]
     );
     const userIsNew = userInsert.rowCount > 0;
 
