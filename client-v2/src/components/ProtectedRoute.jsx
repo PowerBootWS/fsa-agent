@@ -4,14 +4,20 @@
 // active subscription at all, there's no class to pick a paper for — send it to /lobby
 // instead," which now handles the no-course case itself (an enroll prompt). Routes that
 // are simply optional-paper (Profile, Jobs) must NOT set this.
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { isFourthClassCode } from '../utils/fourthClass';
 
 export default function ProtectedRoute({ children, requirePaper = true, requireCourse = false }) {
+  const location = useLocation();
   const user = JSON.parse(localStorage.getItem('fsa_user') || 'null');
 
   // Not logged in → login
-  if (!user) return <Navigate to="/login" replace />;
+  // (remember where they were going, except for the default landing pages)
+  if (!user) {
+    const here = location.pathname + location.search;
+    const keep = location.pathname !== '/' && location.pathname !== '/home';
+    return <Navigate to={keep ? `/login?next=${encodeURIComponent(here)}` : '/login'} replace />;
+  }
 
   // Logged in but no paper selected → paper picker (only when this route requires one)
   // 4th Class never has an active_paper (no paper-switching concept — both 4A and 4B
