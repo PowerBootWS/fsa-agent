@@ -108,7 +108,7 @@ function DiscountCodes({ link, history, onGenerated }) {
       <ul className="af-list">
         <li>20% off their first month of 2nd Class or 3rd Class Complete</li>
         <li>One use, and it expires 48 hours after you generate it</li>
-        <li>You don't earn commission on that first month. Every payment after that pays your normal 20%</li>
+        <li>You earn your 20% on that first month too, on the discounted price they pay. Every payment after that pays 20% of the regular price</li>
         <li>If they use your code, the sale is credited to you, whichever link they clicked last</li>
       </ul>
       <div>
