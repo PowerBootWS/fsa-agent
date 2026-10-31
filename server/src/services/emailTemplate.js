@@ -14,6 +14,9 @@ const CLOSING = 'Warm regards,';
 const SIGNATURE = ['Olivia', 'Customer Support Agent', 'Full Steam Ahead'];
 const CONTACT = `${PHONE} | support@fullsteamahead.ca | fullsteamahead.ca`;
 const FOOTER_TEXT = ['--', 'Full Steam Ahead', ADDRESS, CONTACT].join('\n');
+// Small and quiet but complete (owner rule 2026-10-31): 11px grey, compact,
+// under a thin rule. Same style as email_template.py and fsa-nurture's footer.
+const FOOTER_STYLE = 'font-size:11px;color:#888;line-height:1.4;margin:1.5em 0 0;padding-top:0.75em;border-top:1px solid #ddd';
 
 function signText(body) {
   const text = String(body || '').trim();
@@ -27,11 +30,10 @@ function signHtml(body) {
   return html +
     `<p>${CLOSING}</p>` +
     `<p>${SIGNATURE.join('<br>')}</p>` +
-    '<hr style="border:none;border-top:1px solid #ccc;margin:2em 0 1em">' +
-    '<p style="font-size:12px;color:#666;line-height:1.6">Full Steam Ahead<br>' +
+    `<p style="${FOOTER_STYLE}">Full Steam Ahead<br>` +
     `${ADDRESS}<br>${PHONE} | ` +
-    '<a href="mailto:support@fullsteamahead.ca" style="color:#666">support@fullsteamahead.ca</a> | ' +
-    '<a href="https://fullsteamahead.ca" style="color:#666">fullsteamahead.ca</a></p>';
+    '<a href="mailto:support@fullsteamahead.ca" style="color:#888">support@fullsteamahead.ca</a> | ' +
+    '<a href="https://fullsteamahead.ca" style="color:#888">fullsteamahead.ca</a></p>';
 }
 
 module.exports = { OLIVIA_FROM, ADDRESS, PHONE, CLOSING, SIGNATURE, FOOTER_TEXT, signText, signHtml };
