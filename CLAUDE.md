@@ -50,7 +50,7 @@ docker compose up -d ai-service
 
 ## Question DB rules
 
-`options` JSONB never empty/null · `question_type`: `objective_practice` or `chapter_quiz` · calculation questions are staged multi-step MCQ only · questions must be self-contained. LaTeX: `$...$` inline, `$$...$$` display, never nest delimiters.
+`options` JSONB never empty/null · `question_type`: `objective_practice` or `chapter_quiz` · calculation questions are staged multi-step MCQ only · questions must be self-contained · never reference a table or figure (students never see them): a lookup question just asks for the value. LaTeX: `$...$` inline, `$$...$$` display, never nest delimiters.
 
 ## Environment
 
