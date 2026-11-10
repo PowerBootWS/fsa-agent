@@ -236,8 +236,9 @@
   .as-sidebar .as-class-switcher {
     display: none;
   }
-  /* No room in the bottom bar; on phones it lives in the user menu. */
-  .as-nav-contact {
+  /* No room in the bottom bar; on phones these live in the user menu. */
+  .as-nav-contact,
+  .as-nav-attempts {
     display: none;
   }
   .as-nav-item {

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -12,6 +13,7 @@ import { CountdownTimer } from './components/CountdownTimer.jsx';
 import { isFourthClassCode } from './utils/fourthClass';
 import FlagQuestion from './components/FlagQuestion';
 import { track } from './utils/usage';
+import { pastAttemptsHref } from './pages/attemptFormat';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -172,7 +174,7 @@ function ExamProgressBar({ current, total, correct }) {
 // Results panel
 // ---------------------------------------------------------------------------
 
-export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, user, leadMagnetMode = false }) {
+export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, user, leadMagnetMode = false, pastAttemptsHref: pastHref = null }) {
   const { score, total, score_pct, chapter_stats,
           objective_breakdowns, next_attempt_allocation, question_review,
           distractor_coaching } = displayContent;
@@ -257,6 +259,12 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
         </div>
       )}
 
+      {!leadMagnetMode && pastHref && (
+        <Link className="results-past-link" to={pastHref}>
+          {isExam ? 'All your past practice exams' : 'Past attempts at this quiz'}
+        </Link>
+      )}
+
       {/* Lead-magnet exams have no lobby to return to and no saved
           progress to retake — instead of onRetry, point at the subscription
           CTA. No price mentioned here deliberately: pricing varies by class
@@ -333,7 +341,7 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
 // Quiz/exam display section
 // ---------------------------------------------------------------------------
 
-function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSelectChapter, user, leadMagnetMode }) {
+function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSelectChapter, user, leadMagnetMode, lessonId }) {
   if (!displayContent) {
     return (
       <div className="quizexam-display-empty">
@@ -353,6 +361,9 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSele
         onSelectChapter={leadMagnetMode ? null : onSelectChapter}
         user={user}
         leadMagnetMode={leadMagnetMode}
+        pastAttemptsHref={lessonId ? (mode === 'chapter_quiz'
+          ? pastAttemptsHref({ course: String(lessonId).split('-')[0], kind: 'chapter_quiz', chapter: lessonId })
+          : pastAttemptsHref({ course: lessonId, kind: 'practice_exam' })) : null}
       />
     );
   }
@@ -724,6 +735,7 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
               onSelectChapter={onSelectChapter}
               user={user}
               leadMagnetMode={leadMagnetMode}
+              lessonId={lessonId}
             />
           )}
         </div>
@@ -876,6 +888,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
                 onSelectChapter={handleSelectChapter}
                 user={user}
                 leadMagnetMode={leadMagnetMode}
+                pastAttemptsHref={pastAttemptsHref({ course: lessonId, kind: 'practice_exam' })}
               />
             )}
           </div>

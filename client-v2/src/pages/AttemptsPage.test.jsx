@@ -78,7 +78,43 @@ describe('AttemptsPage', () => {
   it('shows an empty state', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue(respond({ attempts: [] }));
     renderAt('/attempts');
-    expect(await screen.findByText(/no finished practice exams or chapter quizzes yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(
+      "No past practice exams or chapter quizzes on record yet. Once you finish one, it will show up here."
+    )).toBeInTheDocument();
+  });
+
+  it('says which piece has no attempts yet when arriving from a practice exam', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respond({ attempts: [] }));
+    renderAt('/attempts?course=2B3&kind=practice_exam');
+    expect(await screen.findByText(
+      'No past practice exams on record for 2B3 yet. Once you finish one, it will show up here.'
+    )).toBeInTheDocument();
+  });
+
+  it('says which chapter has no attempts yet, even when other attempts exist', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respond({ attempts }));
+    renderAt('/attempts?course=2B1&kind=chapter_quiz&chapter=2B1-7');
+    expect(await screen.findByText(
+      'No past Chapter 7 quizzes on record for 2B1 yet. Once you finish one, it will show up here.'
+    )).toBeInTheDocument();
+    // The paper filter still offers the paper even though nothing from it matched.
+    expect(screen.getByLabelText(/paper/i)).toHaveValue('2B1');
+  });
+
+  it('filters to one chapter and can widen back out', async () => {
+    const more = [...attempts, { ...attempts[0], id: '13', chapter_id: '2B1-4', chapter_title: 'Pumps' }];
+    globalThis.fetch = vi.fn().mockResolvedValue(respond({ attempts: more }));
+    renderAt('/attempts?course=2B1&kind=chapter_quiz&chapter=2B1-3');
+    expect(await screen.findByRole('link', { name: /chapter 3 quiz/i })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /chapter 4 quiz/i })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /show all chapters/i }));
+    expect(screen.getByRole('link', { name: /chapter 4 quiz/i })).toBeInTheDocument();
+  });
+
+  it('explains a 403 instead of calling it a loading error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respond({ error: 'Active subscription required' }, 403));
+    renderAt('/attempts');
+    expect(await screen.findByText(/past attempts are part of an active subscription/i)).toBeInTheDocument();
   });
 
   it('shows an error when loading fails', async () => {

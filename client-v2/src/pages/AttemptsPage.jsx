@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getJson } from '../utils/api';
-import { attemptTitle, attemptDate, attemptScore, NO_REVIEW } from './attemptFormat';
+import { attemptTitle, attemptDate, attemptScore, emptyMessage, NO_REVIEW } from './attemptFormat';
 import './AttemptsPage.css';
 
 // Past practice exams and chapter quizzes (attempt history, Phase C).
@@ -43,30 +43,40 @@ export default function AttemptsPage() {
   const [failed, setFailed] = useState(false);
   const paper = params.get('course') || '';
   const type = params.get('kind') || '';
+  const chapter = params.get('chapter') || '';
 
   useEffect(() => {
     getJson('/api/attempts?limit=200')
       .then(d => setAttempts(d?.attempts || []))
       .catch(err => {
         if (err?.status === 401) navigate('/login', { replace: true });
-        else setFailed(true);
+        else setFailed(err?.status === 403 ? 'forbidden' : true);
       });
   }, [navigate]);
 
+  // Include the paper from the URL even when it has no attempts yet, so the
+  // filter shows what the student came from rather than snapping to "All".
   const papers = useMemo(
-    () => [...new Set((attempts || []).map(a => a.course_id))].sort(),
-    [attempts]
+    () => [...new Set([...(attempts || []).map(a => a.course_id), ...(paper ? [paper] : [])])].sort(),
+    [attempts, paper]
   );
   const shown = (attempts || []).filter(
     a => (!paper || a.course_id === paper) && (!type || a.kind === type)
+      && (!chapter || a.chapter_id === chapter)
   );
+  const empty = <p className="at-muted">{emptyMessage({ paper, kind: type, chapter })}</p>;
 
   const setFilter = (key, value) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value); else next.delete(key);
+    // A chapter filter only makes sense for the paper/type it came with.
+    if (key !== 'chapter') next.delete('chapter');
     setParams(next, { replace: true });
   };
 
+  if (failed === 'forbidden') {
+    return <div className="at-page"><p className="at-muted">Past attempts are part of an active subscription.</p></div>;
+  }
   if (failed) {
     return <div className="at-page"><p className="at-error">Couldn't load your attempts right now. Try again in a minute.</p></div>;
   }
@@ -75,11 +85,7 @@ export default function AttemptsPage() {
   return (
     <div className="at-page">
       <h1>Past attempts</h1>
-      {attempts.length === 0 ? (
-        <p className="at-muted">
-          No finished practice exams or chapter quizzes yet. Your attempts will show up here after you finish one.
-        </p>
-      ) : (
+      {attempts.length === 0 ? empty : (
         <>
           <div className="at-filters">
             <label className="at-field">
@@ -96,9 +102,15 @@ export default function AttemptsPage() {
               </select>
             </label>
           </div>
-          {shown.length === 0 ? (
-            <p className="at-muted">Nothing matches these filters.</p>
-          ) : (
+          {chapter && (
+            <p className="at-chapter-note">
+              Showing Chapter {/-(\d+)$/.exec(chapter)?.[1] || chapter} only.{' '}
+              <button type="button" className="at-linkbtn" onClick={() => setFilter('chapter', '')}>
+                Show all chapters
+              </button>
+            </p>
+          )}
+          {shown.length === 0 ? empty : (
             <ul className="at-list">
               {shown.map(a => (
                 <li key={a.id}>

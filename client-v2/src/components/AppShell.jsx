@@ -101,6 +101,11 @@ export default function AppShell({ children }) {
         <NavLink to="/lobby" className={({ isActive }) => `as-nav-item${isActive ? ' as-nav-item--active' : ''}`}>
           📚 Courses
         </NavLink>
+        {hasCourse && (
+          <NavLink to="/attempts" className={({ isActive }) => `as-nav-item as-nav-attempts${isActive ? ' as-nav-item--active' : ''}`}>
+            📝 Past attempts
+          </NavLink>
+        )}
         <NavLink to="/jobs" className={({ isActive }) => `as-nav-item${isActive ? ' as-nav-item--active' : ''}`}>
           💼 Jobs
         </NavLink>
@@ -142,6 +147,11 @@ export default function AppShell({ children }) {
                   onClick={() => { setMenuOpen(false); navigate('/select-paper'); }}
                 >
                   Switch Paper
+                </button>
+              )}
+              {hasCourse && (
+                <button className="as-menu-item" onClick={() => { setMenuOpen(false); navigate('/attempts'); }}>
+                  📝 Past attempts
                 </button>
               )}
               <button className="as-menu-item" onClick={() => { setMenuOpen(false); setShowContact(true); }}>

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { getJson } from '../utils/api';
+import { pastAttemptsHref } from '../pages/attemptFormat';
 
 const COUNT_OPTIONS = [
   { count: 25,  label: '25 Questions', sublabel: '~45 min' },
@@ -90,6 +92,12 @@ export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, on
               Review most recent results
             </button>
           )}
+
+          {!leadMagnetMode && (
+            <Link className="lobby-past-link" to={pastAttemptsHref({ course: courseId, kind: 'practice_exam' })}>
+              Past practice exams
+            </Link>
+          )}
         </div>
 
         <div className="lobby-panel">
@@ -134,6 +142,12 @@ export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, on
                 );
               })}
             </div>
+          )}
+
+          {!leadMagnetMode && (
+            <Link className="lobby-past-link" to={pastAttemptsHref({ course: courseId, kind: 'chapter_quiz' })}>
+              Past chapter quizzes
+            </Link>
           )}
         </div>
       </div>
