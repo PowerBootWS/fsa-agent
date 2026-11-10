@@ -176,7 +176,9 @@ Express, in a new `server/src/routes/attempts.js` mounted under `/api/attempts`,
 Deploy per phase, using the standard commands in `fsa-agent/CLAUDE.md`:
 - Before the migration: `sudo /usr/local/bin/fsa-backup.sh daily`; note the path.
 - Migration: `docker cp` + `psql -f` against `fsa_agent`, **after** it has been applied and tested on `fsa_agent_test` and `fsa_agent_scratch`; then `bash server/scripts/rebuild-test-db.sh`.
-- Phase A: `docker compose build ai-service && docker compose up -d ai-service`. Restarting the AI service drops in-memory quiz/exam state for anyone mid-attempt (existing behaviour); deploy in a quiet hour.
+- **Phase A order is mandatory: migration 034 on production first, then the ai-service deploy.** The new `record_response` INSERT names the new columns; against the old schema it fails, and because it is non-fatal every answer would be silently dropped.
+- Phase A: `docker compose build ai-service && docker compose up -d ai-service`.
+- Phase A backfill (Russ's OK, it writes to real student records): `node server/scripts/backfill_debrief_attempts.js` (dry run) then `--write`. On scratch 2026-11-10: 67 of 89 debriefs linked, 9 had no `question_review`, 13 could not be aligned (9 free-exam takers with no answer rows, 4 2A1 sittings whose answers were lost in the 2026-10-12 cascade). Restarting the AI service drops in-memory quiz/exam state for anyone mid-attempt (existing behaviour); deploy in a quiet hour.
 - Phase B/C/D: client-v2 build + `GITHUB_TOKEN=$(gh auth token) docker compose build api && docker compose up -d api`.
 - After Phase A: verify on production read-only that new rows have `attempt_id`, `position` and `question_snapshot`, and that one attempt per sitting is created (count attempts vs distinct sittings for the day).
 - Wiki: update `wiki/projects/fsa-agent.md` (DB schema, API reference) and append to `wiki/log.md` per phase.
