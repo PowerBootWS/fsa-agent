@@ -1,6 +1,6 @@
 # Practice Attempt History: Implementation Plan
 
-> **Status: Phases A, B and C fully live 2026-11-10**, links included (sidebar or phone menu, practice exam lobby, 4th Class lobby, quiz and exam results). When a paper or chapter has nothing on record, the page says so. Phase D not started.
+> **Status: all phases (A–D) live 2026-11-10.** D shipped: retry the wrong ones (session_type `retry_wrong`, migration 036), the weakest-chapters card, and the Home/lobby last-exam score now read from the latest finished attempt.
 >
 > Written 2026-11-08 from a Telegram request (task 1794180077059-36843d2a assessment + follow-up). Russ approved **all** items below, extras included, and will add more features of his own (see "Additional features (Russ to add)"). He will pick this up himself in an interactive session as the `debian`/FSA user. Nothing in this document has been built: no code, no migrations, no schema changes, no backlog item.
 >
