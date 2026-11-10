@@ -3,8 +3,10 @@
 export function attemptTitle(a) {
   if (a.kind === 'practice_exam') return 'Practice exam';
   const num = a.chapter_id && /-(\d+)$/.exec(a.chapter_id);
-  const chapter = num ? `Chapter ${num[1]} quiz` : 'Chapter quiz';
-  return a.kind === 'retry_wrong' ? `Retry: ${chapter}` : chapter;
+  if (a.kind === 'retry_wrong') {
+    return num ? `Retry of missed Chapter ${num[1]} questions` : 'Retry of missed questions';
+  }
+  return num ? `Chapter ${num[1]} quiz` : 'Chapter quiz';
 }
 
 export function attemptDate(iso) {
@@ -24,6 +26,17 @@ export function pastAttemptsHref({ course, kind, chapter } = {}) {
   if (chapter) q.set('chapter', chapter);
   const s = q.toString();
   return s ? `/attempts?${s}` : '/attempts';
+}
+
+// "Retry the ones I got wrong": runs on the chapter-quiz screen with the
+// lesson id <PAPER>-R<attemptId>.
+export function retryWrongHref(course, attemptId) {
+  if (!course || !attemptId) return null;
+  return `/practice-exam?paper=${encodeURIComponent(course)}&quiz=${encodeURIComponent(`${course}-R${attemptId}`)}`;
+}
+
+export function retryWrongLabel(n) {
+  return `Retry the ${n} question${n === 1 ? '' : 's'} you got wrong`;
 }
 
 function chapterNumber(chapterId) {

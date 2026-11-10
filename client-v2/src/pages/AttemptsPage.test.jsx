@@ -160,3 +160,48 @@ describe('AttemptDetailPage', () => {
     expect(await screen.findByText(/couldn't find that attempt/i)).toBeInTheDocument();
   });
 });
+
+describe('Phase D on the history pages', () => {
+  const wrongAndRight = [
+    { question_text: 'First question', options: ['a', 'b'], correct_index: 0, selected_index: 0, correct: true, explanation: '' },
+    { question_text: 'Second question', options: ['a', 'b'], correct_index: 0, selected_index: 1, correct: false, explanation: '' },
+  ];
+
+  it('detail offers to retry the wrong ones', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respond({ attempt: attempts[0], review_available: true, questions: wrongAndRight }));
+    renderAt('/attempts/12');
+    const link = await screen.findByRole('link', { name: /retry the 1 question you got wrong/i });
+    expect(link).toHaveAttribute('href', '/practice-exam?paper=2B1&quiz=2B1-R12');
+  });
+
+  it('no retry link when everything was right', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respond({ attempt: attempts[0], review_available: true, questions: [wrongAndRight[0]] }));
+    renderAt('/attempts/12');
+    await screen.findByText('First question');
+    expect(screen.queryByRole('link', { name: /retry/i })).toBeNull();
+  });
+
+  it('shows weakest chapters for the selected paper', async () => {
+    globalThis.fetch = vi.fn().mockImplementation(url => Promise.resolve(
+      url.startsWith('/api/attempts/weak-chapters')
+        ? respond({ exams: 2, chapters: [
+          { chapter_id: '2A1-3', title: 'Boilers', correct: 2, total: 8, pct: 25 },
+          { chapter_id: '2A1-5', title: null, correct: 4, total: 4, pct: 100 },
+        ] })
+        : respond({ attempts })
+    ));
+    renderAt('/attempts?course=2A1');
+    expect(await screen.findByText(/weakest chapters/i)).toBeInTheDocument();
+    expect(screen.getByText(/last 2 practice exams/i)).toBeInTheDocument();
+    expect(screen.getByText('Chapter 3 · Boilers')).toBeInTheDocument();
+    expect(screen.getByText('2/8 (25%)')).toBeInTheDocument();
+    expect(globalThis.fetch.mock.calls.some(([u]) => u === '/api/attempts/weak-chapters?course=2A1')).toBe(true);
+  });
+
+  it('labels retry attempts', async () => {
+    const retry = { ...attempts[0], id: '20', kind: 'retry_wrong', chapter_id: null, chapter_title: null };
+    globalThis.fetch = vi.fn().mockResolvedValue(respond({ attempts: [retry] }));
+    renderAt('/attempts');
+    expect(await screen.findByRole('link', { name: /retry of missed questions/i })).toBeInTheDocument();
+  });
+});

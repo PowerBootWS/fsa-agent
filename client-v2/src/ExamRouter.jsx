@@ -13,7 +13,7 @@ import { CountdownTimer } from './components/CountdownTimer.jsx';
 import { isFourthClassCode } from './utils/fourthClass';
 import FlagQuestion from './components/FlagQuestion';
 import { track } from './utils/usage';
-import { pastAttemptsHref } from './pages/attemptFormat';
+import { pastAttemptsHref, retryWrongHref, retryWrongLabel } from './pages/attemptFormat';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -174,7 +174,7 @@ function ExamProgressBar({ current, total, correct }) {
 // Results panel
 // ---------------------------------------------------------------------------
 
-export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, user, leadMagnetMode = false, pastAttemptsHref: pastHref = null }) {
+export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, user, leadMagnetMode = false, pastAttemptsHref: pastHref = null, retryWrongHref: retryHref = null, retryOfMissed = false }) {
   const { score, total, score_pct, chapter_stats,
           objective_breakdowns, next_attempt_allocation, question_review,
           distractor_coaching } = displayContent;
@@ -188,6 +188,7 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
   };
 
   const hasFocus = objective_breakdowns && objective_breakdowns.length > 0;
+  const wrongCount = (question_review || []).filter(q => !q.correct).length;
   const hasReview = question_review && question_review.length > 0;
 
   // Left column — the score overview, always visible (sticky) while the
@@ -249,13 +250,21 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
           >
             {retrying
               ? 'Loading…'
-              : isExam ? 'Retake Exam (Adaptive)' : 'Retry Quiz'}
+              : isExam ? 'Retake Exam (Adaptive)' : retryOfMissed ? 'Retry what I still missed' : 'Retry Quiz'}
           </button>
           <p className="results-retry-hint">
             {isExam
               ? 'Your next exam will pull more questions from chapters you struggled with.'
-              : 'Get a fresh, randomly selected set of questions for this chapter.'}
+              : retryOfMissed
+                ? 'Serves only the questions you got wrong this time.'
+                : 'Get a fresh, randomly selected set of questions for this chapter.'}
           </p>
+        </div>
+      )}
+
+      {!leadMagnetMode && retryHref && wrongCount > 0 && (
+        <div className="results-retry-wrong-block">
+          <Link className="results-retry-wrong-btn" to={retryHref}>{retryWrongLabel(wrongCount)}</Link>
         </div>
       )}
 
@@ -341,6 +350,20 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
 // Quiz/exam display section
 // ---------------------------------------------------------------------------
 
+// '2B1-R12' is a retry of the wrong answers from attempt 12 (see attemptFormat).
+function isRetryLesson(lessonId) {
+  return /^[A-Za-z0-9]{2,5}-R\d+$/.test(String(lessonId || ''));
+}
+
+function pastHrefFor(lessonId, mode) {
+  if (!lessonId) return null;
+  const course = String(lessonId).split('-')[0];
+  if (isRetryLesson(lessonId)) return pastAttemptsHref({ course });
+  return mode === 'chapter_quiz'
+    ? pastAttemptsHref({ course, kind: 'chapter_quiz', chapter: lessonId })
+    : pastAttemptsHref({ course: lessonId, kind: 'practice_exam' });
+}
+
 function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSelectChapter, user, leadMagnetMode, lessonId }) {
   if (!displayContent) {
     return (
@@ -361,9 +384,10 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSele
         onSelectChapter={leadMagnetMode ? null : onSelectChapter}
         user={user}
         leadMagnetMode={leadMagnetMode}
-        pastAttemptsHref={lessonId ? (mode === 'chapter_quiz'
-          ? pastAttemptsHref({ course: String(lessonId).split('-')[0], kind: 'chapter_quiz', chapter: lessonId })
-          : pastAttemptsHref({ course: lessonId, kind: 'practice_exam' })) : null}
+        pastAttemptsHref={pastHrefFor(lessonId, mode)}
+        retryOfMissed={isRetryLesson(lessonId)}
+        retryWrongHref={isRetryLesson(lessonId) ? null
+          : retryWrongHref(String(lessonId || '').split('-')[0], displayContent.attempt_id)}
       />
     );
   }
@@ -889,6 +913,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
                 user={user}
                 leadMagnetMode={leadMagnetMode}
                 pastAttemptsHref={pastAttemptsHref({ course: lessonId, kind: 'practice_exam' })}
+                retryWrongHref={retryWrongHref(lessonId, reviewDebrief.display_update.attempt_id)}
               />
             )}
           </div>

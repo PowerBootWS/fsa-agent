@@ -2,6 +2,34 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getJson } from '../utils/api';
 import { attemptTitle, attemptDate, attemptScore, emptyMessage, NO_REVIEW } from './attemptFormat';
+
+function WeakChapters({ paper }) {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    setData(null);
+    getJson(`/api/attempts/weak-chapters?course=${encodeURIComponent(paper)}`)
+      .then(setData)
+      .catch(() => setData(null));
+  }, [paper]);
+  if (!data || !data.exams || !data.chapters.length) return null;
+  const shown = data.chapters.slice(0, 5);
+  return (
+    <section className="at-weak">
+      <h2>Weakest chapters</h2>
+      <p className="at-muted">
+        {paper}, across your last {data.exams} practice exam{data.exams === 1 ? '' : 's'}.
+      </p>
+      <ul className="at-weak-list">
+        {shown.map(c => (
+          <li key={c.chapter_id} className="at-weak-row">
+            <span>Chapter {c.chapter_id.split('-').pop()}{c.title ? ` · ${c.title}` : ''}</span>
+            <span className="at-weak-score">{`${c.correct}/${c.total} (${c.pct}%)`}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 import './AttemptsPage.css';
 
 // Past practice exams and chapter quizzes (attempt history, Phase C).
@@ -102,6 +130,7 @@ export default function AttemptsPage() {
               </select>
             </label>
           </div>
+          {paper && type !== 'chapter_quiz' && <WeakChapters paper={paper} />}
           {chapter && (
             <p className="at-chapter-note">
               Showing Chapter {/-(\d+)$/.exec(chapter)?.[1] || chapter} only.{' '}

@@ -1585,6 +1585,19 @@ body {
   text-decoration: underline;
 }
 .lobby-past-link:hover { color: var(--orange-glow); }
+.results-retry-wrong-block { margin-top: 12px; }
+.results-retry-wrong-btn {
+  display: block;
+  text-align: center;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--orange);
+  border-radius: 6px;
+  color: var(--orange);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.results-retry-wrong-btn:hover { background: rgba(232,114,12,0.08); }
 .results-past-link {
   display: inline-block;
   color: var(--orange);

@@ -41,6 +41,17 @@
   background: none; border: none; padding: 0; font: inherit; color: #E8720C;
   cursor: pointer; text-decoration: underline;
 }
+.at-retry-btn {
+  display: inline-block; margin: 14px 0 4px; padding: 10px 16px; min-height: 44px; box-sizing: border-box;
+  background: #E8720C; color: #0D1117; border-radius: 4px; font-weight: 700; text-decoration: none;
+}
+.at-retry-btn:hover { background: #F5862A; }
+.at-weak { background: #1C2333; border: 1px solid #252F42; border-radius: 4px; padding: 14px 16px; margin-bottom: 16px; }
+.at-weak h2 { font-size: 17px; margin: 0 0 4px; }
+.at-weak .at-muted { font-size: 14px; margin: 0 0 8px; }
+.at-weak-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.at-weak-row { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
+.at-weak-score { color: #9AA4B5; flex-shrink: 0; }
 .at-back { display: inline-block; color: #9AA4B5; text-decoration: none; margin-bottom: 16px; font-size: 15px; }
 .at-back:hover { color: #F4F5F7; }
 .at-detail-meta { display: flex; gap: 16px; flex-wrap: wrap; color: #9AA4B5; font-size: 15px; }

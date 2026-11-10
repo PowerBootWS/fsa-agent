@@ -50,6 +50,20 @@ for a, d, shown in zip(atts, (quiz, exam), (quiz_shown, exam_shown)):
         if s['q'] is not None: assert snap['question_text'] == s['q']
         if s['id'] is not None: assert r['question_id'] == s['id']
     print(a['kind'], 'ok:', len(rows), 'answers match what was rendered; score', a['score'], '/', d['total'])
+# Phase D: retry the wrong ones from the chapter quiz attempt.
+quiz_attempt = atts[0]['id']
+cur.execute('SELECT question_id FROM question_responses WHERE attempt_id=%s AND NOT correct ORDER BY position', (quiz_attempt,))
+wrong_ids = [r['question_id'] for r in cur.fetchall()]
+retry, retry_shown = run(f"2B1-R{quiz_attempt}")
+cur.execute("SELECT id, kind, parent_attempt_id, chapter_id, question_count, finished_at IS NOT NULL done FROM assessment_attempts WHERE parent_attempt_id=%s", (quiz_attempt,))
+r_att = cur.fetchone()
+assert r_att and r_att['kind'] == 'retry_wrong' and r_att['done'] and r_att['chapter_id'] == '2B1-3', r_att
+cur.execute('SELECT question_id, session_type FROM question_responses WHERE attempt_id=%s ORDER BY position', (r_att['id'],))
+rows = cur.fetchall()
+assert [r['question_id'] for r in rows] == wrong_ids, ([r['question_id'] for r in rows], wrong_ids)
+assert {r['session_type'] for r in rows} == {'retry_wrong'}
+assert retry.get('attempt_id') == r_att['id']
+print('retry_wrong ok:', len(rows), 'missed questions re-served in order; parent', quiz_attempt)
 cur.execute('DELETE FROM question_responses WHERE user_email=%s', (USER,))
 cur.execute('DELETE FROM assessment_attempts WHERE user_email=%s', (USER,))
 cur.execute("SELECT count(*) FROM exam_last_debrief WHERE user_email=%s", (USER,)); print('debrief rows', cur.fetchone())

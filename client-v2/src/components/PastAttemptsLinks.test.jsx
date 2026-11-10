@@ -47,6 +47,25 @@ describe('Past attempts entry points', () => {
     expect(screen.queryByRole('link', { name: /past/i })).toBeNull();
   });
 
+  it('results panel offers to retry the wrong ones when it has an attempt id', () => {
+    const dc = { score: 1, total: 3, score_pct: 33, attempt_id: 44, question_review: [
+      { correct: true }, { correct: false }, { correct: false },
+    ] };
+    render(
+      <MemoryRouter>
+        <ResultsPanel displayContent={dc} isExam onRetry={() => {}} retryWrongHref="/practice-exam?paper=2B1&quiz=2B1-R44" />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('link', { name: /retry the 2 questions you got wrong/i }))
+      .toHaveAttribute('href', '/practice-exam?paper=2B1&quiz=2B1-R44');
+  });
+
+  it('a retry session offers to retry what is still missed, not a fresh quiz', () => {
+    const dc = { score: 1, total: 2, score_pct: 50, question_review: [] };
+    render(<MemoryRouter><ResultsPanel displayContent={dc} isExam={false} onRetry={() => {}} retryOfMissed /></MemoryRouter>);
+    expect(screen.getByRole('button', { name: /retry what i still missed/i })).toBeInTheDocument();
+  });
+
   it('4th Class lobby links each paper to its past attempts', async () => {
     const paper = { total_chapters: 2, chapter_quizzes: [], quizzes_passed: 0, avg_quiz_score: null, next_quiz_chapter_id: null, last_exam: null };
     globalThis.fetch = vi.fn().mockResolvedValue(respond({ papers: { '4A': paper, '4B': paper } }));
