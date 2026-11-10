@@ -19,7 +19,8 @@
  * deleting the platform_users rows themselves. Tables that DO cascade from
  * platform_users (credit_balances, credit_transactions, saved_jobs,
  * user_documents, generated_documents) clean up automatically once the
- * owning user row goes and need no explicit statement here.
+ * owning user row goes and need no explicit statement here. Also deletes the
+ * fixture users' question_responses and assessment_attempts (keyed by email).
  */
 async function deleteFixtureUsersByEmailLike(pool, emailLikePattern) {
   if (!emailLikePattern || !emailLikePattern.includes('@example.com')) {
@@ -40,6 +41,12 @@ async function deleteFixtureUsersByEmailLike(pool, emailLikePattern) {
     `DELETE FROM login_events WHERE user_id IN (SELECT id FROM platform_users WHERE email LIKE $1)`,
     [emailLikePattern]
   );
+  // Keyed by email, not by an FK to platform_users. Since migration 034
+  // (2026-11-10) deleting a fixture question no longer cascades to its
+  // answers (question_id is ON DELETE SET NULL), so answers must be removed
+  // explicitly; deleting the attempts cascades to any still linked to them.
+  await pool.query(`DELETE FROM question_responses WHERE user_email LIKE $1`, [emailLikePattern]);
+  await pool.query(`DELETE FROM assessment_attempts WHERE user_email LIKE $1`, [emailLikePattern]);
   await pool.query(`DELETE FROM platform_users WHERE email LIKE $1`, [emailLikePattern]);
 }
 

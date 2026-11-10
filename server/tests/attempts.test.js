@@ -23,10 +23,6 @@ const FIXTURE_LIKE = 'attempts-%@example.com';
 
 let questionId;
 
-afterAll(async () => {
-  await pool.end();
-});
-
 beforeAll(async () => {
   const { rows } = await pool.query(
     `INSERT INTO questions (course_id, chapter_id, question_text, options, correct_answer)
@@ -43,6 +39,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await pool.query('DELETE FROM questions WHERE id = $1', [questionId]);
   await pool.query(`DELETE FROM chapters WHERE course_id = '2A1' AND title = 'Attempts fixture chapter'`);
+  await pool.end();
 });
 
 afterEach(async () => {

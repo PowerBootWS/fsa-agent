@@ -92,8 +92,9 @@ describe('GET /api/platform/quiz-lobby-data', () => {
     // Scoped to exactly the tuples/ids this test may have inserted (see
     // assertNoRealDataAtFixtureKeys above for why not "WHERE course_id IN
     // (...)"), and only run at all if this test's own insert actually
-    // happened (see the flag comment above) — question_responses cascades
-    // automatically via its FK on questions.id.
+    // happened (see the flag comment above). question_responses no longer
+    // cascades from questions (migration 034, ON DELETE SET NULL); the
+    // fixture users' answers go in deleteFixtureUsersByEmailLike below.
     if (questionsInserted) {
       await pool.query(`DELETE FROM questions WHERE id = ANY($1::int[])`, [FIXTURE_QUESTION_IDS]);
     }
