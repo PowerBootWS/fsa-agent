@@ -135,6 +135,9 @@ app.use('/api/chat', requireAuth, requireActiveSubscription, chatRouter);
 // client/, client-v2/ or ai-service/ calls this route, so there is no legacy
 // caller to preserve. Entitlement gate matches /api/lesson and /api/chat.
 app.use('/api/progress', requireAuth, requireActiveSubscription, progressRouter);
+// Practice exam / chapter quiz attempt history (Phase B, 2026-11-10).
+const attemptsRouter = require('./routes/attempts');
+app.use('/api/attempts', requireAuth, requireActiveSubscription, attemptsRouter);
 // Behind requireAuth but NOT requireActiveSubscription: how a lapsed
 // subscriber behaves in the weeks before they leave is exactly the thing
 // worth being able to see (backlog #113).
