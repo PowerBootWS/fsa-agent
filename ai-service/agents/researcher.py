@@ -808,7 +808,8 @@ class Researcher:
             return []
 
     def record_response(self, user_email, question_id, session_type,
-                        course_id, chapter_id, correct, selected_index=None):
+                        course_id, chapter_id, correct, selected_index=None,
+                        attempt_id=None, position=None, question_snapshot=None):
         """
         Persist a single question response for progress tracking.
         Silently ignores errors (non-critical path).
@@ -817,6 +818,10 @@ class Researcher:
         `correct` meant a mis-keyed question looked exactly like a hard one: on
         2026-09-19 a whole chapter marked the right answer wrong and the data
         could not show it. Both callers already had this value to hand.
+
+        attempt_id / position / question_snapshot tie the answer to its sitting
+        (assessment_attempts) and keep the question exactly as it was shown,
+        so later in-place edits to the question never change the history.
         """
         try:
             conn = self._get_connection()
@@ -825,17 +830,73 @@ class Researcher:
                 """
                 INSERT INTO question_responses
                     (user_email, question_id, session_type, course_id, chapter_id,
-                     correct, selected_index)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                     correct, selected_index, attempt_id, position, question_snapshot)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (user_email, question_id, session_type, course_id, chapter_id,
-                 bool(correct), selected_index)
+                 bool(correct), selected_index, attempt_id, position,
+                 json.dumps(question_snapshot) if question_snapshot is not None else None)
             )
             conn.commit()
             cursor.close()
             conn.close()
         except Exception as e:
             print(f'Researcher.record_response error (non-fatal): {e}')
+
+    def start_attempt(self, user_email, course_id, kind, question_count=None,
+                      chapter_id=None, parent_attempt_id=None):
+        """
+        Open an assessment_attempts row for one sitting (practice exam or
+        chapter quiz) and return its id, or None on any error. Non-fatal: a
+        history write failure must never break the quiz itself.
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO assessment_attempts
+                    (user_email, course_id, chapter_id, kind, question_count, parent_attempt_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (user_email, course_id, chapter_id, kind, question_count, parent_attempt_id)
+            )
+            attempt_id = cursor.fetchone()['id']
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return attempt_id
+        except Exception as e:
+            print(f'Researcher.start_attempt error (non-fatal): {e}')
+            return None
+
+    def finish_attempt(self, attempt_id, score, score_pct, chapter_stats=None):
+        """
+        Close an attempt with its score. Only the first finish counts
+        (finished_at IS NULL guard), so a resumed debrief can't overwrite it.
+        Non-fatal, and a no-op when attempt_id is None.
+        """
+        if attempt_id is None:
+            return
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE assessment_attempts
+                   SET finished_at = now(), score = %s, score_pct = %s, chapter_stats = %s
+                 WHERE id = %s AND finished_at IS NULL
+                """,
+                (score, score_pct,
+                 json.dumps(chapter_stats) if chapter_stats is not None else None,
+                 attempt_id)
+            )
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f'Researcher.finish_attempt error (non-fatal): {e}')
 
     def save_last_debrief(self, user_email, course_id, debrief):
         """
