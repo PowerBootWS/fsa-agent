@@ -9,6 +9,16 @@ class TransitionError extends Error {
   constructor(message) { super(message); this.name = 'TransitionError'; }
 }
 
+class NotFoundError extends Error {
+  constructor(message) { super(message); this.name = 'NotFoundError'; }
+}
+
+// Hash both sides so lengths always match (byte length != string length for non-ASCII).
+function tokenMatches(given, actual) {
+  const h = (x) => crypto.createHash('sha256').update(x).digest();
+  return crypto.timingSafeEqual(h(given), h(actual));
+}
+
 const ALLOWED = {
   pending: ['live', 'awaiting_approval', 'held'],
   awaiting_approval: ['live', 'held'],
@@ -29,8 +39,7 @@ async function getPublic(slug, previewToken) {
   if (!ml) return null;
   let version = null;
   if (previewToken && ['pending', 'awaiting_approval'].includes(ml.status)
-      && typeof previewToken === 'string' && previewToken.length === ml.preview_token.length
-      && crypto.timingSafeEqual(Buffer.from(previewToken), Buffer.from(ml.preview_token))) {
+      && typeof previewToken === 'string' && tokenMatches(previewToken, ml.preview_token)) {
     version = ml.draft_version;
   } else if (ml.live_version != null) {
     version = ml.live_version;
@@ -110,7 +119,7 @@ async function setStatus(slug, to, { holdReason = null, checksPassed } = {}) {
   try {
     await client.query('BEGIN');
     const { rows: [ml] } = await client.query('SELECT * FROM mini_lessons WHERE slug = $1 FOR UPDATE', [slug]);
-    if (!ml) throw new TransitionError(`unknown slug ${slug}`);
+    if (!ml) throw new NotFoundError(`unknown slug ${slug}`);
     if (!(ALLOWED[ml.status] || []).includes(to)) {
       throw new TransitionError(`transition ${ml.status} -> ${to} not allowed`);
     }
@@ -150,4 +159,4 @@ async function list() {
   return rows;
 }
 
-module.exports = { getPublic, upsertDraft, setStatus, list, TransitionError, classCodeFor };
+module.exports = { getPublic, upsertDraft, setStatus, list, TransitionError, NotFoundError, classCodeFor };

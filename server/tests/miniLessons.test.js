@@ -63,7 +63,7 @@ test('held to live throws; invalid and unknown transitions throw', async () => {
   await ml.upsertDraft(payload('v1'));
   await ml.setStatus(SLUG, 'held', { holdReason: 'x' });
   await expect(ml.setStatus(SLUG, 'live', { checksPassed: true })).rejects.toBeInstanceOf(ml.TransitionError);
-  await expect(ml.setStatus('test-mini-nope', 'live', { checksPassed: true })).rejects.toBeInstanceOf(ml.TransitionError);
+  await expect(ml.setStatus('test-mini-nope', 'live', { checksPassed: true })).rejects.toBeInstanceOf(ml.NotFoundError);
   const { rows } = await pool.query(`SELECT hold_reason FROM mini_lessons WHERE slug=$1`, [SLUG]);
   expect(rows[0].hold_reason).toBe('x');
 });
@@ -99,4 +99,9 @@ test('rebuild metadata is versioned: live keeps title A, draft token sees B', as
   const d = await ml.getPublic(SLUG, r2.preview_token);
   expect(d).toMatchObject({ title: 'B', description: 'd2', og_image_url: 'x.png' });
   expect((await ml.list()).find(r => r.slug === SLUG).title).toBe('A');
+});
+
+test('non-ASCII token of 64 chars resolves to null, no throw', async () => {
+  await ml.upsertDraft(payload('v1'));
+  expect(await ml.getPublic(SLUG, '\u00e9'.repeat(64))).toBeNull();
 });
