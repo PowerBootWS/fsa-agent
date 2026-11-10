@@ -73,4 +73,4 @@ mediaRouter.get('/:slug/:ver/:file', async (req, res) => {
   }
 });
 
-module.exports = { apiRouter, mediaRouter };
+module.exports = { apiRouter, mediaRouter, SLUG_RE, withPreview, previewParam };

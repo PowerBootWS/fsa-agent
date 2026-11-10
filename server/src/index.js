@@ -314,6 +314,33 @@ function sendSpaOrNotFound(req, res, buildDir) {
   return res.sendFile(path.join(buildDir, 'index.html'));
 }
 
+// /explained/<slug>: serve index.html with real Open Graph tags (crawlers don't
+// run JS). index.html is read once at startup, like CLIENT_V2_BUILD itself; if
+// it is missing (tests without a build) fall through to the existing behaviour.
+const miniLessonsService = require('./services/miniLessons');
+const { renderExplainedHtml } = require('./services/explainedOg');
+const { SLUG_RE: EXPLAINED_SLUG_RE, withPreview: explainedWithPreview, previewParam: explainedPreviewParam } = require('./routes/explained');
+let CLIENT_V2_INDEX_HTML = null;
+try { CLIENT_V2_INDEX_HTML = require('fs').readFileSync(path.join(CLIENT_V2_BUILD, 'index.html'), 'utf8'); } catch (_) { /* no build */ }
+const EXPLAINED_BASE_URL = 'https://' + (process.env.LEARN_DOMAIN || 'learn.fullsteamahead.ca');
+app.get('/explained/:slug', async (req, res, next) => {
+  if (!CLIENT_V2_INDEX_HTML || !req.isPlatformMode) return next();
+  let lesson = null;
+  const token = explainedPreviewParam(req);
+  if (EXPLAINED_SLUG_RE.test(req.params.slug)) {
+    try {
+      lesson = await miniLessonsService.getPublic(req.params.slug, token);
+    } catch (err) {
+      console.error('explained og lookup failed:', err.message);
+    }
+  }
+  if (lesson && lesson.is_draft) {
+    lesson.og_image_url = explainedWithPreview(lesson.og_image_url, token);
+    res.set('Cache-Control', 'private, no-store');
+  }
+  res.status(200).type('html').send(renderExplainedHtml(CLIENT_V2_INDEX_HTML, lesson, EXPLAINED_BASE_URL));
+});
+
 // Serve client-v2 at /v2 (always — for iframe embed on fsachat.*)
 app.use('/v2', express.static(CLIENT_V2_BUILD));
 app.get('/v2/*', (req, res) => {
