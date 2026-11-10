@@ -49,6 +49,23 @@ def _detect_mode(lesson_id):
     return 'lesson'  # numeric id or UUID → lesson
 
 
+def _question_snapshot(q):
+    """
+    The question exactly as it was rendered, stored with each answer
+    (question_responses.question_snapshot) so attempt history never depends
+    on the live questions row, which #138 cutovers edit in place.
+    """
+    return {
+        'question_text': q.get('question_text', ''),
+        'options': q.get('options', []),
+        'correct_index': q.get('correct_answer'),
+        'explanation': q.get('explanation', ''),
+        'lesson_code': q.get('lesson_code', ''),
+        'topic': q.get('topic', ''),
+        'chapter_id': q.get('chapter_id', ''),
+    }
+
+
 def _class_prefix(lesson_id):
     """
     Certification-level digit of a lesson code ('2B1-1-1' → '2'), used to keep
@@ -246,6 +263,7 @@ class Orchestrator:
                 state['exam_questions'] = []
                 state['exam_index'] = 0
                 state['exam_results'] = []
+                state['exam_attempt_id'] = None
                 state['exam_question_count'] = exam_config.get('count', PRACTICE_EXAM_QUESTION_COUNT)
                 state['exam_timed'] = exam_config.get('timed', False)
                 state['exam_lead_magnet'] = exam_config.get('lead_magnet', False)
@@ -962,6 +980,7 @@ class Orchestrator:
             state['quiz_index'] = 0
             state['quiz_correct'] = 0
             state['quiz_awaiting_feedback'] = False
+            state['quiz_attempt_id'] = None
 
         questions = state['quiz_questions']
         idx = state['quiz_index']
@@ -1009,7 +1028,13 @@ class Orchestrator:
                 'explanation': explanation,
             })
 
-            # Record response silently
+            # Record response silently. One attempt per sitting, opened on
+            # the first answer (see _record_exam_answer).
+            if not state.get('quiz_attempt_id'):
+                state['quiz_attempt_id'] = researcher.start_attempt(
+                    user, course_id, 'chapter_quiz',
+                    question_count=total, chapter_id=chapter_id,
+                )
             researcher.record_response(
                 user_email=user,
                 question_id=current_q['id'],
@@ -1018,6 +1043,9 @@ class Orchestrator:
                 chapter_id=chapter_id,
                 correct=student_correct,
                 selected_index=selected_index,
+                attempt_id=state.get('quiz_attempt_id'),
+                position=idx,
+                question_snapshot=_question_snapshot(current_q),
             )
 
             if student_correct:
@@ -1042,6 +1070,14 @@ class Orchestrator:
             # no second round-trip required to see the result.
             if idx >= total:
                 state['quiz_done'] = True
+                # Finished here, at the one transition into quiz_done, not in
+                # _build_chapter_quiz_debrief, which also runs on every resume.
+                score = state['quiz_correct']
+                researcher.finish_attempt(
+                    state.get('quiz_attempt_id'), score,
+                    int(score / total * 100) if total else 0,
+                    {chapter_id: {'correct': score, 'total': total}},
+                )
                 return self._build_chapter_quiz_debrief(state, first_name)
 
             # Load next question
@@ -1145,6 +1181,7 @@ class Orchestrator:
         state['quiz_questions'] = qs
         state['quiz_correct'] = 0
         state['quiz_done'] = False
+        state['quiz_attempt_id'] = None
         state['quiz_topics_missed'] = []
         state['quiz_review'] = []
         state['quiz_awaiting_feedback'] = True
@@ -1816,6 +1853,10 @@ class Orchestrator:
         # Persist durably so the lobby review button and refreshes survive an
         # AI-service restart (in-memory state is lost on every deploy).
         researcher.save_last_debrief(user, course_id, state['last_debrief'])
+        researcher.finish_attempt(
+            state.get('exam_attempt_id'), total_correct, score_pct,
+            {cid: dict(s) for cid, s in chapter_stats.items()},
+        )
         return {
             'tutor_response': tutor_response,
             'display_update': display_update,
@@ -1938,6 +1979,7 @@ class Orchestrator:
         state['exam_results'] = []
         state['exam_phase'] = 'answering'
         state['exam_done'] = False
+        state['exam_attempt_id'] = None
 
         display_update = self._build_exam_question_display(qs[0], 0, len(qs))
         state['exam_index'] = 1
@@ -2105,6 +2147,13 @@ class Orchestrator:
             'correct_index': prev_q['correct_answer'],
             'selected_index': selected_index,
         })
+        # One attempt per sitting, opened on the first recorded answer so a
+        # served-but-never-answered exam leaves no empty attempt behind.
+        if not state.get('exam_attempt_id'):
+            state['exam_attempt_id'] = researcher.start_attempt(
+                user, course_id, 'practice_exam',
+                question_count=len(state['exam_questions']),
+            )
         researcher.record_response(
             user_email=user,
             question_id=prev_q['id'],
@@ -2113,6 +2162,9 @@ class Orchestrator:
             chapter_id=prev_q['chapter_id'],
             correct=correct,
             selected_index=selected_index,
+            attempt_id=state.get('exam_attempt_id'),
+            position=idx,
+            question_snapshot=_question_snapshot(prev_q),
         )
 
     # ------------------------------------------------------------------
