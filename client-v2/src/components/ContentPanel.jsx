@@ -100,6 +100,7 @@ export function ContentPanel({
   onToggleAutoAdvance = null,
   holdAutoAdvance = false,
   practicePrompt = null,
+  lastSlideLabel = 'Finish Objective →',
 }) {
   const [sectionStartTime, setSectionStartTime] = useState(() => Date.now());
   const { play, pause, playing, ended, muted, toggleMute, currentTimeMs, playbackRate, setPlaybackRate } = useAudio(
@@ -157,7 +158,7 @@ export function ContentPanel({
   if (!section && !isComplete) return null;
 
   const isLastSlide = !isComplete && sectionIndex === totalSections - 1;
-  const nextLabel = isLastSlide ? 'Finish Objective →' : 'Next →';
+  const nextLabel = isLastSlide ? lastSlideLabel : 'Next →';
 
   return (
     <div className="content-panel">

@@ -28,6 +28,7 @@ import HomePage from './pages/HomePage';
 import AffiliatePage from './pages/AffiliatePage';
 import AttemptsPage from './pages/AttemptsPage';
 import AttemptDetailPage from './pages/AttemptDetailPage';
+import ExplainedPage from './pages/ExplainedPage';
 import { LessonPlayer } from './LessonPlayer';
 import { ExamRouter } from './ExamRouter';
 import { isFourthClassCode } from './utils/fourthClass';
@@ -116,6 +117,8 @@ export default function App() {
         }
       />
       <Route path="/jobs/capture" element={<JobsCapturePage />} />
+      {/* Public mini lesson: no login, no shell. */}
+      <Route path="/explained/:slug" element={<ExplainedPage />} />
       <Route path="/free-practice-exam" element={<FreePracticeExamPage />} />
       <Route
         path="/chapters"
