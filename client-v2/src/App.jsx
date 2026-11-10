@@ -26,6 +26,8 @@ import FreePracticeExamPage from './pages/FreePracticeExamPage';
 import AdminUsagePage from './pages/AdminUsagePage';
 import HomePage from './pages/HomePage';
 import AffiliatePage from './pages/AffiliatePage';
+import AttemptsPage from './pages/AttemptsPage';
+import AttemptDetailPage from './pages/AttemptDetailPage';
 import { LessonPlayer } from './LessonPlayer';
 import { ExamRouter } from './ExamRouter';
 import { isFourthClassCode } from './utils/fourthClass';
@@ -173,6 +175,27 @@ export default function App() {
           <ProtectedRoute requirePaper={false}>
             <AppShell>
               <CreditsPage />
+            </AppShell>
+          </ProtectedRoute>
+        }
+      />
+      {/* Attempt history (Phase C). Reachable by URL only until Russ turns the links on. */}
+      <Route
+        path="/attempts"
+        element={
+          <ProtectedRoute requirePaper={false}>
+            <AppShell>
+              <AttemptsPage />
+            </AppShell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/attempts/:id"
+        element={
+          <ProtectedRoute requirePaper={false}>
+            <AppShell>
+              <AttemptDetailPage />
             </AppShell>
           </ProtectedRoute>
         }
