@@ -1,6 +1,6 @@
 # Practice Attempt History: Implementation Plan
 
-> **Status: DRAFT. Not started. Do not build until Russ says go.**
+> **Status: IN PROGRESS. Russ said go 2026-11-10; Phase A built on branch `feature/attempt-history`.**
 >
 > Written 2026-11-08 from a Telegram request (task 1794180077059-36843d2a assessment + follow-up). Russ approved **all** items below, extras included, and will add more features of his own (see "Additional features (Russ to add)"). He will pick this up himself in an interactive session as the `debian`/FSA user. Nothing in this document has been built: no code, no migrations, no schema changes, no backlog item.
 >
@@ -244,9 +244,13 @@ All automated tests run against **`fsa_agent_test`** only (`POSTGRES_DB=fsa_agen
 
 ## 11. Additional features (Russ to add)
 
-_Placeholder. Russ is considering bundling more features into this work; add them here before building, then re-estimate._
+**Answers to section 10 (Russ, 2026-11-10):** Q1 wait for Phase D. Q3 convert the `exam_last_debrief` rows into one reviewable `pre_history` attempt each; no time-gap backfill. Q2/Q4/Q5/Q8 defaults accepted: hide unfinished attempts; retry answers do not count toward adaptive weighting; weak chapters = last 3 practice exams; history needs an active subscription.
 
--
+**No extra features for this project.** Russ flagged a future, separate project to keep in mind so nothing here has to be undone:
+
+- **Chapter mastery levels 1 to 4 replace count-based adaptive weighting.** Each practice exam keeps the real provincial exam's fixed chapter makeup (questions per chapter out of 100). The first sitting serves level 2 questions in every chapter; strong results move that chapter up a level on the next sitting, weak results drop it (to 1 at the floor) until the student improves. Level 4 in every chapter = ready to write, and the platform shows the level per chapter.
+- Higher levels are harder by **question style**, not just content: "except" traps, several technically-true options where only one answers the question, and similar. Needs a large question rewrite across all papers.
+- Build this project as if the leveling change is not happening. Compatibility notes: `assessment_attempts.chapter_stats` already stores per-chapter correct/total per sitting, which is the input a level step needs; `question_snapshot` is JSONB, so a question's level can be added to it later without a migration; the weak-chapter view (D2) is the natural place a per-chapter level would later be shown.
 
 ---
 
