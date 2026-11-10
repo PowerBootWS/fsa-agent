@@ -27,8 +27,6 @@ function requireToken(req, res, next) {
 // The global express.json() (100kb) skips this prefix; payloads carry narration timing.
 router.use(requireToken, express.json({ limit: '10mb' }));
 
-const isStr = (v) => typeof v === 'string' && v.trim() !== '';
-
 // Collect every string in a value, for the em-dash rule.
 function* strings(v) {
   if (typeof v === 'string') yield v;
@@ -36,53 +34,67 @@ function* strings(v) {
   else if (v && typeof v === 'object') for (const x of Object.values(v)) yield* strings(x);
 }
 
+const SLIDE_FILE_RE = /^slide-\d{3}\.(mp3|png)$/;
+const LESSON_CODE_RE = /^[0-9][A-B0-9]{1,3}-\d{1,2}-\d{1,2}$/;
+const isIdx = (n) => Number.isInteger(n) && n >= 0 && n <= 9999;
+const nonEmpty = (v) => typeof v === 'string' && v.trim() !== '';
+
 function validatePayload(p, slug) {
   const errs = [];
   if (!p || typeof p !== 'object' || Array.isArray(p)) return ['body must be an object'];
   if (typeof p.slug !== 'string' || !SLUG_RE.test(p.slug) || p.slug.length > 80) errs.push('slug invalid');
   else if (p.slug !== slug) errs.push('slug does not match path');
   if (!PAPERS.has(p.paper_code)) errs.push('paper_code not in papersForClass');
+  if (p.source_lesson_code != null
+      && !(typeof p.source_lesson_code === 'string' && p.source_lesson_code.length <= 20 && LESSON_CODE_RE.test(p.source_lesson_code))) {
+    errs.push('source_lesson_code invalid');
+  }
   for (const f of ['title', 'description', 'source_label', 'request_text']) {
-    if (!isStr(p[f])) errs.push(`${f} required`);
+    if (!nonEmpty(p[f])) errs.push(`${f} required`);
   }
   if (!Array.isArray(p.slides) || p.slides.length === 0) errs.push('slides must be a non-empty array');
   else {
-    const prefix = `/explained-media/${slug}/v`;
+    const seen = new Set();
     p.slides.forEach((s, i) => {
       if (!s || typeof s !== 'object') { errs.push(`slides[${i}] must be an object`); return; }
-      if (!Number.isInteger(s.slide_number)) errs.push(`slides[${i}].slide_number must be an integer`);
+      if (!isIdx(s.slide_number)) errs.push(`slides[${i}].slide_number must be an integer 0..9999`);
+      else if (seen.has(s.slide_number)) errs.push(`slides[${i}].slide_number duplicated`);
+      else seen.add(s.slide_number);
       for (const f of ['audio_url', 'image_url']) {
-        if (s[f] != null && !(typeof s[f] === 'string' && s[f].startsWith(prefix) && !s[f].includes('..'))) {
-          errs.push(`slides[${i}].${f} must start with ${prefix}`);
+        if (s[f] != null && !(typeof s[f] === 'string' && SLIDE_FILE_RE.test(s[f]))) {
+          errs.push(`slides[${i}].${f} must be a bare filename like slide-001.mp3`);
         }
       }
     });
   }
-  if (p.og_image_url != null && !(typeof p.og_image_url === 'string'
-      && p.og_image_url.startsWith(`/explained-media/${slug}/v`) && !p.og_image_url.includes('..'))) {
-    errs.push('og_image_url must be under /explained-media/<slug>/v');
-  }
+  if (p.og_image_url != null && p.og_image_url !== 'og.png') errs.push('og_image_url must be og.png');
   if (!Array.isArray(p.questions) || p.questions.length === 0) errs.push('questions must be a non-empty array');
   else {
+    const seen = new Set();
     p.questions.forEach((q, i) => {
       if (!q || typeof q !== 'object') { errs.push(`questions[${i}] must be an object`); return; }
-      if (!Number.isInteger(q.position)) errs.push(`questions[${i}].position must be an integer`);
-      if (!isStr(q.question_text)) errs.push(`questions[${i}].question_text required`);
+      if (!isIdx(q.position)) errs.push(`questions[${i}].position must be an integer 0..9999`);
+      else if (seen.has(q.position)) errs.push(`questions[${i}].position duplicated`);
+      else seen.add(q.position);
+      if (!nonEmpty(q.question_text)) errs.push(`questions[${i}].question_text required`);
       const steps = q.step_data && q.step_data.steps;
       if (!Array.isArray(steps) || steps.length === 0) { errs.push(`questions[${i}].step_data.steps must be non-empty`); return; }
       steps.forEach((st, j) => {
         const at = `questions[${i}].step_data.steps[${j}]`;
         if (!st || typeof st !== 'object') { errs.push(`${at} must be an object`); return; }
+        for (const f of ['type', 'question', 'explanation']) if (!nonEmpty(st[f])) errs.push(`${at}.${f} required`);
+        if (typeof st.context !== 'string') errs.push(`${at}.context must be a string`);
         if (!Array.isArray(st.options) || st.options.length < 2) errs.push(`${at}.options needs at least 2`);
-        else if (!Number.isInteger(st.correct) || st.correct < 0 || st.correct >= st.options.length) {
-          errs.push(`${at}.correct out of range`);
+        else {
+          if (!st.options.every(nonEmpty)) errs.push(`${at}.options must all be non-empty strings`);
+          if (!Number.isInteger(st.correct) || st.correct < 0 || st.correct >= st.options.length) errs.push(`${at}.correct out of range`);
         }
       });
     });
   }
   // Russ's voice: no em dashes anywhere in the text.
   for (const s of strings({ ...p, slug: undefined })) {
-    if (s.includes('—')) { errs.push('text contains an em dash'); break; }
+    if (s.includes('\u2014')) { errs.push('text contains an em dash'); break; }
   }
   return errs;
 }
@@ -106,7 +118,11 @@ router.put('/:slug', async (req, res) => {
 
 router.post('/:slug/status', async (req, res) => {
   const { to, hold_reason: holdReason, checks_passed: checksPassed } = req.body || {};
-  if (!STATUSES.includes(to)) return res.status(400).json({ error: 'invalid payload', details: ['to must be one of ' + STATUSES.join(', ')] });
+  const details = [];
+  if (!STATUSES.includes(to)) details.push('to must be one of ' + STATUSES.join(', '));
+  if (checksPassed !== undefined && typeof checksPassed !== 'boolean') details.push('checks_passed must be a boolean');
+  if (holdReason !== undefined && (typeof holdReason !== 'string' || holdReason.length > 2000)) details.push('hold_reason must be a string up to 2000 chars');
+  if (details.length) return res.status(400).json({ error: 'invalid payload', details });
   try {
     res.json(await miniLessons.setStatus(req.params.slug, to, { holdReason: holdReason || null, checksPassed }));
   } catch (e) { fail(res, e); }

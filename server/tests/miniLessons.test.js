@@ -93,11 +93,11 @@ test('list', async () => {
 test('rebuild metadata is versioned: live keeps title A, draft token sees B', async () => {
   await ml.upsertDraft(payload('v1', { title: 'A' }));
   await ml.setStatus(SLUG, 'live', { checksPassed: true });
-  const r2 = await ml.upsertDraft(payload('v2', { title: 'B', description: 'd2', og_image_url: 'x.png' }));
+  const r2 = await ml.upsertDraft(payload('v2', { title: 'B', description: 'd2', og_image_url: 'og.png' }));
   expect((await ml.getPublic(SLUG, null)).title).toBe('A');
   expect((await ml.getPublic(SLUG, null)).og_image_url).toBeNull();
   const d = await ml.getPublic(SLUG, r2.preview_token);
-  expect(d).toMatchObject({ title: 'B', description: 'd2', og_image_url: 'x.png' });
+  expect(d).toMatchObject({ title: 'B', description: 'd2', og_image_url: '/explained-media/test-mini-a/v2/og.png' });
   expect((await ml.list()).find(r => r.slug === SLUG).title).toBe('A');
 });
 
@@ -139,4 +139,20 @@ test('getPublic reports version and is_draft', async () => {
   const r2 = await ml.upsertDraft(payload('v2'));
   expect(await ml.getPublic(SLUG, r2.preview_token)).toMatchObject({ version: 2, is_draft: true });
   expect(await ml.getPublic(SLUG, 'bad')).toMatchObject({ version: 1, is_draft: false });
+});
+
+test('upsertDraft stores media URLs built from the assigned version', async () => {
+  const slides = (t) => [{ slide_number: 1, title: t, body: 'b', audio_url: 'slide-001.mp3', image_url: 'slide-001.png' }];
+  const r1 = await ml.upsertDraft(payload('v1', { slides: slides('a'), og_image_url: 'og.png' }));
+  const p1 = await ml.getPublic(SLUG, r1.preview_token);
+  expect(p1.sections[0]).toMatchObject({ audio_url: `/explained-media/${SLUG}/v1/slide-001.mp3`, image_url: `/explained-media/${SLUG}/v1/slide-001.png` });
+  expect(p1.og_image_url).toBe(`/explained-media/${SLUG}/v1/og.png`);
+  const r2 = await ml.upsertDraft(payload('v2', { slides: slides('b') }));
+  const p2 = await ml.getPublic(SLUG, r2.preview_token);
+  expect(p2.sections[0].audio_url).toBe(`/explained-media/${SLUG}/v2/slide-001.mp3`);
+});
+
+test('setStatus: checksPassed must be strictly true', async () => {
+  await ml.upsertDraft(payload('v1'));
+  await expect(ml.setStatus(SLUG, 'live', { checksPassed: 'false' })).rejects.toBeInstanceOf(ml.TransitionError);
 });

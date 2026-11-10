@@ -99,17 +99,19 @@ async function upsertDraft(p) {
          COALESCE((SELECT MAX(version) FROM mini_lesson_questions WHERE mini_lesson_id = $1), 0),
          COALESCE((SELECT MAX(version) FROM mini_lesson_versions WHERE mini_lesson_id = $1), 0)) + 1 AS version`,
       [ml.id]);
+    // Payload carries bare filenames (R6); the stored URL is built from the version assigned here.
+    const mediaUrl = (file) => (file ? `/explained-media/${ml.slug}/v${version}/${file}` : null);
     await client.query(
       `INSERT INTO mini_lesson_versions (mini_lesson_id, version, title, description, source_label, og_image_url, request_text)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [ml.id, version, p.title, p.description, p.source_label, p.og_image_url || null, p.request_text]);
+      [ml.id, version, p.title, p.description, p.source_label, mediaUrl(p.og_image_url), p.request_text]);
     for (const s of p.slides || []) {
       await client.query(
         `INSERT INTO mini_lesson_slides (mini_lesson_id, version, slide_number, chunk_type, title, body,
                                          narration, audio_url, image_url, narration_timing)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
         [ml.id, version, s.slide_number, s.chunk_type || null, s.title || null, s.body || null,
-         s.narration || null, s.audio_url || null, s.image_url || null,
+         s.narration || null, mediaUrl(s.audio_url), mediaUrl(s.image_url),
          s.narration_timing == null ? null : JSON.stringify(s.narration_timing)]);
     }
     for (const q of p.questions || []) {
@@ -138,7 +140,7 @@ async function setStatus(slug, to, { holdReason = null, checksPassed } = {}) {
     if (!(ALLOWED[ml.status] || []).includes(to)) {
       throw new TransitionError(`transition ${ml.status} -> ${to} not allowed`);
     }
-    const checks = checksPassed === undefined ? ml.checks_passed : !!checksPassed;
+    const checks = checksPassed === undefined ? ml.checks_passed : checksPassed === true;
     if ((to === 'live' || to === 'awaiting_approval') && !checks) {
       throw new TransitionError(`${to} requires checks_passed`);
     }

@@ -29,9 +29,9 @@ const get = (p) => request(app).get(p).set('Host', LEARN);
 
 const payload = (slug, over = {}, v = 1) => ({
   slug, title: 'T ' + slug, description: 'd', paper_code: '2B3', source_lesson_code: '2B3-1-7',
-  source_label: 'src', request_text: 'req', og_image_url: `/explained-media/${slug}/v${v}/og.png`,
+  source_label: 'src', request_text: 'req', og_image_url: 'og.png',
   slides: [{ slide_number: 1, chunk_type: 'intro', title: 's1', body: 'b', narration: 'n',
-    audio_url: `/explained-media/${slug}/v${v}/slide-001.mp3`, image_url: null, narration_timing: null }],
+    audio_url: 'slide-001.mp3', image_url: null, narration_timing: null }],
   questions: [{ position: 1, question_text: 'q?', step_data: { steps: [] }, explanation: 'e' }],
   ...over,
 });
