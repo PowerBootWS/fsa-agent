@@ -89,7 +89,8 @@ app.use((req, res, next) => {
 });
 
 // Parse JSON bodies
-app.use(express.json());
+// The mini-lesson internal publish route parses its own (larger) body.
+app.use((req, res, next) => (req.path.startsWith('/api/internal/mini-lessons') ? next() : express.json()(req, res, next)));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -180,6 +181,7 @@ app.use('/api/practice-exam', practiceExamRouter);
 // Free public mini lessons. Deliberately unauthenticated; see routes/explained.js.
 const { apiRouter: explainedApiRouter, mediaRouter: explainedMediaRouter } = require('./routes/explained');
 app.use('/api/explained', explainedApiRouter);
+app.use('/api/internal/mini-lessons', require('./routes/miniLessonInternal'));
 
 // v2 routes
 const v2LessonRouter = require('./routes/v2/lesson');
