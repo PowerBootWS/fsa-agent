@@ -38,9 +38,11 @@ async function getPublic(slug, previewToken) {
   const { rows: [ml] } = await pool.query('SELECT * FROM mini_lessons WHERE slug = $1', [slug]);
   if (!ml) return null;
   let version = null;
+  let isDraft = false;
   if (previewToken && ['pending', 'awaiting_approval'].includes(ml.status)
       && typeof previewToken === 'string' && tokenMatches(previewToken, ml.preview_token)) {
     version = ml.draft_version;
+    isDraft = true;
   } else if (ml.live_version != null) {
     version = ml.live_version;
   }
@@ -61,8 +63,21 @@ async function getPublic(slug, previewToken) {
     slug: ml.slug, title: meta.title, description: meta.description,
     paper_code: ml.paper_code, class_code: classCodeFor(ml.paper_code),
     source_label: meta.source_label, og_image_url: meta.og_image_url,
-    sections, questions,
+    sections, questions, version, is_draft: isDraft,
   };
+}
+
+// One cheap query: may this (slug, version) media be served to this requester?
+async function mediaAccess(slug, version, previewToken) {
+  if (!Number.isInteger(version)) return false;
+  const { rows: [ml] } = await pool.query(
+    'SELECT status, live_version, draft_version, preview_token FROM mini_lessons WHERE slug = $1', [slug]);
+  if (!ml) return false;
+  if (ml.live_version != null && version === ml.live_version) return true;
+  return !!(previewToken && typeof previewToken === 'string'
+    && ml.draft_version != null && version === ml.draft_version
+    && ['pending', 'awaiting_approval'].includes(ml.status)
+    && tokenMatches(previewToken, ml.preview_token));
 }
 
 async function upsertDraft(p) {
@@ -159,4 +174,4 @@ async function list() {
   return rows;
 }
 
-module.exports = { getPublic, upsertDraft, setStatus, list, TransitionError, NotFoundError, classCodeFor };
+module.exports = { getPublic, mediaAccess, upsertDraft, setStatus, list, TransitionError, NotFoundError, classCodeFor };

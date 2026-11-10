@@ -20,6 +20,8 @@ function withPreview(url, token) {
   return url + (url.includes('?') ? '&' : '?') + 'preview=' + encodeURIComponent(token);
 }
 
+const VER_RE = /^v[1-9]\d*$/;
+
 const apiRouter = express.Router();
 apiRouter.get('/:slug', async (req, res) => {
   const { slug } = req.params;
@@ -28,18 +30,12 @@ apiRouter.get('/:slug', async (req, res) => {
     const token = previewParam(req);
     const lesson = await miniLessons.getPublic(slug, token);
     if (!lesson) return res.status(404).json({ error: 'Not found' });
-    // Draft served via preview token: media URLs need the token too. Detect by
-    // asking for the public (tokenless) view; if that differs, this is a draft.
-    if (token) {
-      const pub = await miniLessons.getPublic(slug, null);
-      const isDraft = !pub || pub.title !== lesson.title
-        || JSON.stringify(pub.sections) !== JSON.stringify(lesson.sections);
-      if (isDraft) {
-        lesson.og_image_url = withPreview(lesson.og_image_url, token);
-        lesson.sections = lesson.sections.map((s) => ({
-          ...s, audio_url: withPreview(s.audio_url, token), image_url: withPreview(s.image_url, token),
-        }));
-      }
+    // Draft served via preview token: its media URLs need the token too.
+    if (lesson.is_draft) {
+      lesson.og_image_url = withPreview(lesson.og_image_url, token);
+      lesson.sections = lesson.sections.map((s) => ({
+        ...s, audio_url: withPreview(s.audio_url, token), image_url: withPreview(s.image_url, token),
+      }));
     }
     res.json(lesson);
   } catch (err) {
@@ -49,19 +45,27 @@ apiRouter.get('/:slug', async (req, res) => {
 });
 
 const mediaRouter = express.Router();
-mediaRouter.get('/:slug/:file', async (req, res) => {
-  const { slug, file } = req.params;
-  if (!SLUG_RE.test(slug) || !FILE_RE.test(file)) return res.status(404).json({ error: 'Not found' });
+mediaRouter.get('/:slug/:ver/:file', async (req, res) => {
+  const { slug, ver, file } = req.params;
+  if (!SLUG_RE.test(slug) || !VER_RE.test(ver) || !FILE_RE.test(file)) {
+    return res.status(404).json({ error: 'Not found' });
+  }
   try {
-    if (!(await miniLessons.getPublic(slug, previewParam(req)))) {
+    const token = previewParam(req);
+    const version = parseInt(ver.slice(1), 10);
+    if (!(await miniLessons.mediaAccess(slug, version, token))) {
       return res.status(404).json({ error: 'Not found' });
     }
-    res.set('Cache-Control', 'public, max-age=3600');
-    res.sendFile(file, { root: path.join(MINI_MEDIA_DIR, slug), dotfiles: 'deny' }, (err) => {
-      if (err && !res.headersSent) {
-        res.removeHeader('Cache-Control');
-        res.status(404).json({ error: 'Not found' });
-      }
+    // Live media is shareable; anything reached via a preview token must never
+    // sit in a shared cache (Cloudflare), so it is private + no-store.
+    const live = await miniLessons.mediaAccess(slug, version, null);
+    res.set('Cache-Control', live ? 'public, max-age=3600' : 'private, no-store');
+    res.sendFile(file, { root: path.join(MINI_MEDIA_DIR, slug, ver), dotfiles: 'deny' }, (err) => {
+      if (!err || res.headersSent) return;
+      res.removeHeader('Cache-Control');
+      if (err.code === 'ENOENT' || err.code === 'ENOTDIR') return res.status(404).json({ error: 'Not found' });
+      console.error('explained media send failed:', err.message);
+      res.status(500).json({ error: 'Server error' });
     });
   } catch (err) {
     console.error('explained media failed:', err.message);

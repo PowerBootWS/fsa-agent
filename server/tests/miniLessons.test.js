@@ -105,3 +105,38 @@ test('non-ASCII token of 64 chars resolves to null, no throw', async () => {
   await ml.upsertDraft(payload('v1'));
   expect(await ml.getPublic(SLUG, '\u00e9'.repeat(64))).toBeNull();
 });
+
+test('mediaAccess: live version anyone; draft only with token; held/superseded/wrong false', async () => {
+  const r1 = await ml.upsertDraft(payload('v1'));
+  expect(await ml.mediaAccess(SLUG, 1, null)).toBe(false); // pending, no token
+  expect(await ml.mediaAccess(SLUG, 1, r1.preview_token)).toBe(true);
+  expect(await ml.mediaAccess(SLUG, 1, 'wrong')).toBe(false);
+  expect(await ml.mediaAccess(SLUG, 1, '')).toBe(false);
+  expect(await ml.mediaAccess('test-mini-nope', 1, r1.preview_token)).toBe(false);
+  await ml.setStatus(SLUG, 'live', { checksPassed: true });
+  expect(await ml.mediaAccess(SLUG, 1, null)).toBe(true);
+  const r2 = await ml.upsertDraft(payload('v2'));
+  expect(await ml.mediaAccess(SLUG, 1, null)).toBe(true);   // live stays served
+  expect(await ml.mediaAccess(SLUG, 2, null)).toBe(false);
+  expect(await ml.mediaAccess(SLUG, 2, 'wrong')).toBe(false);
+  expect(await ml.mediaAccess(SLUG, 2, r2.preview_token)).toBe(true);
+  expect(await ml.mediaAccess(SLUG, 3, r2.preview_token)).toBe(false);
+  await ml.setStatus(SLUG, 'held', { holdReason: 'bad' });
+  expect(await ml.mediaAccess(SLUG, 2, r2.preview_token)).toBe(false); // held draft never
+  expect(await ml.mediaAccess(SLUG, 1, null)).toBe(true);
+  // promote a new draft: old v1 superseded
+  const r3 = await ml.upsertDraft(payload('v3'));
+  await ml.setStatus(SLUG, 'live', { checksPassed: true });
+  expect(await ml.mediaAccess(SLUG, r3.version, null)).toBe(true);
+  expect(await ml.mediaAccess(SLUG, 1, null)).toBe(false);
+});
+
+test('getPublic reports version and is_draft', async () => {
+  const r1 = await ml.upsertDraft(payload('v1'));
+  expect(await ml.getPublic(SLUG, r1.preview_token)).toMatchObject({ version: 1, is_draft: true });
+  await ml.setStatus(SLUG, 'live', { checksPassed: true });
+  expect(await ml.getPublic(SLUG, null)).toMatchObject({ version: 1, is_draft: false });
+  const r2 = await ml.upsertDraft(payload('v2'));
+  expect(await ml.getPublic(SLUG, r2.preview_token)).toMatchObject({ version: 2, is_draft: true });
+  expect(await ml.getPublic(SLUG, 'bad')).toMatchObject({ version: 1, is_draft: false });
+});
