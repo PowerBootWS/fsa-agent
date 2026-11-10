@@ -16,7 +16,7 @@ async function clean() {
   await pool.query(`DELETE FROM mini_lessons WHERE slug LIKE 'test-mini-%'`);
 }
 beforeEach(clean);
-afterAll(async () => { await clean(); await pool.end(); });
+afterAll(async () => { await clean(); await pool.end(); await require('../src/services/database').pool.end(); });
 
 test('upsertDraft new slug is pending v1 with 64-hex token', async () => {
   const r = await ml.upsertDraft(payload('v1'));
@@ -88,4 +88,15 @@ test('list', async () => {
   const l = (await ml.list()).find(r => r.slug === SLUG);
   expect(l).toMatchObject({ title: 'v1', paper_code: '2B3', source_lesson_code: '2B3-1-7', status: 'pending' });
   expect(l.updated_at).toBeTruthy();
+});
+
+test('rebuild metadata is versioned: live keeps title A, draft token sees B', async () => {
+  await ml.upsertDraft(payload('v1', { title: 'A' }));
+  await ml.setStatus(SLUG, 'live', { checksPassed: true });
+  const r2 = await ml.upsertDraft(payload('v2', { title: 'B', description: 'd2', og_image_url: 'x.png' }));
+  expect((await ml.getPublic(SLUG, null)).title).toBe('A');
+  expect((await ml.getPublic(SLUG, null)).og_image_url).toBeNull();
+  const d = await ml.getPublic(SLUG, r2.preview_token);
+  expect(d).toMatchObject({ title: 'B', description: 'd2', og_image_url: 'x.png' });
+  expect((await ml.list()).find(r => r.slug === SLUG).title).toBe('A');
 });
