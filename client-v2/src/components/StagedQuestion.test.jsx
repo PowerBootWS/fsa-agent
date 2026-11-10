@@ -29,8 +29,9 @@ describe('StagedQuestion', () => {
     fireEvent.click(screen.getByRole('button', { name: /S1 A/ }));
     expect(screen.getByText('Because 1')).toBeTruthy();
     expect(screen.getByText('Not quite')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /S1 B/ }).className).toContain('sq-correct');
-    expect(screen.getByRole('button', { name: /S1 A/ }).className).toContain('sq-wrong');
+    expect(screen.getByRole('button', { name: /S1 B.*\(correct answer\)/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /S1 A.*\(your answer\)/ })).toBeTruthy();
+    expect(screen.queryByText(/S1 C.*\(/)).toBeNull();
     expect(screen.getByRole('button', { name: /S1 C/ }).disabled).toBe(true);
   });
 
@@ -71,14 +72,45 @@ describe('StagedQuestion', () => {
     expect(screen.queryByRole('button', { name: 'Next question' })).toBeNull();
   });
 
-  it('resets when the question prop changes', () => {
-    const { rerender } = setup();
+  it('resets when rendered with a different key', () => {
+    const { rerender } = render(<StagedQuestion key={1} question={Q} number={1} total={3} onDone={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /S1 B/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Next step' }));
     const Q2 = { question_text: 'Second problem', step_data: { steps: [mk(9)] } };
-    rerender(<StagedQuestion question={Q2} number={2} total={3} onDone={() => {}} />);
+    rerender(<StagedQuestion key={2} question={Q2} number={2} total={3} onDone={() => {}} />);
     expect(screen.getByText('Second problem')).toBeTruthy();
     expect(screen.getByText('Step 9 question')).toBeTruthy();
     expect(screen.getByRole('button', { name: /S9 A/ }).disabled).toBe(false);
+  });
+
+  it('Finish calls onDone', () => {
+    const { onDone } = setup({ number: 3, total: 3, question: { question_text: 'T', step_data: { steps: [mk(1)] } } });
+    fireEvent.click(screen.getByRole('button', { name: /S1 B/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    expect(onDone).toHaveBeenCalledWith({ stepsCorrect: 1, steps: 1 });
+  });
+
+  it('single-step question shows the done label straight away', () => {
+    setup({ question: { question_text: 'T', step_data: { steps: [mk(1)] } } });
+    fireEvent.click(screen.getByRole('button', { name: /S1 A/ }));
+    expect(screen.getByRole('button', { name: 'Next question' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Next step' })).toBeNull();
+  });
+
+  it('correct index 0 works', () => {
+    const step = { ...mk(1), correct: 0 };
+    const { onDone } = setup({ number: 3, total: 3, question: { question_text: 'T', step_data: { steps: [step] } } });
+    fireEvent.click(screen.getByRole('button', { name: /S1 A/ }));
+    expect(screen.getByText('Correct')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    expect(onDone).toHaveBeenCalledWith({ stepsCorrect: 1, steps: 1 });
+  });
+
+  it('moves focus to the Next button after a pick; status excludes the button', () => {
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: /S1 B/ }));
+    const next = screen.getByRole('button', { name: 'Next step' });
+    expect(document.activeElement).toBe(next);
+    expect(screen.getByRole('status').contains(next)).toBe(false);
   });
 });

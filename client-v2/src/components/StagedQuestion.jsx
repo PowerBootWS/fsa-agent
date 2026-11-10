@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { MathContent } from './MathContent';
 import './StagedQuestion.css';
 
 /**
  * Staged multi-step practice question. Each step is a single-answer MCQ;
  * picking locks the step and reveals the answer plus explanation.
+ *
+ * Internal step state is NOT reset when `question` changes. The parent must
+ * render it with `key={<question identity>}` (e.g. key={question.position}).
  */
 export function StagedQuestion({ question, number, total, onDone }) {
   const steps = question?.step_data?.steps || [];
@@ -12,12 +15,10 @@ export function StagedQuestion({ question, number, total, onDone }) {
   const [picked, setPicked] = useState(null);
   const [correctCount, setCorrectCount] = useState(0);
 
-  // The page reuses this component for questions 2 and 3.
+  const nextRef = useRef(null);
   useEffect(() => {
-    setStepIdx(0);
-    setPicked(null);
-    setCorrectCount(0);
-  }, [question]);
+    if (picked !== null && nextRef.current) nextRef.current.focus();
+  }, [picked, stepIdx]);
 
   const step = steps[stepIdx];
   if (!step) return null;
@@ -66,17 +67,21 @@ export function StagedQuestion({ question, number, total, onDone }) {
               onClick={() => pick(i)}
             >
               <MathContent text={opt} />
+              {answered && i === step.correct && <span className="sq-marker"> (correct answer)</span>}
+              {answered && i === picked && i !== step.correct && <span className="sq-marker"> (your answer)</span>}
             </button>
           );
         })}
       </div>
       {answered && (
-        <div className="sq-feedback" role="status">
-          <div className={`sq-verdict ${isCorrect ? 'sq-verdict-ok' : 'sq-verdict-bad'}`}>
-            {isCorrect ? 'Correct' : 'Not quite'}
+        <div className="sq-feedback">
+          <div role="status">
+            <div className={`sq-verdict ${isCorrect ? 'sq-verdict-ok' : 'sq-verdict-bad'}`}>
+              {isCorrect ? 'Correct' : 'Not quite'}
+            </div>
+            <div className="sq-explanation"><MathContent text={step.explanation || ''} /></div>
           </div>
-          <div className="sq-explanation"><MathContent text={step.explanation || ''} /></div>
-          <button type="button" className="sq-next" onClick={next}>
+          <button type="button" className="sq-next" ref={nextRef} onClick={next}>
             {isLastStep ? doneLabel : 'Next step'}
           </button>
         </div>
