@@ -116,3 +116,65 @@ def test_start_attempt_failure_is_non_fatal(r):
     with patch.object(r, '_get_connection', side_effect=RuntimeError('db down')):
         assert r.start_attempt(USER, '2B1', 'practice_exam', question_count=1) is None
         r.finish_attempt(1, score=1, score_pct=100)  # must not raise
+
+
+# ---------------------------------------------------------------- Phase D
+
+def _answer(db, user, attempt_id, position, qid, correct, session='practice_exam', chapter='2B1-3'):
+    db.execute(
+        """INSERT INTO question_responses (user_email, question_id, session_type, course_id, chapter_id,
+                                           correct, attempt_id, position)
+           VALUES (%s, %s, %s, '2B1', %s, %s, %s, %s)""",
+        (user, qid, session, chapter, correct, attempt_id, position))
+
+
+@pytest.fixture
+def extra_questions(db):
+    ids = []
+    for text, standalone in (('Extra wrong live', True), ('Extra retired', False), ('Extra right', True)):
+        db.execute(
+            """INSERT INTO questions (course_id, chapter_id, question_text, options, correct_answer,
+                                      standalone, lesson_code)
+               VALUES ('2B1', '2B1-4', %s, '["a","b","c","d"]', 1, %s, '2B1-4-2') RETURNING id""",
+            (text, standalone))
+        ids.append(db.fetchone()['id'])
+    yield ids
+    db.execute('DELETE FROM question_responses WHERE user_email = %s', (USER,))
+    db.execute('DELETE FROM questions WHERE id = ANY(%s)', (ids,))
+
+
+def test_get_retry_questions_serves_live_wrong_ones_in_order(r, db, question_id, extra_questions):
+    wrong_live, retired, right = extra_questions
+    aid = r.start_attempt(USER, '2B1', 'practice_exam', question_count=4)
+    _answer(db, USER, aid, 1, right, True)
+    _answer(db, USER, aid, 2, wrong_live, False, chapter='2B1-4')
+    _answer(db, USER, aid, 3, question_id, False)
+    _answer(db, USER, aid, 4, retired, False, chapter='2B1-4')
+    r.finish_attempt(aid, 1, 25)
+    db.execute("UPDATE questions SET question_text = 'Rewritten after the attempt' WHERE id = %s", (wrong_live,))
+
+    parent, qs = r.get_retry_questions(USER, aid, '2B1')
+    assert parent == {'id': aid, 'course_id': '2B1', 'chapter_id': None, 'kind': 'practice_exam'}
+    assert [q['id'] for q in qs] == [wrong_live, question_id]  # position order; retired skipped
+    assert qs[0]['question_text'] == 'Rewritten after the attempt'  # live, not the snapshot
+    assert qs[0]['chapter_id'] == '2B1-4' and qs[0]['lesson_code'] == '2B1-4-2'
+    assert qs[0]['correct_answer'] == 1
+
+
+def test_get_retry_questions_refuses_other_users_wrong_paper_and_unfinished(r, db, question_id):
+    aid = r.start_attempt(USER, '2B1', 'chapter_quiz', question_count=1, chapter_id='2B1-3')
+    _answer(db, USER, aid, 1, question_id, False, session='chapter_quiz')
+    assert r.get_retry_questions(USER, aid, '2B1') == (None, [])           # not finished
+    r.finish_attempt(aid, 0, 0)
+    assert r.get_retry_questions('someone-else@example.invalid', aid, '2B1') == (None, [])
+    assert r.get_retry_questions(USER, aid, '3A1') == (None, [])           # wrong paper
+    parent, qs = r.get_retry_questions(USER, aid, '2B1')
+    assert parent['chapter_id'] == '2B1-3' and [q['id'] for q in qs] == [question_id]
+
+
+def test_chapter_weights_ignore_retry_answers(r, db, question_id):
+    _answer(db, USER, None, None, question_id, False, session='practice_exam')
+    _answer(db, USER, None, None, question_id, True, session='retry_wrong')
+    _answer(db, USER, None, None, question_id, True, session='retry_wrong')
+    w = r.get_chapter_weights(USER, '2B1')
+    assert w == {'2B1-3': {'accuracy': 0.0, 'total': 1}}

@@ -898,6 +898,70 @@ class Researcher:
         except Exception as e:
             print(f'Researcher.finish_attempt error (non-fatal): {e}')
 
+    def get_retry_questions(self, user_email, parent_attempt_id, course_id):
+        """
+        "Retry the ones I got wrong": the questions answered wrong in one of the
+        student's own finished attempts on `course_id`, in the order they were
+        shown. Serves the LIVE question (current wording and key) so a retry
+        after a #138 cutover practises the current material; deleted
+        (question_id NULL) and retired (standalone = false) questions are
+        skipped. Returns (parent, questions), or (None, []) when the attempt is
+        not this student's, not on this paper, not finished, or on any error.
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, course_id, chapter_id, kind FROM assessment_attempts
+                 WHERE id = %s AND user_email = %s AND course_id = %s
+                   AND finished_at IS NOT NULL
+                """,
+                (parent_attempt_id, user_email, course_id)
+            )
+            parent = cursor.fetchone()
+            if not parent:
+                cursor.close()
+                conn.close()
+                return None, []
+            cursor.execute(
+                """
+                SELECT q.id, q.question_text, q.options, q.correct_answer, q.explanation,
+                       q.difficulty, q.topic, q.step_data, q.chapter_id, q.lesson_code
+                  FROM (SELECT question_id, MIN(position) AS position
+                          FROM question_responses
+                         WHERE attempt_id = %s AND NOT correct AND question_id IS NOT NULL
+                         GROUP BY question_id) w
+                  JOIN questions q ON q.id = w.question_id
+                 WHERE q.standalone = TRUE
+                   AND q.options IS NOT NULL AND jsonb_array_length(q.options) > 0
+                 ORDER BY w.position, q.id
+                """,
+                (parent_attempt_id,)
+            )
+            rows = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            questions = [
+                {
+                    'id': row['id'],
+                    'question_text': row['question_text'],
+                    'options': row['options'],
+                    'correct_answer': row['correct_answer'],
+                    'explanation': row['explanation'] or '',
+                    'difficulty': row['difficulty'],
+                    'topic': row['topic'] or '',
+                    'step_data': row['step_data'],
+                    'chapter_id': row['chapter_id'],
+                    'lesson_code': row['lesson_code'] or '',
+                }
+                for row in rows
+            ]
+            return dict(parent), questions
+        except Exception as e:
+            print(f'Researcher.get_retry_questions error: {e}')
+            return None, []
+
     def save_last_debrief(self, user_email, course_id, debrief):
         """
         Persist the most recent completed-exam debrief (full results + tutor
@@ -968,6 +1032,10 @@ class Researcher:
                 WHERE user_email = %s
                   AND course_id  = %s
                   AND chapter_id IS NOT NULL
+                  -- "Retry the ones I got wrong" answers don't move the
+                  -- adaptive weighting (Russ, 2026-11-10): a retry is a second
+                  -- look at known questions, not a fresh read of the chapter.
+                  AND session_type <> 'retry_wrong'
                 GROUP BY chapter_id
                 """,
                 (user_email, course_id)
