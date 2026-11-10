@@ -57,6 +57,28 @@ function ThinkingDots() {
 // existed.
 // ---------------------------------------------------------------------------
 
+// Turns a non-2xx chat response into a thrown error carrying the status, so
+// callers can't read an error body as an exam turn and silently do nothing.
+// That is how an expired free-exam token froze a student on question 99 with
+// no message (2026-11-09).
+async function readChatResponse(r) {
+  if (!r.ok) {
+    const err = new Error(`Chat request failed (HTTP ${r.status})`);
+    err.status = r.status;
+    throw err;
+  }
+  return r.json();
+}
+
+export function chatErrorMessage(err, { leadMagnet } = {}) {
+  if (err?.status === 401 || err?.status === 403) {
+    return leadMagnet
+      ? 'Your practice exam session has expired, so this answer could not be saved. Email support@fullsteamahead.ca and we will sort out your results.'
+      : 'Your session has ended (you may have signed in on another device). Sign in again to continue.';
+  }
+  return 'Your answer could not be sent. Check your connection and select your answer again.';
+}
+
 function postChatMessage(message, { leadMagnetToken, user, lessonId, examConfig } = {}) {
   if (leadMagnetToken) {
     return fetch('/api/practice-exam/chat', {
@@ -521,6 +543,9 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
   // re-renders (the exam_done display state itself is normally stable once
   // set, but this makes the "fires exactly once" contract explicit).
   const examDoneFiredRef = useRef(false);
+  // Shown above the question when a chat request fails, instead of leaving
+  // the student on a question that silently never advances.
+  const [chatError, setChatError] = useState(null);
 
   const updateMessages = (updater) => {
     setChatState(prev => ({
@@ -532,7 +557,7 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
   useEffect(() => {
     if (chatState.messages.length === 0) {
       postChatMessage('hello', { leadMagnetToken, user, lessonId, examConfig })
-        .then(r => r.json())
+        .then(readChatResponse)
         .then(data => {
           const msgs = [];
           if (data.tutor_response) {
@@ -545,7 +570,10 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
             examProgress: data.exam_progress ?? prev.examProgress,
           }));
         })
-        .catch(err => console.error('Init error:', err));
+        .catch(err => {
+          console.error('Init error:', err);
+          setChatError(chatErrorMessage(err, { leadMagnet: !!leadMagnetToken }));
+        });
     }
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -616,8 +644,9 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
       }));
     }
 
+    setChatError(null);
     postChatMessage(answer, { leadMagnetToken, user, lessonId })
-      .then(r => r.json())
+      .then(readChatResponse)
       .then(data => {
         setChatState(prev => {
           if (suppressChat) {
@@ -643,6 +672,11 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
       .catch(err => {
         console.error('Chat error:', err);
         setCompilingResults(false);
+        // Drop the placeholder tutor bubble added above for the final question.
+        if (!suppressChat) {
+          setChatState(prev => ({ ...prev, messages: prev.messages.slice(0, -1) }));
+        }
+        setChatError(chatErrorMessage(err, { leadMagnet: !!leadMagnetToken }));
       });
   };
 
@@ -672,6 +706,9 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
 
       <div className="quizexam-body" style={{ display: 'block', overflowY: 'auto' }}>
         <div className="quizexam-question-panel" style={{ width: '100%', maxWidth: isExam && isDone ? '1180px' : '800px', margin: '0 auto', borderRight: 'none' }}>
+          {chatError && (
+            <div className="exam-chat-error" role="alert">{chatError}</div>
+          )}
           {compilingResults && !isDone ? (
             <div className="exam-compiling">
               <div className="exam-compiling-spinner" />

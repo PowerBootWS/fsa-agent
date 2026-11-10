@@ -1076,6 +1076,16 @@ body {
   letter-spacing: 0.02em;
 }
 .exam-compiling-sub { font-size: 14px; color: var(--gray-mid); }
+.exam-chat-error {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid #b91c1c;
+  border-radius: 6px;
+  background: rgba(185, 28, 28, 0.12);
+  color: var(--off-white);
+  font-size: 15px;
+  line-height: 1.45;
+}
 
 /* Floating tutor button — pulse to draw attention when the debrief is ready. */
 .tutor-fab--pulse { animation: tutor-fab-pulse 1.4s ease-out infinite; }
