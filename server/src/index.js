@@ -177,6 +177,10 @@ app.use('/api/preview', previewRouter);
 const practiceExamRouter = require('./routes/practiceExam');
 app.use('/api/practice-exam', practiceExamRouter);
 
+// Free public mini lessons. Deliberately unauthenticated; see routes/explained.js.
+const { apiRouter: explainedApiRouter, mediaRouter: explainedMediaRouter } = require('./routes/explained');
+app.use('/api/explained', explainedApiRouter);
+
 // v2 routes
 const v2LessonRouter = require('./routes/v2/lesson');
 const { gateLessonAccess } = require('./middleware/platformGate');
@@ -235,6 +239,10 @@ app.use('/api', (req, res) => {
 // which is read-only lesson content, not user uploads).
 const USER_UPLOADS_DIR = process.env.USER_UPLOADS_DIR || '/srv/fsa-user-uploads';
 fs.mkdirSync(USER_UPLOADS_DIR, { recursive: true });
+
+// Public mini-lesson media. Mounted BEFORE /media and separate from it: only
+// slugs getPublic would serve, from MINI_MEDIA_DIR, never the course tree.
+app.use('/explained-media', explainedMediaRouter);
 
 // Serve lesson media files (bind-mounted from host)
 const MEDIA_DIR = process.env.MEDIA_DIR || '/srv/fsa-media';

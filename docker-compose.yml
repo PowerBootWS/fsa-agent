@@ -37,11 +37,13 @@ services:
       - POSTGRES_PORT=5432
       - PYTHON_SERVICE_URL=http://ai-service:5000
       - MEDIA_DIR=/srv/fsa-media
+      - MINI_MEDIA_DIR=/srv/fsa-mini-media
       - USER_UPLOADS_DIR=/srv/fsa-user-uploads
       - TZ=America/Edmonton
       - AGENT_OUTBOX_DIR=/agent-outbox
     volumes:
       - ${FSA_MEDIA_DIR}:/srv/fsa-media:ro
+      - ${FSA_MINI_MEDIA_DIR}:/srv/fsa-mini-media:ro
       - ${FSA_USER_UPLOADS_DIR}:/srv/fsa-user-uploads
       - ${FSA_GENERATED_DOCS_DIR}:/srv/fsa-generated-documents:ro
       # Gmail service-account key — the only outbound mail credential.
