@@ -1,5 +1,5 @@
 const { pool } = require('./testPool');
-const { getObjectiveProgress, getLastExam, getWeakChapters } = require('../src/services/paperStats');
+const { getObjectiveProgress, getLastExam, getWeakChapters, getChapterQuizScores } = require('../src/services/paperStats');
 
 // question_responses / user_progress are keyed by email, not user id, so the
 // fixture needs no platform_users row; clean up by the fixture email only.
@@ -101,6 +101,41 @@ describe('paperStats', () => {
 
   it('getWeakChapters with no exams is empty', async () => {
     expect(await getWeakChapters(pool, EMAIL, '2A3')).toEqual({ exams: 0, chapters: [] });
+  });
+
+  // The Rylan Arams thread (2026-11-08) found the lobby's chapter test score
+  // added up every attempt at a chapter, so failing then passing still showed
+  // a blended score. It is now the latest finished chapter quiz.
+  it('getChapterQuizScores uses the latest finished chapter quiz per chapter', async () => {
+    await attempt({ kind: 'chapter_quiz', started: '2026-11-01T10:00:00Z', count: 10, score: 4, pct: 40,
+      stats: { '2A3-1': { correct: 4, total: 10 } } });
+    await attempt({ kind: 'chapter_quiz', started: '2026-11-02T10:00:00Z', count: 10, score: 9, pct: 90,
+      stats: { '2A3-1': { correct: 9, total: 10 } } });
+    await attempt({ kind: 'chapter_quiz', started: '2026-11-03T10:00:00Z', finished: null, count: 10, score: 0, pct: 0 });
+    await attempt({ kind: 'retry_wrong', started: '2026-11-04T10:00:00Z', count: 1, score: 0, pct: 0 });
+    await pool.query(`UPDATE assessment_attempts SET chapter_id = '2A3-1' WHERE user_email = $1`, [EMAIL]);
+    const scores = await getChapterQuizScores(pool, EMAIL, '2A3');
+    expect(scores).toEqual([
+      { chapter_id: '2A3-1', score: 90, total: 10, correct: 9, last_attempt: expect.anything() },
+    ]);
+  });
+
+  it('getChapterQuizScores falls back to pre-history answers only for chapters with no attempt', async () => {
+    const answer = (chapter, correct, attemptId = null) => pool.query(
+      `INSERT INTO question_responses (user_email, course_id, chapter_id, session_type, correct, question_id, attempt_id)
+       VALUES ($1, '2A3', $2, 'chapter_quiz', $3, $4, $5)`, [EMAIL, chapter, correct, FIXTURE_QUESTION_ID, attemptId]);
+    await answer('2A3-2', true);
+    await answer('2A3-2', false);
+    await answer('2A3-1', false);   // old answer on a chapter that now has an attempt: ignored
+    const { rows: [a] } = await attempt({ kind: 'chapter_quiz', started: '2026-11-02T10:00:00Z', count: 2, score: 2, pct: 100,
+      stats: { '2A3-1': { correct: 2, total: 2 } } });
+    await pool.query(`UPDATE assessment_attempts SET chapter_id = '2A3-1' WHERE id = $1`, [a.id]);
+    await answer('2A3-1', true, a.id);
+    const scores = await getChapterQuizScores(pool, EMAIL, '2A3');
+    expect(scores.map(s => [s.chapter_id, s.score, s.correct, s.total])).toEqual([
+      ['2A3-1', 100, 2, 2],
+      ['2A3-2', 50, 1, 2],
+    ]);
   });
 
   it('getObjectiveProgress returns percent 0 for a paper with no lessons', async () => {

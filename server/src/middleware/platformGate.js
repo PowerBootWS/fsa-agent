@@ -16,6 +16,7 @@
  */
 
 const { pool } = require('../services/database');
+const { getChapterQuizScores } = require('../services/paperStats');
 
 // Master switch for sequential progression gating. Disabled 2026-06-16 to allow
 // free navigation across all chapters/objectives.
@@ -28,18 +29,10 @@ const PASSING_THRESHOLD = () => parseInt(process.env.QUIZ_PASSING_THRESHOLD || '
  * chapterId format: '{COURSE}-{CHAPTER_NUM}' e.g. '3A1-1'
  */
 async function isChapterQuizPassed(userEmail, chapterId) {
-  const result = await pool.query(
-    `SELECT
-       COUNT(*) as total,
-       SUM(CASE WHEN correct THEN 1 ELSE 0 END) as correct
-     FROM question_responses
-     WHERE user_email = $1 AND chapter_id = $2 AND session_type = 'chapter_quiz'`,
-    [userEmail, chapterId]
-  );
-  const row = result.rows[0];
-  if (!row || parseInt(row.total, 10) === 0) return false;
-  const score = Math.round((parseInt(row.correct, 10) / parseInt(row.total, 10)) * 100);
-  return score >= PASSING_THRESHOLD();
+  // Latest finished chapter quiz for that chapter (see paperStats.getChapterQuizScores).
+  const paper = String(chapterId).split('-')[0];
+  const quiz = (await getChapterQuizScores(pool, userEmail, paper)).find(q => q.chapter_id === chapterId);
+  return Boolean(quiz) && quiz.score >= PASSING_THRESHOLD();
 }
 
 /**
