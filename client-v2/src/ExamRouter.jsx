@@ -830,7 +830,7 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
 // PracticeExamRouter — orchestrates lobby → exam → results flow
 // ---------------------------------------------------------------------------
 
-function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setChatState, startPhase, initialConfig, initialChapterId, onExit, onComplete, leadMagnetToken, onExamDone, leadMagnetMode }) {
+function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setChatState, startPhase, initialConfig, initialChapterId, onExit, exitLabel = '← Back to Lobby', onComplete, leadMagnetToken, onExamDone, leadMagnetMode }) {
   const [phase, setPhase] = useState(startPhase || 'lobby');
   const [examConfig, setExamConfig] = useState(initialConfig || null);
   const [activeChapterId, setActiveChapterId] = useState(initialChapterId || null);
@@ -944,7 +944,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
               and 'results' together since handleBack() returns to either one
               correctly and "Back to Exam Results" reads fine for both. */}
           <button className="quizexam-back-btn" onClick={handleBack}>
-            {returnPhase === 'lobby' || returnPhase === 'exit' ? '← Back to Lobby' : '← Back to Exam Results'}
+            {returnPhase === 'exit' ? exitLabel : returnPhase === 'lobby' ? '← Back to Lobby' : '← Back to Exam Results'}
           </button>
         </div>
         <QuizExamView
@@ -995,7 +995,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
 // ExamRouter — top-level export, receives courseId + learnerId from App.jsx
 // ---------------------------------------------------------------------------
 
-export function ExamRouter({ courseId, learnerId, classCode, initialConfig, initialChapterId, onExit, onComplete, leadMagnetToken, onExamDone }) {
+export function ExamRouter({ courseId, learnerId, classCode, initialConfig, initialChapterId, onExit, exitLabel, onComplete, leadMagnetToken, onExamDone }) {
   const [chatState, setChatState] = useState({
     messages: [],
     displayContent: null,
@@ -1023,6 +1023,7 @@ export function ExamRouter({ courseId, learnerId, classCode, initialConfig, init
         initialConfig={initialConfig}
         initialChapterId={initialChapterId}
         onExit={onExit}
+        exitLabel={exitLabel}
         onComplete={onComplete}
         leadMagnetToken={leadMagnetToken}
         onExamDone={onExamDone}

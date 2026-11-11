@@ -10,6 +10,9 @@ export default function PracticeExamPage() {
   // ?quiz=<chapterId> (e.g. 2B3-4) → straight into that chapter quiz; the
   // platform lobby's Chapter Quizzes list links here.
   const quizChapter = params.get('quiz') || null;
+  // ?quiz=<PAPER>-R<attemptId> is "retry the ones I got wrong" from a past
+  // attempt; Back returns to that attempt instead of the lobby.
+  const retryOf = quizChapter && /^[A-Za-z0-9]{2,5}-R(\d+)$/.exec(quizChapter)?.[1];
 
   const user = JSON.parse(localStorage.getItem('fsa_user') || '{}');
 
@@ -27,7 +30,8 @@ export default function PracticeExamPage() {
       classCode={user.class_code}
       initialConfig={quizChapter ? null : initialConfig}
       initialChapterId={quizChapter}
-      onExit={() => navigate('/lobby')}
+      onExit={() => navigate(retryOf ? `/attempts/${retryOf}` : '/lobby')}
+      exitLabel={retryOf ? '← Back to attempt' : undefined}
       onComplete={(debrief) =>
         navigate(`/exam/results?paper=${encodeURIComponent(paper)}`, { state: { debrief } })
       }
