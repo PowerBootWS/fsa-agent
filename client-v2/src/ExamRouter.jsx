@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -12,6 +13,7 @@ import { CountdownTimer } from './components/CountdownTimer.jsx';
 import { isFourthClassCode } from './utils/fourthClass';
 import FlagQuestion from './components/FlagQuestion';
 import { track } from './utils/usage';
+import { pastAttemptsHref, retryWrongHref, retryWrongLabel } from './pages/attemptFormat';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -172,7 +174,7 @@ function ExamProgressBar({ current, total, correct }) {
 // Results panel
 // ---------------------------------------------------------------------------
 
-export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, user, leadMagnetMode = false }) {
+export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter, user, leadMagnetMode = false, pastAttemptsHref: pastHref = null, retryWrongHref: retryHref = null, retryOfMissed = false }) {
   const { score, total, score_pct, chapter_stats,
           objective_breakdowns, next_attempt_allocation, question_review,
           distractor_coaching } = displayContent;
@@ -186,6 +188,7 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
   };
 
   const hasFocus = objective_breakdowns && objective_breakdowns.length > 0;
+  const wrongCount = (question_review || []).filter(q => !q.correct).length;
   const hasReview = question_review && question_review.length > 0;
 
   // Left column — the score overview, always visible (sticky) while the
@@ -247,14 +250,28 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
           >
             {retrying
               ? 'Loading…'
-              : isExam ? 'Retake Exam (Adaptive)' : 'Retry Quiz'}
+              : isExam ? 'Retake Exam (Adaptive)' : retryOfMissed ? 'Retry what I still missed' : 'Retry Quiz'}
           </button>
           <p className="results-retry-hint">
             {isExam
               ? 'Your next exam will pull more questions from chapters you struggled with.'
-              : 'Get a fresh, randomly selected set of questions for this chapter.'}
+              : retryOfMissed
+                ? 'Serves only the questions you got wrong this time.'
+                : 'Get a fresh, randomly selected set of questions for this chapter.'}
           </p>
         </div>
+      )}
+
+      {!leadMagnetMode && retryHref && wrongCount > 0 && (
+        <div className="results-retry-wrong-block">
+          <Link className="results-retry-wrong-btn" to={retryHref}>{retryWrongLabel(wrongCount)}</Link>
+        </div>
+      )}
+
+      {!leadMagnetMode && pastHref && (
+        <Link className="results-past-link" to={pastHref}>
+          {isExam ? 'All your past practice exams' : 'Past attempts at this quiz'}
+        </Link>
       )}
 
       {/* Lead-magnet exams have no lobby to return to and no saved
@@ -333,7 +350,21 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
 // Quiz/exam display section
 // ---------------------------------------------------------------------------
 
-function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSelectChapter, user, leadMagnetMode }) {
+// '2B1-R12' is a retry of the wrong answers from attempt 12 (see attemptFormat).
+function isRetryLesson(lessonId) {
+  return /^[A-Za-z0-9]{2,5}-R\d+$/.test(String(lessonId || ''));
+}
+
+function pastHrefFor(lessonId, mode) {
+  if (!lessonId) return null;
+  const course = String(lessonId).split('-')[0];
+  if (isRetryLesson(lessonId)) return pastAttemptsHref({ course });
+  return mode === 'chapter_quiz'
+    ? pastAttemptsHref({ course, kind: 'chapter_quiz', chapter: lessonId })
+    : pastAttemptsHref({ course: lessonId, kind: 'practice_exam' });
+}
+
+function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSelectChapter, user, leadMagnetMode, lessonId }) {
   if (!displayContent) {
     return (
       <div className="quizexam-display-empty">
@@ -353,6 +384,10 @@ function QuizExamDisplaySection({ displayContent, onAnswer, isExam, mode, onSele
         onSelectChapter={leadMagnetMode ? null : onSelectChapter}
         user={user}
         leadMagnetMode={leadMagnetMode}
+        pastAttemptsHref={pastHrefFor(lessonId, mode)}
+        retryOfMissed={isRetryLesson(lessonId)}
+        retryWrongHref={isRetryLesson(lessonId) ? null
+          : retryWrongHref(String(lessonId || '').split('-')[0], displayContent.attempt_id)}
       />
     );
   }
@@ -724,6 +759,7 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
               onSelectChapter={onSelectChapter}
               user={user}
               leadMagnetMode={leadMagnetMode}
+              lessonId={lessonId}
             />
           )}
         </div>
@@ -794,7 +830,7 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
 // PracticeExamRouter — orchestrates lobby → exam → results flow
 // ---------------------------------------------------------------------------
 
-function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setChatState, startPhase, initialConfig, initialChapterId, onExit, onComplete, leadMagnetToken, onExamDone, leadMagnetMode }) {
+function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setChatState, startPhase, initialConfig, initialChapterId, onExit, exitLabel = '← Back to Lobby', onComplete, leadMagnetToken, onExamDone, leadMagnetMode }) {
   const [phase, setPhase] = useState(startPhase || 'lobby');
   const [examConfig, setExamConfig] = useState(initialConfig || null);
   const [activeChapterId, setActiveChapterId] = useState(initialChapterId || null);
@@ -876,6 +912,8 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
                 onSelectChapter={handleSelectChapter}
                 user={user}
                 leadMagnetMode={leadMagnetMode}
+                pastAttemptsHref={pastAttemptsHref({ course: lessonId, kind: 'practice_exam' })}
+                retryWrongHref={retryWrongHref(lessonId, reviewDebrief.display_update.attempt_id)}
               />
             )}
           </div>
@@ -906,7 +944,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
               and 'results' together since handleBack() returns to either one
               correctly and "Back to Exam Results" reads fine for both. */}
           <button className="quizexam-back-btn" onClick={handleBack}>
-            {returnPhase === 'lobby' || returnPhase === 'exit' ? '← Back to Lobby' : '← Back to Exam Results'}
+            {returnPhase === 'exit' ? exitLabel : returnPhase === 'lobby' ? '← Back to Lobby' : '← Back to Exam Results'}
           </button>
         </div>
         <QuizExamView
@@ -957,7 +995,7 @@ function PracticeExamRouter({ lesson, user, classCode, lessonId, chatState, setC
 // ExamRouter — top-level export, receives courseId + learnerId from App.jsx
 // ---------------------------------------------------------------------------
 
-export function ExamRouter({ courseId, learnerId, classCode, initialConfig, initialChapterId, onExit, onComplete, leadMagnetToken, onExamDone }) {
+export function ExamRouter({ courseId, learnerId, classCode, initialConfig, initialChapterId, onExit, exitLabel, onComplete, leadMagnetToken, onExamDone }) {
   const [chatState, setChatState] = useState({
     messages: [],
     displayContent: null,
@@ -985,6 +1023,7 @@ export function ExamRouter({ courseId, learnerId, classCode, initialConfig, init
         initialConfig={initialConfig}
         initialChapterId={initialChapterId}
         onExit={onExit}
+        exitLabel={exitLabel}
         onComplete={onComplete}
         leadMagnetToken={leadMagnetToken}
         onExamDone={onExamDone}

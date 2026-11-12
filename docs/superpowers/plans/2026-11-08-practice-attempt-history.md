@@ -1,6 +1,6 @@
 # Practice Attempt History: Implementation Plan
 
-> **Status: Phases A, B, C live 2026-11-10.** A is collecting data. The B/C pages are reachable at `/attempts` by URL only; the entry-point links (§4) wait for Russ. Phase D not started.
+> **Status: all phases (A–D) live 2026-11-10.** D shipped: retry the wrong ones (session_type `retry_wrong`, migration 036), the weakest-chapters card, and the Home/lobby last-exam score now read from the latest finished attempt.
 >
 > Written 2026-11-08 from a Telegram request (task 1794180077059-36843d2a assessment + follow-up). Russ approved **all** items below, extras included, and will add more features of his own (see "Additional features (Russ to add)"). He will pick this up himself in an interactive session as the `debian`/FSA user. Nothing in this document has been built: no code, no migrations, no schema changes, no backlog item.
 >

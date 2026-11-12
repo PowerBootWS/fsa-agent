@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getJson } from '../utils/api';
 import { QuestionReview } from '../components/QuestionReview';
-import { attemptTitle, attemptDate, attemptScore, NO_REVIEW } from './attemptFormat';
+import { attemptTitle, attemptDate, attemptScore, retryWrongHref, retryWrongLabel, NO_REVIEW } from './attemptFormat';
 import './AttemptsPage.css';
 
 // One past attempt, question by question, exactly as it was shown
@@ -31,6 +31,7 @@ export default function AttemptDetailPage() {
   if (!data) return <div className="at-page"><p className="at-muted">Loading…</p></div>;
 
   const a = data.attempt;
+  const wrong = data.review_available ? data.questions.filter(q => !q.correct).length : 0;
   return (
     <div className="at-page">
       {back}
@@ -43,6 +44,11 @@ export default function AttemptDetailPage() {
         <span className="at-score">{attemptScore(a)}</span>
         <span className="at-pct">{a.score_pct}%</span>
       </div>
+      {wrong > 0 && (
+        <Link className="at-retry-btn" to={retryWrongHref(a.course_id, a.id)}>
+          {retryWrongLabel(wrong)}
+        </Link>
+      )}
       {data.review_available ? (
         <QuestionReview questions={data.questions} />
       ) : (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { pastAttemptsHref } from './attemptFormat';
 import './QuizOnlyLobbyPage.css';
 
 const PAPER_NAMES = {
@@ -25,6 +26,9 @@ function PaperCard({ paperCode, data, onStartExam }) {
           Practice This Paper
         </button>
       </div>
+      <Link className="qo-past-link" to={pastAttemptsHref({ course: paperCode })}>
+        Past attempts for {paperCode}
+      </Link>
 
       <div className="qo-chip-row">
         <span className="qo-chip">

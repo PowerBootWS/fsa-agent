@@ -40,6 +40,9 @@ def _detect_mode(lesson_id):
     Returns 'lesson', 'chapter_quiz', or 'practice_exam'.
     """
     lid = str(lesson_id)
+    # '<PAPER>-R<attemptId>': "retry the ones I got wrong" from that attempt.
+    if re.match(r'^[A-Z0-9]{2,5}-R\d{1,18}$', lid, re.IGNORECASE):
+        return 'retry_wrong'
     if re.match(r'^[A-Z0-9]{2,5}-\d{1,3}-\d{1,3}$', lid, re.IGNORECASE):
         return 'lesson'
     if re.match(r'^[A-Z0-9]{2,5}-\d{1,3}$', lid, re.IGNORECASE):
@@ -47,6 +50,12 @@ def _detect_mode(lesson_id):
     if re.match(r'^[A-Z0-9]{2,5}$', lid, re.IGNORECASE):
         return 'practice_exam'
     return 'lesson'  # numeric id or UUID → lesson
+
+
+def _retry_parent_id(lesson_id):
+    """'2B1-R12' -> 12; None for any other lesson id."""
+    m = re.match(r'^[A-Z0-9]{2,5}-R(\d{1,18})$', str(lesson_id), re.IGNORECASE)
+    return int(m.group(1)) if m else None
 
 
 def _question_snapshot(q):
@@ -244,8 +253,9 @@ class Orchestrator:
                 slide_number, screen_question, exercise,
             )
 
-        # Route chapter quiz and practice exam modes entirely separately
-        if mode == 'chapter_quiz':
+        # Route chapter quiz and practice exam modes entirely separately.
+        # A retry of wrong answers runs on the chapter-quiz flow.
+        if mode in ('chapter_quiz', 'retry_wrong'):
             return self._process_chapter_quiz(
                 state, user, lesson_id, message, researcher, display
             )
@@ -968,19 +978,29 @@ class Orchestrator:
         """
         first_name = state['first_name']
 
-        # Parse chapter context from lesson_id e.g. '2B1-1'
+        # Parse chapter context from lesson_id e.g. '2B1-1'. A retry
+        # ('2B1-R12') has no single chapter: each question keeps its own.
+        retry_parent = _retry_parent_id(lesson_id)
         parts = lesson_id.split('-')
         course_id = parts[0] if parts else lesson_id
-        chapter_id = lesson_id  # e.g. '2B1-1'
+        chapter_id = lesson_id if retry_parent is None else None  # e.g. '2B1-1'
 
         # Load questions on first message
         if not state['quiz_questions'] and not state.get('quiz_done'):
-            qs = researcher.get_chapter_quiz_questions(chapter_id, limit=CHAPTER_QUIZ_QUESTION_COUNT)
+            if retry_parent is None:
+                qs = researcher.get_chapter_quiz_questions(chapter_id, limit=CHAPTER_QUIZ_QUESTION_COUNT)
+            elif not state.get('retry_loaded'):
+                state['retry_loaded'] = True
+                parent, qs = researcher.get_retry_questions(user, retry_parent, course_id)
+                state['retry_parent'] = parent
+            else:
+                qs = []
             state['quiz_questions'] = qs
             state['quiz_index'] = 0
             state['quiz_correct'] = 0
             state['quiz_awaiting_feedback'] = False
             state['quiz_attempt_id'] = None
+            state['quiz_chapter_stats'] = {}
 
         questions = state['quiz_questions']
         idx = state['quiz_index']
@@ -989,10 +1009,29 @@ class Orchestrator:
         # ---- Handle debrief phase ----
         if state.get('quiz_done'):
             if self._is_exam_retry(message):
+                if retry_parent is not None:
+                    return self._restart_retry(state, researcher, user, course_id, first_name)
                 return self._reset_and_start_quiz(state, researcher, chapter_id, first_name)
             return self._build_chapter_quiz_debrief(state, first_name)
 
         # ---- No questions available ----
+        if not questions and retry_parent is not None:
+            if state.get('retry_parent') is None:
+                text = (f"Sorry {first_name}, I couldn't find that attempt. "
+                        "Head to Past attempts and pick it from your list.")
+            else:
+                text = (f"Those questions have since been replaced with updated ones, {first_name}, "
+                        "so there's nothing left to retry from that attempt. "
+                        "A fresh chapter quiz or practice exam will cover the current material.")
+            return {
+                'tutor_response': text,
+                'display_update': None,
+                'progress_update': {},
+                'complexity_level': state['complexity_level'],
+                'first_name': first_name,
+                'action': None,
+                'mode': 'chapter_quiz',
+            }
         if not questions:
             return {
                 'tutor_response': (
@@ -1029,18 +1068,30 @@ class Orchestrator:
             })
 
             # Record response silently. One attempt per sitting, opened on
-            # the first answer (see _record_exam_answer).
+            # the first answer (see _record_exam_answer). Retries get their
+            # own session_type so they stay out of chapter-quiz pass gates,
+            # lobby quiz stats and adaptive weighting (migration 036).
+            is_retry = retry_parent is not None
+            parent = state.get('retry_parent') or {}
+            q_chapter = (current_q.get('chapter_id') or None) if is_retry else chapter_id
             if not state.get('quiz_attempt_id'):
                 state['quiz_attempt_id'] = researcher.start_attempt(
-                    user, course_id, 'chapter_quiz',
-                    question_count=total, chapter_id=chapter_id,
+                    user, course_id, 'retry_wrong' if is_retry else 'chapter_quiz',
+                    question_count=total,
+                    chapter_id=parent.get('chapter_id') if is_retry else chapter_id,
+                    parent_attempt_id=parent.get('id') if is_retry else None,
                 )
+            stats = state.setdefault('quiz_chapter_stats', {}).setdefault(
+                q_chapter or 'Unknown', {'correct': 0, 'total': 0})
+            stats['total'] += 1
+            if student_correct:
+                stats['correct'] += 1
             researcher.record_response(
                 user_email=user,
                 question_id=current_q['id'],
-                session_type='chapter_quiz',
+                session_type='retry_wrong' if is_retry else 'chapter_quiz',
                 course_id=course_id,
-                chapter_id=chapter_id,
+                chapter_id=q_chapter,
                 correct=student_correct,
                 selected_index=selected_index,
                 attempt_id=state.get('quiz_attempt_id'),
@@ -1076,7 +1127,7 @@ class Orchestrator:
                 researcher.finish_attempt(
                     state.get('quiz_attempt_id'), score,
                     int(score / total * 100) if total else 0,
-                    {chapter_id: {'correct': score, 'total': total}},
+                    {cid: dict(v) for cid, v in state.get('quiz_chapter_stats', {}).items()},
                 )
                 return self._build_chapter_quiz_debrief(state, first_name)
 
@@ -1105,7 +1156,13 @@ class Orchestrator:
         state['quiz_current_correct_answer'] = q['correct_answer']
         state['quiz_index'] = idx + 1
 
-        if idx == 0:
+        if idx == 0 and retry_parent is not None:
+            intro = (
+                f"Let's take another run at the **{total} question{'s' if total != 1 else ''}** "
+                f"you missed, {first_name}. These are the current versions of each question, "
+                f"one at a time, with feedback after each. Here's question 1."
+            )
+        elif idx == 0:
             intro = (
                 f"Let's get into it, {first_name}! Here's your Chapter Quiz — "
                 f"**{total} questions**, one at a time. I'll give you feedback after each one. "
@@ -1153,6 +1210,7 @@ class Orchestrator:
                 'type': 'quiz_done', 'title': 'Chapter Quiz Complete',
                 'score': correct, 'total': total, 'score_pct': score_pct,
                 'question_review': state.get('quiz_review', []),
+                'attempt_id': state.get('quiz_attempt_id'),
             },
             'progress_update': {},
             'complexity_level': state['complexity_level'],
@@ -1161,12 +1219,40 @@ class Orchestrator:
             'mode': 'chapter_quiz',
         }
 
-    def _reset_and_start_quiz(self, state, researcher, chapter_id, first_name):
+    def _restart_retry(self, state, researcher, user, course_id, first_name):
+        """'Retry' at the end of a retry: serve what was still wrong this time,
+        as a new retry_wrong attempt whose parent is the one just finished."""
+        just_done = state.get('quiz_attempt_id')
+        parent, qs = (researcher.get_retry_questions(user, just_done, course_id)
+                      if just_done else (None, []))
+        if not qs:
+            return {
+                'tutor_response': (
+                    f"Nothing left to retry, {first_name}: you got every one right this time. "
+                    "A fresh chapter quiz or practice exam is a good next step."
+                ),
+                'display_update': None,
+                'progress_update': {},
+                'complexity_level': state.get('complexity_level', 3),
+                'first_name': first_name,
+                'action': None,
+                'mode': 'chapter_quiz',
+            }
+        state['retry_parent'] = parent
+        n = len(qs)
+        return self._reset_and_start_quiz(
+            state, researcher, None, first_name, questions=qs,
+            intro=(f"Another run at the **{n} question{'s' if n != 1 else ''}** you still missed, "
+                   f"{first_name}. Here's question 1."),
+        )
+
+    def _reset_and_start_quiz(self, state, researcher, chapter_id, first_name, questions=None, intro=None):
         """Chapter-quiz retry — mirrors _reset_and_start_exam's pattern exactly
         (chat-message-triggered, not a remount: QuizExamView's init effect
         only fires once per mount, so a fresh question set has to arrive via
         the same in-place state-update path every other answer uses)."""
-        qs = researcher.get_chapter_quiz_questions(chapter_id, limit=CHAPTER_QUIZ_QUESTION_COUNT)
+        qs = questions if questions is not None else researcher.get_chapter_quiz_questions(
+            chapter_id, limit=CHAPTER_QUIZ_QUESTION_COUNT)
         if not qs:
             return {
                 'tutor_response': f"Sorry {first_name}, I couldn't load new quiz questions for this chapter right now. Please try again in a moment.",
@@ -1182,6 +1268,7 @@ class Orchestrator:
         state['quiz_correct'] = 0
         state['quiz_done'] = False
         state['quiz_attempt_id'] = None
+        state['quiz_chapter_stats'] = {}
         state['quiz_topics_missed'] = []
         state['quiz_review'] = []
         state['quiz_awaiting_feedback'] = True
@@ -1189,7 +1276,7 @@ class Orchestrator:
         state['quiz_index'] = 1
 
         display_update = self._build_quiz_question_display(qs[0], 0, len(qs))
-        intro = (
+        intro = intro or (
             f"Fresh chapter quiz, {first_name}! **{len(qs)} questions**, one at a time, "
             f"randomly selected — here's question 1."
         )
@@ -1844,6 +1931,7 @@ class Orchestrator:
             'next_attempt_allocation': next_allocation,
             'question_review': question_review,
             'distractor_coaching': distractor_coaching,
+            'attempt_id': state.get('exam_attempt_id'),
         }
         # Cache so page refreshes can return results without re-running the LLM.
         state['last_debrief'] = {

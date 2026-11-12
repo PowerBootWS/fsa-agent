@@ -11,6 +11,7 @@
 const express = require('express');
 const { pool } = require('../services/database');
 const { requirePaperEntitlement, entitledPapers } = require('../middleware/requirePaperEntitlement');
+const { getWeakChapters } = require('../services/paperStats');
 
 const router = express.Router();
 
@@ -61,6 +62,18 @@ router.get('/', requirePaperEntitlement(req => req.query.course), async (req, re
   } catch (err) {
     console.error('attempts list failed:', err.message);
     res.status(500).json({ error: 'Could not load your attempts' });
+  }
+});
+
+// Phase D: per-chapter totals over the last 3 finished practice exams on one
+// paper, weakest first. Registered before /:id.
+router.get('/weak-chapters', requirePaperEntitlement(req => req.query.course), async (req, res) => {
+  if (!req.query.course) return res.status(400).json({ error: 'course is required' });
+  try {
+    res.json(await getWeakChapters(pool, req.user.email, String(req.query.course).toUpperCase()));
+  } catch (err) {
+    console.error('weak chapters failed:', err.message);
+    res.status(500).json({ error: 'Could not load your weak chapters' });
   }
 });
 

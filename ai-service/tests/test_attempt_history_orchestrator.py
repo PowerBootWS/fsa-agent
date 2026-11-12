@@ -228,3 +228,137 @@ def test_quiz_retry_is_a_new_attempt():
     assert [r['attempt_id'] for r in rs] == [1, 1, 2, 2]
     assert [r['position'] for r in rs] == [1, 2, 1, 2]
     assert researcher.finish_attempt.call_count == 2
+
+
+# ---------------------------------------------------------------- Phase D: retry wrong
+
+from agents.orchestrator import _detect_mode  # noqa: E402
+
+
+def make_retry_env(loads):
+    """loads: list of (parent, questions) returned by successive get_retry_questions calls."""
+    o, researcher, tutor, display = make_env([])
+    it = iter(loads)
+    researcher.get_retry_questions.side_effect = lambda *a, **k: next(it)
+    ids = count(50)
+    researcher.start_attempt.side_effect = lambda *a, **k: next(ids)
+    return o, researcher, tutor, display
+
+
+def mixed_questions():
+    qs = make_questions(2, course='2B1', chapter='2B1-4', start=3000)
+    qs += make_questions(1, course='2B1', chapter='2B1-7', start=3100)
+    return qs
+
+
+EXAM_PARENT = {'id': 7, 'course_id': '2B1', 'chapter_id': None, 'kind': 'practice_exam'}
+
+
+def test_retry_lesson_ids_are_their_own_mode():
+    assert _detect_mode('2B1-R12') == 'retry_wrong'
+    assert _detect_mode('4A-R3') == 'retry_wrong'
+    assert _detect_mode('2B1-3') == 'chapter_quiz'
+    assert _detect_mode('2B1') == 'practice_exam'
+
+
+def test_retry_serves_the_wrong_questions_of_my_attempt():
+    qs = mixed_questions()
+    o, researcher, tutor, display = make_retry_env([(EXAM_PARENT, qs)])
+    first = send(o, researcher, tutor, display, '2B1-R7', 'hello')
+    researcher.get_retry_questions.assert_called_once_with(USER, 7, '2B1')
+    assert first['display_update']['question'] == qs[0]['question_text']
+    assert 'missed' in first['tutor_response']
+    assert first['mode'] == 'chapter_quiz'  # the client runs it on the chapter-quiz screen
+
+
+def test_retry_records_a_retry_attempt_with_its_parent_and_per_question_chapters():
+    qs = mixed_questions()
+    o, researcher, tutor, display = make_retry_env([(EXAM_PARENT, qs)])
+    send(o, researcher, tutor, display, '2B1-R7', 'hello')
+    answer_all(o, researcher, tutor, display, '2B1-R7', qs)  # last one wrong
+
+    args, kwargs = researcher.start_attempt.call_args
+    call = dict(zip(['user_email', 'course_id', 'kind'], args), **kwargs)
+    assert (call['course_id'], call['kind'], call['parent_attempt_id']) == ('2B1', 'retry_wrong', 7)
+    assert call['chapter_id'] is None and call['question_count'] == 3
+
+    rs = responses(researcher)
+    assert {r['session_type'] for r in rs} == {'retry_wrong'}
+    assert [r['chapter_id'] for r in rs] == ['2B1-4', '2B1-4', '2B1-7']
+    assert [r['attempt_id'] for r in rs] == [50, 50, 50]
+
+    args, kwargs = researcher.finish_attempt.call_args
+    fin = dict(zip(['attempt_id', 'score', 'score_pct', 'chapter_stats'], args), **kwargs)
+    assert (fin['attempt_id'], fin['score'], fin['score_pct']) == (50, 2, 66)
+    assert fin['chapter_stats'] == {'2B1-4': {'correct': 2, 'total': 2}, '2B1-7': {'correct': 0, 'total': 1}}
+
+
+def test_retry_of_a_chapter_quiz_keeps_the_chapter_on_the_attempt():
+    parent = {'id': 9, 'course_id': '2B1', 'chapter_id': '2B1-4', 'kind': 'chapter_quiz'}
+    qs = make_questions(2, course='2B1', chapter='2B1-4', start=3000)
+    o, researcher, tutor, display = make_retry_env([(parent, qs)])
+    send(o, researcher, tutor, display, '2B1-R9', 'hello')
+    answer_all(o, researcher, tutor, display, '2B1-R9', qs)
+    assert researcher.start_attempt.call_args.kwargs['chapter_id'] == '2B1-4'
+
+
+def test_done_payload_carries_the_attempt_id():
+    qs = mixed_questions()
+    o, researcher, tutor, display = make_retry_env([(EXAM_PARENT, qs)])
+    send(o, researcher, tutor, display, '2B1-R7', 'hello')
+    for i, q in enumerate(qs):
+        last = send(o, researcher, tutor, display, '2B1-R7', f'My answer is {chr(65 + q["correct_answer"])}')
+    assert last['display_update']['type'] == 'quiz_done'
+    assert last['display_update']['attempt_id'] == 50
+
+
+def test_retry_again_serves_what_was_still_wrong_this_time():
+    qs = mixed_questions()
+    still_wrong = [qs[2]]
+    o, researcher, tutor, display = make_retry_env([(EXAM_PARENT, qs), ({**EXAM_PARENT, 'id': 50, 'kind': 'retry_wrong'}, still_wrong)])
+    send(o, researcher, tutor, display, '2B1-R7', 'hello')
+    answer_all(o, researcher, tutor, display, '2B1-R7', qs)
+    again = send(o, researcher, tutor, display, '2B1-R7', 'yes')
+    assert researcher.get_retry_questions.call_args_list[1].args == (USER, 50, '2B1')
+    assert again['display_update']['question'] == qs[2]['question_text']
+    answer_all(o, researcher, tutor, display, '2B1-R7', still_wrong)
+    assert researcher.start_attempt.call_args.kwargs['parent_attempt_id'] == 50
+    assert [r['attempt_id'] for r in responses(researcher)][-1] == 51
+
+
+def test_retry_again_when_everything_was_right_says_so():
+    qs = make_questions(1, course='2B1', chapter='2B1-4', start=3000)
+    o, researcher, tutor, display = make_retry_env([(EXAM_PARENT, qs), ({**EXAM_PARENT, 'id': 50}, [])])
+    send(o, researcher, tutor, display, '2B1-R7', 'hello')
+    send(o, researcher, tutor, display, '2B1-R7', f'My answer is {chr(65 + qs[0]["correct_answer"])}')
+    again = send(o, researcher, tutor, display, '2B1-R7', 'yes')
+    assert 'every one' in again['tutor_response']
+    assert researcher.start_attempt.call_count == 1
+
+
+def test_retry_with_nothing_left_offers_a_normal_quiz_instead():
+    o, researcher, tutor, display = make_retry_env([(EXAM_PARENT, [])])
+    out = send(o, researcher, tutor, display, '2B1-R7', 'hello')
+    assert 'replaced' in out['tutor_response']
+    researcher.start_attempt.assert_not_called()
+
+
+def test_retry_of_someone_elses_attempt_gets_nothing():
+    o, researcher, tutor, display = make_retry_env([(None, [])])
+    out = send(o, researcher, tutor, display, '2B1-R7', 'hello')
+    assert out['display_update'] is None
+    researcher.start_attempt.assert_not_called()
+
+
+def test_chapter_quiz_done_payload_carries_attempt_id():
+    o, researcher, tutor, display, _ = run_quiz(2)
+    done = send(o, researcher, tutor, display, '2B1-3', 'hello')
+    assert done['display_update']['type'] == 'quiz_done'
+    assert done['display_update']['attempt_id'] == 1
+
+
+def test_exam_done_payload_carries_attempt_id():
+    o, researcher, tutor, display, _ = run_exam(3)
+    done = send(o, researcher, tutor, display, '2A2', 'hello')
+    assert done['display_update']['type'] == 'exam_done'
+    assert done['display_update']['attempt_id'] == 1

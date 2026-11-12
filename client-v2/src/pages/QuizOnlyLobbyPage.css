@@ -143,3 +143,12 @@
   font-family: 'Barlow Condensed', sans-serif;
 }
 .qo-exam-date { font-size: 12px; color: #6b7686; }
+
+.qo-past-link {
+  display: inline-block;
+  color: #E8720C;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 4px 0 12px;
+  text-decoration: underline;
+}

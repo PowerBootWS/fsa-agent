@@ -255,3 +255,30 @@ describe('GET /api/attempts/:id', () => {
     expect(res.body.questions).toEqual([]);
   });
 });
+
+describe('GET /api/attempts/weak-chapters', () => {
+  it('needs a course (400) the caller is entitled to (403)', async () => {
+    const token = await createUser(ME);
+    expect((await get('/api/attempts/weak-chapters', token)).status).toBe(400);
+    expect((await get('/api/attempts/weak-chapters?course=3A1', token)).status).toBe(403);
+  });
+
+  it('adds up my last 3 practice exams on that paper, weakest first, and not anyone else\'s', async () => {
+    const token = await createUser(ME);
+    await createUser(OTHER);
+    const withStats = async (email, started, stats) => {
+      const id = await addAttempt(email, { started_at: started, finished_at: started });
+      await pool.query('UPDATE assessment_attempts SET chapter_stats = $1 WHERE id = $2', [JSON.stringify(stats), id]);
+    };
+    await withStats(ME, '2026-11-01T10:00:00Z', { '2A1-3': { correct: 1, total: 4 }, '2A1-5': { correct: 4, total: 4 } });
+    await withStats(ME, '2026-11-02T10:00:00Z', { '2A1-3': { correct: 1, total: 4 } });
+    await withStats(OTHER, '2026-11-03T10:00:00Z', { '2A1-5': { correct: 0, total: 50 } });
+    const res = await get('/api/attempts/weak-chapters?course=2A1', token);
+    expect(res.status).toBe(200);
+    expect(res.body.exams).toBe(2);
+    expect(res.body.chapters).toEqual([
+      { chapter_id: '2A1-3', title: 'Attempts fixture chapter', correct: 2, total: 8, pct: 25 },
+      { chapter_id: '2A1-5', title: null, correct: 4, total: 4, pct: 100 },
+    ]);
+  });
+});

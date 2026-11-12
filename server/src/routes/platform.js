@@ -6,7 +6,7 @@ const { CREDIT_PACKS, PACK_ORDER } = require('../config/creditPacks');
 const { PAPERS_BY_CLASS, FOURTH_CLASS_CODES } = require('../config/papersForClass');
 const credits = require('../services/credits');
 const signupCredit = require('../services/signupCredit');
-const { getObjectiveProgress, getLastExam } = require('../services/paperStats');
+const { getObjectiveProgress, getLastExam, getChapterQuizScores } = require('../services/paperStats');
 
 // While the LMS transition stabilizes, automated deactivations are held for operator
 // confirmation instead of pulling access immediately. Default ON; set to 'false' to resume
@@ -587,32 +587,10 @@ router.get('/lobby-data', requireAuth, async (req, res) => {
     );
     const lastVisited = lastVisitedResult.rows[0] || null;
 
-    // 4. Chapter quiz data — for each chapter, get the latest quiz score
-    const chapterQuizResult = await pool.query(
-      `SELECT
-         qr.chapter_id,
-         COUNT(*) as total_questions,
-         SUM(CASE WHEN qr.correct THEN 1 ELSE 0 END) as correct_count,
-         MAX(qr.answered_at) as last_attempt
-       FROM question_responses qr
-       WHERE qr.user_email = $1 AND qr.course_id = $2 AND qr.session_type = 'chapter_quiz'
-       GROUP BY qr.chapter_id
-       ORDER BY (substring(qr.chapter_id from '([0-9]+)$'))::int NULLS LAST, qr.chapter_id`,
-      [email, active_paper]
-    );
-
+    // 4. Chapter quiz data — for each chapter, the latest quiz score
     const passingThreshold = parseInt(process.env.QUIZ_PASSING_THRESHOLD || '75', 10);
-    const chapterQuizzes = chapterQuizResult.rows.map(row => {
-      const score = Math.round((parseInt(row.correct_count) / parseInt(row.total_questions)) * 100);
-      return {
-        chapter_id: row.chapter_id,
-        score,
-        total: parseInt(row.total_questions),
-        correct: parseInt(row.correct_count),
-        last_attempt: row.last_attempt,
-        passed: score >= passingThreshold,
-      };
-    });
+    const chapterQuizzes = (await getChapterQuizScores(pool, email, active_paper))
+      .map(q => ({ ...q, passed: q.score >= passingThreshold }));
 
     // 5. Practice exam history — last attempt
     const lastExam = await getLastExam(pool, email, active_paper);
@@ -693,29 +671,8 @@ router.get('/quiz-lobby-data', requireAuth, async (req, res) => {
     const result = {};
 
     for (const paper of papers) {
-      const chapterQuizResult = await pool.query(
-        `SELECT
-           qr.chapter_id,
-           COUNT(*) as total_questions,
-           SUM(CASE WHEN qr.correct THEN 1 ELSE 0 END) as correct_count,
-           MAX(qr.answered_at) as last_attempt
-         FROM question_responses qr
-         WHERE qr.user_email = $1 AND qr.course_id = $2 AND qr.session_type = 'chapter_quiz'
-         GROUP BY qr.chapter_id
-         ORDER BY (substring(qr.chapter_id from '([0-9]+)$'))::int NULLS LAST, qr.chapter_id`,
-        [email, paper]
-      );
-      const chapterQuizzes = chapterQuizResult.rows.map(row => {
-        const score = Math.round((parseInt(row.correct_count) / parseInt(row.total_questions)) * 100);
-        return {
-          chapter_id: row.chapter_id,
-          score,
-          total: parseInt(row.total_questions),
-          correct: parseInt(row.correct_count),
-          last_attempt: row.last_attempt,
-          passed: score >= passingThreshold,
-        };
-      });
+      const chapterQuizzes = (await getChapterQuizScores(pool, email, paper))
+        .map(q => ({ ...q, passed: q.score >= passingThreshold }));
 
       const lastExam = await getLastExam(pool, email, paper);
 
@@ -774,19 +731,9 @@ router.get('/course-structure/:paperCode', requireAuth, async (req, res) => {
     const completedLessons = new Set(progressResult.rows.map(r => r.lesson_code));
 
     // Get chapter quiz scores
-    const quizResult = await pool.query(
-      `SELECT chapter_id,
-         COUNT(*) as total,
-         SUM(CASE WHEN correct THEN 1 ELSE 0 END) as correct
-       FROM question_responses
-       WHERE user_email = $1 AND course_id = $2 AND session_type = 'chapter_quiz'
-       GROUP BY chapter_id`,
-      [email, paperCode]
-    );
     const quizMap = {};
-    for (const row of quizResult.rows) {
-      const score = Math.round((parseInt(row.correct) / parseInt(row.total)) * 100);
-      quizMap[row.chapter_id] = { score, passed: score >= PASSING_THRESHOLD };
+    for (const q of await getChapterQuizScores(pool, email, paperCode)) {
+      quizMap[q.chapter_id] = { score: q.score, passed: q.score >= PASSING_THRESHOLD };
     }
 
     // Free navigation (2026-06-16): sequential gating disabled — every chapter

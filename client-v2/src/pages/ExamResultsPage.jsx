@@ -7,6 +7,7 @@ import { isFourthClassCode } from '../utils/fourthClass';
 import { postJson } from '../utils/api';
 import { track } from '../utils/usage';
 import './ExamResultsPage.css';
+import { pastAttemptsHref, retryWrongHref } from './attemptFormat';
 
 // ── Grade helpers (used by the summary fallback view) ─────────────────────────
 function getGrade(pct) {
@@ -222,6 +223,8 @@ export default function ExamResultsPage() {
             isExam={true}
             onRetry={() => navigate(`/practice-exam?paper=${encodeURIComponent(courseId)}&count=${dc.total || 50}&timed=false`)}
             onSelectChapter={null}
+            pastAttemptsHref={pastAttemptsHref({ course: courseId, kind: 'practice_exam' })}
+            retryWrongHref={retryWrongHref(courseId, dc.attempt_id)}
             user={user.email}
           />
           <GoalNudge />
