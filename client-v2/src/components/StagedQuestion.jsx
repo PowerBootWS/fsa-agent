@@ -46,9 +46,10 @@ export function StagedQuestion({ question, number, total, onDone }) {
 
   return (
     <div className="sq-card">
-      <div className="sq-label">Question {number} of {total}</div>
+      {/* A mini lesson ends with one question: "Question 1 of 1" and "Step 1 of 1" read as noise */}
+      <div className="sq-label">{total > 1 ? `Question ${number} of ${total}` : 'Practice question'}</div>
       <div className="sq-text"><MathContent text={question.question_text || ''} /></div>
-      <div className="sq-step-label">Step {stepIdx + 1} of {steps.length}</div>
+      {steps.length > 1 && <div className="sq-step-label">Step {stepIdx + 1} of {steps.length}</div>}
       {step.context ? (
         <div className="sq-context"><MathContent text={step.context} /></div>
       ) : null}

@@ -149,4 +149,17 @@ describe('ExplainedPage', () => {
     renderAt();
     await waitFor(() => expect(screen.getByText("This lesson isn't available.")).toBeTruthy());
   });
+
+  it('a lesson with one question: "Practice question" button and label, no counters', async () => {
+    mockFetch(lesson({ questions: [{ position: 1, question_text: 'Only Q', step_data: { steps: [step(1)] } }] }));
+    renderAt();
+    await screen.findByText('Slide one');
+    fireEvent.click(screen.getByRole('button', { name: /Next/ }));
+    expect(screen.queryByRole('button', { name: /Practice questions/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Practice question →/ }));
+    expect(await screen.findByText('Only Q')).toBeTruthy();
+    expect(screen.getByText('Practice question')).toBeTruthy();
+    expect(screen.queryByText(/Question 1 of 1/)).toBeNull();
+    expect(screen.queryByText(/Step 1 of 1/)).toBeNull();
+  });
 });

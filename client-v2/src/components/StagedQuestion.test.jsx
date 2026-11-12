@@ -114,3 +114,26 @@ describe('StagedQuestion', () => {
     expect(screen.getByRole('status').contains(next)).toBe(false);
   });
 });
+
+// Owner ruling 2026-11-12: a mini lesson ends with one practice question
+describe('StagedQuestion with a single question', () => {
+  it('shows "Practice question", never "Question 1 of 1", and keeps "Step k of N" for N > 1', () => {
+    render(<StagedQuestion question={Q} number={1} total={1} onDone={() => {}} />);
+    expect(screen.getByText('Practice question')).toBeTruthy();
+    expect(screen.queryByText(/Question 1 of 1/)).toBeNull();
+    expect(screen.getByText('Step 1 of 3')).toBeTruthy();
+  });
+
+  it('a one-step question shows no step counter', () => {
+    const one = { question_text: 'Concept check', step_data: { steps: [mk(1)] } };
+    render(<StagedQuestion question={one} number={1} total={1} onDone={() => {}} />);
+    expect(screen.getByText('Practice question')).toBeTruthy();
+    expect(screen.queryByText(/Step 1 of 1/)).toBeNull();
+  });
+
+  it('keeps the multi-question label when there are several', () => {
+    render(<StagedQuestion question={Q} number={2} total={3} onDone={() => {}} />);
+    expect(screen.getByText('Question 2 of 3')).toBeTruthy();
+    expect(screen.queryByText('Practice question')).toBeNull();
+  });
+});

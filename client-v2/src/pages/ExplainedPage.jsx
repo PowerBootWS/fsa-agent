@@ -89,7 +89,7 @@ export default function ExplainedPage() {
             onBack={goBack}
             isComplete={false}
             hideNarration={true}
-            lastSlideLabel={questions.length ? 'Practice questions →' : 'Finish'}
+            lastSlideLabel={questions.length > 1 ? 'Practice questions →' : questions.length ? 'Practice question →' : 'Finish'}
           />
         </div>
       )}
