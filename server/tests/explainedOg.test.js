@@ -32,9 +32,9 @@ let pendToken;
 beforeAll(async () => {
   await pool.query(`DELETE FROM mini_lessons WHERE slug LIKE 'test-mini-%'`);
   await ml.upsertDraft(payload('test-mini-live', { title: 'A <script>alert(1)</script> "q" & co', description: 'x"><b>' }));
-  await ml.setStatus('test-mini-live', 'live', { checksPassed: true });
+  await ml.setStatus('test-mini-live', 'live', { checksPassed: true, expectedVersion: 1 });
   await ml.upsertDraft(payload('test-mini-noimg', { og_image_url: null }));
-  await ml.setStatus('test-mini-noimg', 'live', { checksPassed: true });
+  await ml.setStatus('test-mini-noimg', 'live', { checksPassed: true, expectedVersion: 1 });
   pendToken = (await ml.upsertDraft(payload('test-mini-pend'))).preview_token;
 });
 afterAll(async () => {

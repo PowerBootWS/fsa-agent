@@ -40,7 +40,7 @@ let pendToken, otherToken, ownedChunk = false;
 beforeAll(async () => {
   await pool.query(`DELETE FROM mini_lessons WHERE slug LIKE 'test-mini-%'`);
   await ml.upsertDraft(payload('test-mini-live'));
-  await ml.setStatus('test-mini-live', 'live', { checksPassed: true });
+  await ml.setStatus('test-mini-live', 'live', { checksPassed: true, expectedVersion: 1 });
   pendToken = (await ml.upsertDraft(payload('test-mini-pend'))).preview_token;
   otherToken = (await ml.upsertDraft(payload('test-mini-other'))).preview_token;
   const { rows } = await pool.query(`SELECT 1 FROM lesson_chunks WHERE lesson_code='2B3-1-7' LIMIT 1`);
