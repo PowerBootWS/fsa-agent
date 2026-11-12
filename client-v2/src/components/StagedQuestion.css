@@ -21,7 +21,11 @@
   padding: 9px 12px; margin-bottom: 6px; color: inherit;
   font: inherit; cursor: pointer;
 }
-.sq-option:hover:not(:disabled) { border-color: #E8720C; background: rgba(232,114,12,0.08); }
+/* Hover only where there is a real pointer: a tap on a phone leaves :hover
+   stuck on until the next tap elsewhere. */
+@media (hover: hover) {
+  .sq-option:hover:not(:disabled) { border-color: #E8720C; background: rgba(232,114,12,0.08); }
+}
 .sq-option:disabled { cursor: default; }
 .sq-option.sq-correct { background: rgba(82,168,130,0.15); border-color: #52A882; color: #7FD1AB; }
 .sq-option.sq-wrong { background: rgba(220,38,38,0.1); border-color: #dc2626; color: #f87171; }
@@ -34,7 +38,9 @@
   background: #E8720C; color: #fff; border: none; border-radius: 4px;
   padding: 9px 18px; font: inherit; font-weight: 600; cursor: pointer;
 }
-.sq-next:hover { filter: brightness(1.1); }
+@media (hover: hover) {
+  .sq-next:hover { filter: brightness(1.1); }
+}
 @media (max-width: 768px) {
   .sq-option { min-height: 44px; padding: 12px; }
   .sq-next { width: 100%; min-height: 44px; }

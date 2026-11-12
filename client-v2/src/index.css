@@ -272,7 +272,11 @@ body {
   transition: background 0.2s;
 }
 
-.audio-controls button:hover { background: var(--orange-glow); }
+/* Hover only where there is a real pointer: a tap on a phone leaves :hover
+   stuck on until the next tap elsewhere. */
+@media (hover: hover) {
+  .audio-controls button:hover { background: var(--orange-glow); }
+}
 
 .audio-controls .toggle-label {
   font-size: 0.85rem;
@@ -317,7 +321,9 @@ body {
 }
 
 .nav-bar button:disabled { opacity: 0.3; cursor: not-allowed; }
-.nav-bar button:not(:disabled):hover { background: var(--orange); color: var(--white); }
+@media (hover: hover) {
+  .nav-bar button:not(:disabled):hover { background: var(--orange); color: var(--white); }
+}
 
 .nav-counter { font-size: 0.85rem; color: var(--gray-mid); }
 
@@ -1808,7 +1814,9 @@ body {
   border: 1px solid var(--steel-light);
   color: var(--steel-light);
 }
-.audio-controls .ask-tutor-btn:hover { background: var(--steel-dim); color: var(--off-white); }
+@media (hover: hover) {
+  .audio-controls .ask-tutor-btn:hover { background: var(--steel-dim); color: var(--off-white); }
+}
 /* Only the first of the two tutor buttons pushes right; the second sits beside it. */
 .audio-controls .ask-tutor-btn + .ask-tutor-btn { margin-left: 0; }
 
@@ -1967,7 +1975,9 @@ body {
   cursor: pointer;
   animation: practice-prompt-in 0.35s var(--ease);
 }
-.practice-prompt:hover { background: var(--amber); color: var(--carbon); }
+@media (hover: hover) {
+  .practice-prompt:hover { background: var(--amber); color: var(--carbon); }
+}
 @keyframes practice-prompt-in {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }

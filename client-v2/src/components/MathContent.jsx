@@ -170,34 +170,44 @@ function looksLikeMath(content) {
   return true;
 }
 
+// Split text into plain / inline-math / display-math segments in ONE left-to-
+// right pass. At each "$" a display "$$...$$" is tried first, then an inline
+// "$...$"; a candidate that doesn't look like math (currency, prose) is
+// skipped one character at a time, so its closing "$" can still open the next
+// formula. The old version matched $$ and $ in two separate global passes, so
+// the inline pass started at the closing "$$" of a display formula and
+// swallowed the "$" that opened the next inline one, leaving it raw.
+const BLOCK_AT = /\$\$([\s\S]+?)\$\$/y;
+const INLINE_AT = /\$([^$]+?)\$/y;
+export function tokenizeMath(text) {
+  const segs = [];
+  let plainFrom = 0;
+  let i = 0;
+  const take = (type, m, end) => {
+    if (i > plainFrom) segs.push({ type: 'text', text: text.slice(plainFrom, i) });
+    segs.push({ type, math: m });
+    i = plainFrom = end;
+  };
+  while (i < text.length) {
+    if (text[i] !== '$') { i++; continue; }
+    BLOCK_AT.lastIndex = i;
+    let m = BLOCK_AT.exec(text);
+    if (m && looksLikeMath(m[1])) { take('block', m[1], BLOCK_AT.lastIndex); continue; }
+    INLINE_AT.lastIndex = i;
+    m = INLINE_AT.exec(text);
+    if (m && looksLikeMath(m[1])) { take('inline', m[1], INLINE_AT.lastIndex); continue; }
+    i++;
+  }
+  if (plainFrom < text.length) segs.push({ type: 'text', text: text.slice(plainFrom) });
+  return segs;
+}
+
 export function MathContent({ text }) {
   if (!text) return null;
-
-  const parts = [];
-  const blockRegex = /\$\$([\s\S]+?)\$\$/g;
-  const inlineRegex = /\$((?:[^$]|\\.)+?)\$/g;
-
-  const blockMatches = [...text.matchAll(blockRegex)].filter(m => looksLikeMath(m[1]));
-  const inlineMatches = [...text.matchAll(inlineRegex)].filter(m => looksLikeMath(m[1]));
-
-  const segments = [];
-  blockMatches.forEach(m => segments.push({ start: m.index, end: m.index + m[0].length, type: 'block', math: m[1] }));
-  inlineMatches.forEach(m => {
-    const insideBlock = blockMatches.some(b => m.index >= b.index && m.index < b.index + b[0].length);
-    if (!insideBlock) {
-      segments.push({ start: m.index, end: m.index + m[0].length, type: 'inline', math: m[1] });
-    }
+  const parts = tokenizeMath(text).map((seg, i) => {
+    if (seg.type === 'block') return <KatexSpan key={`b${i}`} math={seg.math} displayMode />;
+    if (seg.type === 'inline') return <KatexSpan key={`il${i}`} math={seg.math} displayMode={false} />;
+    return <span key={`t${i}`}>{renderText(seg.text, `t${i}`)}</span>;
   });
-  segments.sort((a, b) => a.start - b.start);
-
-  let cursor = 0;
-  segments.forEach((seg, i) => {
-    if (seg.start > cursor) parts.push(<span key={`t${i}`}>{renderText(text.slice(cursor, seg.start), `t${i}`)}</span>);
-    if (seg.type === 'block') parts.push(<KatexSpan key={`b${i}`} math={seg.math} displayMode />);
-    else parts.push(<KatexSpan key={`il${i}`} math={seg.math} displayMode={false} />);
-    cursor = seg.end;
-  });
-  if (cursor < text.length) parts.push(<span key="tail">{renderText(text.slice(cursor), 'tail')}</span>);
-
-  return parts.length > 0 ? <>{parts}</> : <span>{renderText(text, 'only')}</span>;
+  return <>{parts}</>;
 }
