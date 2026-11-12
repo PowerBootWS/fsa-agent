@@ -156,7 +156,7 @@ describe('ExplainedPage', () => {
     await screen.findByText('Slide one');
     fireEvent.click(screen.getByRole('button', { name: /Next/ }));
     expect(screen.queryByRole('button', { name: /Practice questions/ })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /Practice question →/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Practice question' }));
     expect(await screen.findByText('Only Q')).toBeTruthy();
     expect(screen.getByText('Practice question')).toBeTruthy();
     expect(screen.queryByText(/Question 1 of 1/)).toBeNull();

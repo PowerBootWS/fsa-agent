@@ -80,6 +80,24 @@ export function BodyContent({ body, imageUrl, chunkType }) {
   );
 }
 
+// Phone control-bar icons. Inline SVG so they render the same on every
+// platform (iOS turns a bare ▶ into a colour emoji).
+function Icon({ children, fill = 'none' }) {
+  return (
+    <svg className="ctl-svg" viewBox="0 0 24 24" width="22" height="22" fill={fill}
+      stroke={fill === 'none' ? 'currentColor' : 'none'} strokeWidth="2.25"
+      strokeLinecap="round" strokeLinejoin="round" focusable="false" aria-hidden="true">
+      {children}
+    </svg>
+  );
+}
+const BackIcon = () => <Icon><path d="M19 12H5M11 6l-6 6 6 6" /></Icon>;
+const NextIcon = () => <Icon><path d="M5 12h14M13 6l6 6-6 6" /></Icon>;
+const PlayIcon = () => <Icon fill="currentColor"><path d="M8 5.5v13l10.5-6.5z" /></Icon>;
+const PauseIcon = () => <Icon fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1" /><rect x="13.5" y="5" width="4" height="14" rx="1" /></Icon>;
+const SpeakerIcon = () => <Icon><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" /><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" /></Icon>;
+const SpeakerOffIcon = () => <Icon><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" /><path d="M16 9.5l5 5M21 9.5l-5 5" /></Icon>;
+
 export function ContentPanel({
   section,
   sectionIndex,
@@ -105,6 +123,7 @@ export function ContentPanel({
   holdAutoAdvance = false,
   practicePrompt = null,
   lastSlideLabel = 'Finish Objective →',
+  lastSlideShortLabel = 'Finish',
 }) {
   const [sectionStartTime, setSectionStartTime] = useState(() => Date.now());
   const { play, pause, playing, ended, muted, toggleMute, currentTimeMs, playbackRate, setPlaybackRate } = useAudio(
@@ -163,6 +182,9 @@ export function ContentPanel({
 
   const isLastSlide = !isComplete && sectionIndex === totalSections - 1;
   const nextLabel = isLastSlide ? lastSlideLabel : 'Next →';
+  // Accessible name: the visible label without its arrow. Phones show an icon
+  // (or the short last-slide label) instead of the text.
+  const nextName = isLastSlide ? lastSlideLabel.replace(/\s*→\s*$/, '') : 'Next';
 
   return (
     <div className="content-panel">
@@ -205,70 +227,94 @@ export function ContentPanel({
             <div className="narration-box">{visibleText || ' '}</div>
           )}
 
-          <div className="audio-controls">
-            {section?.audio_url && (
-              <button onClick={() => {
-                if (playing) {
-                  pause();
-                  return;
-                }
-                // currentTimeMs is 0 only when this slide's audio hasn't
-                // started yet — a nonzero value means the button is resuming
-                // a paused position, which is not a "played" event.
-                if (currentTimeMs === 0) {
-                  track('feature_use', { action: 'lesson_audio_played', props: { lesson_code: activeLessonCode } });
-                }
-                play();
-              }}>
-                {playing ? '⏸ Pause' : '▶ Play'}
-              </button>
-            )}
-            {section?.audio_url && (
-              <label className="toggle-label speed-control">
-                Speed
-                <select
-                  value={playbackRate}
-                  onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
-                >
-                  <option value={1}>1×</option>
-                  <option value={1.25}>1.25×</option>
-                  <option value={1.5}>1.5×</option>
-                </select>
-              </label>
-            )}
-            {onToggleAutoAdvance && (
-              <label className="toggle-label autoplay-control">
-                <input
-                  type="checkbox"
-                  checked={autoAdvance}
-                  onChange={() => {
-                    const on = !autoAdvance;
-                    onToggleAutoAdvance(on);
-                    // Turning it on mid-slide starts this slide's narration too.
-                    if (on && !playing && !ended && currentTimeMs === 0 && section?.audio_url && !muted) play();
+          {/* Desktop: .player-controls is display:contents, so the audio row and
+              the nav bar lay out exactly as before. Phones (<=768px): it becomes
+              one compact bar pinned to the bottom of the player, icon-only
+              buttons, the slide content scrolling above it (index.css). */}
+          <div className={`player-controls${isLastSlide ? ' player-controls--last' : ''}`}>
+            <div className="audio-controls">
+              {section?.audio_url && (
+                <button
+                  className="play-btn"
+                  aria-label={playing ? 'Pause narration' : 'Play narration'}
+                  onClick={() => {
+                    if (playing) {
+                      pause();
+                      return;
+                    }
+                    // currentTimeMs is 0 only when this slide's audio hasn't
+                    // started yet — a nonzero value means the button is resuming
+                    // a paused position, which is not a "played" event.
+                    if (currentTimeMs === 0) {
+                      track('feature_use', { action: 'lesson_audio_played', props: { lesson_code: activeLessonCode } });
+                    }
+                    play();
                   }}
-                />
-                Autoplay
+                >
+                  <span className="ctl-text" aria-hidden="true">{playing ? '⏸ Pause' : '▶ Play'}</span>
+                  <span className="ctl-icon" aria-hidden="true">{playing ? <PauseIcon /> : <PlayIcon />}</span>
+                </button>
+              )}
+              {section?.audio_url && (
+                <label className="toggle-label speed-control">
+                  <span className="ctl-text">Speed</span>
+                  <select
+                    aria-label="Speed"
+                    value={playbackRate}
+                    onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
+                  >
+                    <option value={1}>1×</option>
+                    <option value={1.25}>1.25×</option>
+                    <option value={1.5}>1.5×</option>
+                  </select>
+                </label>
+              )}
+              {onToggleAutoAdvance && (
+                <label className="toggle-label autoplay-control">
+                  <input
+                    type="checkbox"
+                    checked={autoAdvance}
+                    onChange={() => {
+                      const on = !autoAdvance;
+                      onToggleAutoAdvance(on);
+                      // Turning it on mid-slide starts this slide's narration too.
+                      if (on && !playing && !ended && currentTimeMs === 0 && section?.audio_url && !muted) play();
+                    }}
+                  />
+                  <span className="ctl-text">Autoplay</span>
+                  <span className="ctl-icon ctl-pill" aria-hidden="true">Auto</span>
+                </label>
+              )}
+              <label className="toggle-label mute-control">
+                <input type="checkbox" checked={muted} onChange={toggleMute} />
+                <span className="ctl-text">Mute audio</span>
+                <span className="ctl-icon" aria-hidden="true">{muted ? <SpeakerOffIcon /> : <SpeakerIcon />}</span>
               </label>
-            )}
-            <label className="toggle-label">
-              <input type="checkbox" checked={muted} onChange={toggleMute} />
-              Mute audio
-            </label>
-            {onAsk && (
-              <button className="ask-tutor-btn" onClick={onAsk}>💬 Ask about this slide</button>
-            )}
-            {onExercise && (
-              <button className="ask-tutor-btn exercise-tutor-btn" onClick={onExercise}>✏️ Quick exercise</button>
-            )}
-          </div>
+              {onAsk && (
+                <button className="ask-tutor-btn" onClick={onAsk}>💬 Ask about this slide</button>
+              )}
+              {onExercise && (
+                <button className="ask-tutor-btn exercise-tutor-btn" onClick={onExercise}>✏️ Quick exercise</button>
+              )}
+            </div>
 
-          <div className="nav-bar">
-            <button onClick={onBack} disabled={sectionIndex === 0}>← Back</button>
-            <span className="nav-counter">
-              {sectionIndex + 1} of {totalSections}
-            </span>
-            <button onClick={onNext}>{nextLabel}</button>
+            <div className="nav-bar">
+              <button className="nav-back" aria-label="Back" onClick={onBack} disabled={sectionIndex === 0}>
+                <span className="ctl-text" aria-hidden="true">← Back</span>
+                <span className="ctl-icon" aria-hidden="true"><BackIcon /></span>
+              </button>
+              <span className="nav-counter">
+                {sectionIndex + 1} of {totalSections}
+              </span>
+              <button className="nav-next" aria-label={nextName} onClick={onNext}>
+                <span className="ctl-text" aria-hidden="true">{nextLabel}</span>
+                {isLastSlide ? (
+                  <span className="ctl-icon ctl-icon--text" aria-hidden="true">{lastSlideShortLabel}<NextIcon /></span>
+                ) : (
+                  <span className="ctl-icon" aria-hidden="true"><NextIcon /></span>
+                )}
+              </button>
+            </div>
           </div>
         </>
       )}

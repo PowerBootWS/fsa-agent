@@ -13,7 +13,8 @@
 //  - every slide's image_url and audio_url returns 200 as image/png / audio/mpeg
 //    (og:image as image/png), so an HTML page answering 200 doesn't pass
 //  - in Chromium at 390x844 with a fresh, cookie-less context, every slide
-//    renders (title, image, no KaTeX error), then every question step is
+//    renders (title, image, no KaTeX error) with its Next button on screen
+//    without scrolling, then every question step is
 //    answered wrong on one pass and right on another, checking the marking,
 //    the verdict and the explanation text
 //  - the pitch button links to the expected enrol URL
@@ -161,10 +162,18 @@ async function playPass(browser, url, lesson, mode, expectPitch, failures) {
       if (await page.locator('.content-scroll .katex-error').count()) {
         failures.push(`${where}: an equation failed to render`);
       }
+      // Phone layout: icon buttons named by aria-label ("Next"); the last
+      // slide's button is named by its label without the arrow.
       const isLast = i === sections.length - 1;
-      const practice = questions.length > 1 ? 'Practice questions →' : 'Practice question →';
-      const label = isLast ? (questions.length ? practice : 'Finish') : 'Next →';
-      await page.getByRole('button', { name: label, exact: true }).click();
+      const practice = questions.length > 1 ? 'Practice questions' : 'Practice question';
+      const label = isLast ? (questions.length ? practice : 'Finish') : 'Next';
+      const next = page.getByRole('button', { name: label, exact: true });
+      // The control bar is pinned to the bottom of the screen: reachable without scrolling.
+      const box = await next.boundingBox();
+      if (!box || box.y < 0 || box.y + box.height > VIEWPORT.height) {
+        failures.push(`${where}: "${label}" button is off-screen`);
+      }
+      await next.click();
     }
 
     for (const [qi, q] of questions.entries()) {

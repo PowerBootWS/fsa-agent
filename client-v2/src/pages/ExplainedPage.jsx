@@ -69,7 +69,7 @@ export default function ExplainedPage() {
   };
 
   return (
-    <main className="ex-page">
+    <main className={`ex-page${phase === 'lesson' ? ' ex-page--lesson' : ''}`}>
       <header className="ex-header">
         <img className="ex-logo" src="/pwa-192.png" alt="Full Steam Ahead" width="40" height="40" />
         <div className="ex-heading">
@@ -90,6 +90,7 @@ export default function ExplainedPage() {
             isComplete={false}
             hideNarration={true}
             lastSlideLabel={questions.length > 1 ? 'Practice questions →' : questions.length ? 'Practice question →' : 'Finish'}
+            lastSlideShortLabel={questions.length ? 'Practice' : 'Finish'}
           />
         </div>
       )}

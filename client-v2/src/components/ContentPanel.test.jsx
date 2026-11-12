@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { BodyContent, parseBody } from './ContentPanel';
+import { render, screen, within } from '@testing-library/react';
+import { BodyContent, ContentPanel, parseBody } from './ContentPanel';
+import { MathContent } from './MathContent';
 
 // Final fix 3: every verified body line is shown, including plain lines after a bullet.
 describe('ContentPanel body', () => {
@@ -37,5 +38,72 @@ describe('ContentPanel body', () => {
     const lines = body.split('\n').map((l) => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
     const shown = parseBody(body).flatMap((b) => b.lines);
     expect(shown).toEqual(lines);
+  });
+});
+
+// Mobile player (2026-11-12): one compact bar of icon-only buttons on phones.
+// jsdom has no media queries, so these check the markup the CSS relies on.
+describe('ContentPanel controls', () => {
+  const section = { slide_number: 1, title: 'T', body: 'Body', audio_url: '/a.mp3', narration_timing: null };
+  const panel = (over = {}) => render(
+    <ContentPanel section={section} sectionIndex={0} totalSections={3} onNext={() => {}} onBack={() => {}}
+      isComplete={false} hideNarration {...over} />,
+  );
+
+  it('renders the controls in one .player-controls bar with labelled icon buttons', () => {
+    const { container } = panel({ onToggleAutoAdvance: () => {} });
+    const bar = container.querySelector('.player-controls');
+    expect(bar).toBeTruthy();
+    const b = within(bar);
+    for (const name of ['Back', 'Play narration', 'Next']) {
+      const btn = b.getByRole('button', { name });
+      expect(btn.getAttribute('aria-label')).toBe(name);
+      expect(btn.querySelector('.ctl-icon svg')).toBeTruthy();
+    }
+    expect(b.getByRole('combobox', { name: 'Speed' })).toBeTruthy();
+    expect(b.getByRole('checkbox', { name: /Mute audio/ })).toBeTruthy();
+    expect(b.getByRole('checkbox', { name: /Autoplay/ })).toBeTruthy();
+    expect(b.getByText('1 of 3')).toBeTruthy();
+  });
+
+  it('keeps the desktop text labels', () => {
+    const { container } = panel();
+    const text = [...container.querySelectorAll('.player-controls .ctl-text')].map((e) => e.textContent);
+    expect(text).toEqual(expect.arrayContaining(['▶ Play', 'Speed', 'Mute audio', '← Back', 'Next →']));
+  });
+
+  it('names the last-slide button by its label and shows the short label on phones', () => {
+    const { container } = panel({ sectionIndex: 2, lastSlideLabel: 'Practice question →', lastSlideShortLabel: 'Practice' });
+    const next = screen.getByRole('button', { name: 'Practice question' });
+    expect(next.querySelector('.ctl-text').textContent).toBe('Practice question →');
+    expect(next.querySelector('.ctl-icon').textContent).toBe('Practice');
+    expect(container.querySelector('.player-controls--last')).toBeTruthy();
+  });
+
+  it('defaults the last slide to Finish Objective / Finish', () => {
+    panel({ sectionIndex: 2 });
+    const next = screen.getByRole('button', { name: 'Finish Objective' });
+    expect(next.querySelector('.ctl-icon').textContent).toBe('Finish');
+  });
+
+  it('disables Back on the first slide and has no play button without audio', () => {
+    panel({ section: { ...section, audio_url: null } });
+    expect(screen.getByRole('button', { name: 'Back' }).disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: /Play narration/ })).toBeNull();
+  });
+});
+
+describe('formula wrappers', () => {
+  it('wraps a display formula in a .math-display scroll box', () => {
+    const { container } = render(<BodyContent body={'Seed\n$$Z = \\sqrt{R^2 + X^2}$$'} chunkType="example" />);
+    const box = container.querySelector('.math-display');
+    expect(box).toBeTruthy();
+    expect(box.querySelector(':scope > .katex-display')).toBeTruthy();
+  });
+
+  it('marks inline math in options and explanations', () => {
+    const { container } = render(<MathContent text={'So $X = -80\\ \\Omega$ and $$Q = I^2 X$$'} />);
+    expect(container.querySelector('.math-inline .katex')).toBeTruthy();
+    expect(container.querySelector('.math-display .katex-display')).toBeTruthy();
   });
 });

@@ -31,6 +31,39 @@
 .ex-lesson .slide-seed, .ex-lesson .slide-bullets { font-size: 1.05rem; line-height: 1.5; overflow-wrap: anywhere; }
 
 .ex-questions, .ex-pitch { scroll-margin-top: 12px; }
+
+/* Phones, lesson phase: the page is exactly the visible viewport. The header
+   sits at the top, the control bar at the bottom, and only the slide content
+   scrolls between them. Desktop keeps the shrink-to-fit card above. */
+@media (max-width: 768px) {
+  .ex-page--lesson {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0 0;
+    overflow: hidden;
+  }
+  .ex-page--lesson .ex-header { flex-shrink: 0; gap: 10px; margin-bottom: 8px; padding: 0 12px; }
+  .ex-page--lesson .ex-logo { width: 32px; height: 32px; }
+  .ex-page--lesson .ex-heading h1 { font-size: 1.05rem; }
+  .ex-page--lesson .ex-source { font-size: 0.78rem; }
+  .ex-page--lesson .ex-lesson {
+    flex: 1 1 auto;
+    min-height: 0;
+    border-width: 1px 0 0;
+    border-radius: 0;
+  }
+  .ex-page--lesson .ex-lesson .content-panel { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  .ex-page--lesson .ex-lesson .content-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}
 .ex-pitch {
   background: #161C2A;
   border: 2px solid #E8720C;
