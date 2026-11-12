@@ -30,7 +30,25 @@ function renderInline(text, keyPrefix) {
   });
 }
 
-function BodyContent({ body, imageUrl, chunkType }) {
+// A body is paragraphs (consecutive plain lines, joined) and bullet lists, in
+// the order written. Every non-empty line is shown: plain lines after a bullet
+// used to be dropped, which hid text a mini lesson's checks had verified.
+export function parseBody(body) {
+  const blocks = [];
+  for (const raw of (body || '').split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    const bullet = /^[-•*]\s/.test(line);
+    const type = bullet ? 'bullets' : 'text';
+    const text = bullet ? line.replace(/^[-•*]\s*/, '') : line;
+    const last = blocks[blocks.length - 1];
+    if (last && last.type === type) last.lines.push(text);
+    else blocks.push({ type, lines: [text] });
+  }
+  return blocks;
+}
+
+export function BodyContent({ body, imageUrl, chunkType }) {
   if (!body && !imageUrl) {
     if (chunkType === 'title') {
       return (
@@ -42,35 +60,21 @@ function BodyContent({ body, imageUrl, chunkType }) {
     return null;
   }
 
-  const seedLines = [];
-  const bulletLines = [];
-
-  if (body) {
-    for (const raw of body.split('\n')) {
-      const line = raw.trim();
-      if (!line) continue;
-      if (/^[-•*]\s/.test(line)) {
-        bulletLines.push(line.replace(/^[-•*]\s*/, ''));
-      } else if (bulletLines.length === 0) {
-        seedLines.push(line);
-      }
-    }
-  }
-
-  const seedText = seedLines.join(' ');
+  const blocks = parseBody(body);
   const isLatex = chunkType === 'formula';
 
   return (
     <div className="body-content">
       {imageUrl && !isLatex && <img className="slide-image" src={imageUrl} alt="" />}
-      {seedText && <p className="slide-seed">{renderInline(seedText, 'seed')}</p>}
-      {bulletLines.length > 0 && (
-        <ul className="slide-bullets">
-          {bulletLines.map((line, i) => (
-            <li key={i}>{renderInline(line, `b${i}`)}</li>
+      {blocks.map((b, k) => (b.type === 'text' ? (
+        <p key={k} className="slide-seed">{renderInline(b.lines.join(' '), `seed${k}`)}</p>
+      ) : (
+        <ul key={k} className="slide-bullets">
+          {b.lines.map((line, i) => (
+            <li key={i}>{renderInline(line, `b${k}-${i}`)}</li>
           ))}
         </ul>
-      )}
+      )))}
       {imageUrl && isLatex && <img className="slide-image-latex" src={imageUrl} alt="" />}
     </div>
   );
