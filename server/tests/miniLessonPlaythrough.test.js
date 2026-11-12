@@ -114,6 +114,21 @@ test('a good lesson passes both passes', async () => {
   expect(r.ok).toBe(true);
 }, 90000);
 
+// Owner ruling 2026-11-12: a mini lesson ends with one practice question
+test('a one-question lesson (math, staged steps) passes: "Practice question", no 1-of-1', async () => {
+  current = lesson({ questions: [lesson().questions[0]] });
+  const r = await playthrough(url(), { expectPitch: PITCH });
+  expect(r.failures).toEqual([]);
+  expect(r.ok).toBe(true);
+}, 90000);
+
+test('a one-question, one-step lesson (theory) passes', async () => {
+  current = lesson({ questions: [{ ...lesson().questions[1], position: 1 }] });
+  const r = await playthrough(url(), { expectPitch: PITCH });
+  expect(r.failures).toEqual([]);
+  expect(r.ok).toBe(true);
+}, 90000);
+
 test('wrong pitch link fails', async () => {
   const r = await playthrough(url(), { expectPitch: PITCH.replace('second', 'third') });
   expect(r.ok).toBe(false);

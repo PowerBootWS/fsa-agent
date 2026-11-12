@@ -162,7 +162,8 @@ async function playPass(browser, url, lesson, mode, expectPitch, failures) {
         failures.push(`${where}: an equation failed to render`);
       }
       const isLast = i === sections.length - 1;
-      const label = isLast ? (questions.length ? 'Practice questions →' : 'Finish') : 'Next →';
+      const practice = questions.length > 1 ? 'Practice questions →' : 'Practice question →';
+      const label = isLast ? (questions.length ? practice : 'Finish') : 'Next →';
       await page.getByRole('button', { name: label, exact: true }).click();
     }
 
@@ -172,13 +173,23 @@ async function playPass(browser, url, lesson, mode, expectPitch, failures) {
         const where = `question ${qi + 1} step ${si + 1} ${tag}`;
         const card = page.locator('.sq-card');
         try {
-          await card.locator('.sq-step-label', { hasText: `Step ${si + 1} of ${steps.length}` }).waitFor();
+          // a fresh, unanswered step of this question is on screen
+          await card.locator('.sq-text', { hasText: plainLead(q.question_text) || '' }).waitFor();
+          await card.locator('button.sq-option:not([disabled])').first().waitFor();
+          if (steps.length > 1) {
+            await card.locator('.sq-step-label', { hasText: `Step ${si + 1} of ${steps.length}` }).waitFor();
+          }
         } catch (_) {
           failures.push(`${where}: never showed`);
           return;
         }
+        if (steps.length === 1 && await card.locator('.sq-step-label').count()) {
+          failures.push(`${where}: a one-step question shows a step counter`);
+        }
+        // one question (a mini lesson's normal case) reads "Practice question", never "Question 1 of 1"
+        const wantLabel = questions.length > 1 ? `Question ${qi + 1} of ${questions.length}` : 'Practice question';
         const label = norm(await card.locator('.sq-label').textContent());
-        if (label !== `Question ${qi + 1} of ${questions.length}`) failures.push(`${where}: label "${label}"`);
+        if (label !== wantLabel) failures.push(`${where}: label "${label}"`);
         const opts = card.locator('button.sq-option');
         const n = await opts.count();
         if (n !== st.options.length) failures.push(`${where}: ${n} options shown, expected ${st.options.length}`);
