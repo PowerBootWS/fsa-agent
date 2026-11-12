@@ -74,7 +74,7 @@ describe('GET /explained/:slug', () => {
     const r = await get(`/explained/test-mini-pend?preview=${pendToken}`);
     expect(r.status).toBe(200);
     expect(r.text).toContain('property="og:title" content="T test-mini-pend"');
-    expect(r.text).toContain(`/explained-media/test-mini-pend/v1/og.png?preview=${pendToken}`.replace('?', '?'));
+    expect(r.text).toContain(`/explained-media/test-mini-pend/v1/p/${pendToken}/og.png`);
     expect(r.text).toContain('property="og:url" content="https://learn.fullsteamahead.ca/explained/test-mini-pend"');
     expect(r.headers['cache-control']).toMatch(/no-store/);
   });

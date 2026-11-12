@@ -23,12 +23,12 @@ jest.mock('../src/services/miniLessons', () => ({
 }));
 const miniLessons = require('../src/services/miniLessons');
 const express = require('express');
-const { apiRouter, mediaRouter } = require('../src/routes/explained');
+const { apiRouter, mediaRouter, withPreview } = require('../src/routes/explained');
 const { renderExplainedHtml } = require('../src/services/explainedOg');
 const { playthrough } = require('../scripts/mini-lesson-playthrough');
 
 const SLUG = '2b3-net-reactance-sign';
-const TOKEN = 'tok123';
+const TOKEN = 'tok123tok123tok123';
 // 1x1 white PNG
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC', 'base64');
 const PITCH = `https://fullsteamahead.ca/enroll?class=second&utm_source=mini-lesson&utm_campaign=${SLUG}`;
@@ -87,9 +87,11 @@ beforeAll(async () => {
   app.use('/explained-media', mediaRouter);
   app.get('/explained/:slug', async (req, res) => {
     const l = await miniLessons.getPublic(req.params.slug, req.query.preview);
-    if (l) l.og_image_url = `${l.og_image_url}?preview=${req.query.preview}`;
+    if (l) l.og_image_url = withPreview(l.og_image_url, req.query.preview);
     res.type('html').send(ogTags ? renderExplainedHtml(index, l, 'https://learn.fullsteamahead.ca') : index);
   });
+  // An HTML page answering 200 where media belongs (withPreview puts /p/<token>/ before the file name).
+  app.get(/\/p\/[^/]+\/index\.html$/, (req, res) => res.type('html').send(index));
   app.use('/v2', express.static(BUILD));
   app.use(express.static(BUILD));
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));

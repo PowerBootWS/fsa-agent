@@ -77,10 +77,10 @@ describe('GET /api/explained/:slug', () => {
     expect(r.status).toBe(200);
     expect(r.body.slug).toBe('test-mini-pend');
   });
-  test('draft response appends ?preview=<token> to audio/image/og urls', async () => {
+  test('draft response puts /p/<token>/ in audio/image/og urls', async () => {
     const r = await get(`/api/explained/test-mini-pend?preview=${pendToken}`);
-    expect(r.body.sections[0].audio_url).toBe(`/explained-media/test-mini-pend/v1/slide-001.mp3?preview=${pendToken}`);
-    expect(r.body.og_image_url).toBe(`/explained-media/test-mini-pend/v1/og.png?preview=${pendToken}`);
+    expect(r.body.sections[0].audio_url).toBe(`/explained-media/test-mini-pend/v1/p/${pendToken}/slide-001.mp3`);
+    expect(r.body.og_image_url).toBe(`/explained-media/test-mini-pend/v1/p/${pendToken}/og.png`);
     expect(r.body.sections[0].image_url).toBeNull();
   });
   test('live response never gets a preview suffix even if a token is supplied', async () => {
@@ -125,9 +125,18 @@ describe('GET /explained-media/:slug/:file', () => {
   });
   test('pending media: 404 without/with wrong preview, 200 with right token', async () => {
     expect((await get('/explained-media/test-mini-pend/v1/slide-001.mp3')).status).toBe(404);
-    expect((await get('/explained-media/test-mini-pend/v1/slide-001.mp3?preview=')).status).toBe(404);
-    expect((await get(`/explained-media/test-mini-pend/v1/slide-001.mp3?preview=${otherToken}`)).status).toBe(404);
-    expect((await get(`/explained-media/test-mini-pend/v1/slide-001.mp3?preview=${pendToken}`)).status).toBe(200);
+    expect((await get(`/explained-media/test-mini-pend/v1/p/${otherToken}/slide-001.mp3`)).status).toBe(404);
+    expect((await get('/explained-media/test-mini-pend/v1/p/short/slide-001.mp3')).status).toBe(404);
+    // A query-string token no longer opens a draft (Cloudflare strips it before the origin anyway).
+    expect((await get(`/explained-media/test-mini-pend/v1/slide-001.mp3?preview=${pendToken}`)).status).toBe(404);
+    expect((await get(`/explained-media/test-mini-pend/v1/p/${pendToken}/slide-001.mp3`)).status).toBe(200);
+  });
+  test('media errors are never cacheable (Cloudflare would keep the 404)', async () => {
+    for (const p of ['/explained-media/test-mini-nope/v1/slide-001.mp3', '/explained-media/test-mini-live/v1/slide-009.mp3',
+      '/explained-media/test-mini-pend/v1/slide-001.mp3']) {
+      const r = await get(p);
+      expect([p, r.status, r.headers['cache-control']]).toEqual([p, 404, 'no-store']);
+    }
   });
   test('unknown slug and missing file: 404', async () => {
     expect((await get('/explained-media/test-mini-nope/v1/slide-001.mp3')).status).toBe(404);
@@ -147,24 +156,24 @@ describe('versioned media + cache headers', () => {
   });
   test('draft v2 media: 404 without/wrong token; 200 with token and private, no-store', async () => {
     expect((await get('/explained-media/test-mini-live/v2/slide-001.mp3')).status).toBe(404);
-    expect((await get(`/explained-media/test-mini-live/v2/slide-001.mp3?preview=${otherToken}`)).status).toBe(404);
-    const r = await get(`/explained-media/test-mini-live/v2/slide-001.mp3?preview=${v2Token}`);
+    expect((await get(`/explained-media/test-mini-live/v2/p/${otherToken}/slide-001.mp3`)).status).toBe(404);
+    const r = await get(`/explained-media/test-mini-live/v2/p/${v2Token}/slide-001.mp3`);
     expect(r.status).toBe(200);
     expect(r.headers['cache-control']).toBe('private, no-store');
   });
   test('v3 (nonexistent version) 404 even with token', async () => {
-    expect((await get(`/explained-media/test-mini-live/v3/slide-001.mp3?preview=${v2Token}`)).status).toBe(404);
+    expect((await get(`/explained-media/test-mini-live/v3/p/${v2Token}/slide-001.mp3`)).status).toBe(404);
   });
   test('API: live+differing draft: token gets draft with preview-suffixed v2 urls; tokenless gets live v1 clean', async () => {
     const d = await get(`/api/explained/test-mini-live?preview=${v2Token}`);
     expect(d.body.title).toBe('T2');
-    expect(d.body.sections[0].audio_url).toBe(`/explained-media/test-mini-live/v2/slide-001.mp3?preview=${v2Token}`);
+    expect(d.body.sections[0].audio_url).toBe(`/explained-media/test-mini-live/v2/p/${v2Token}/slide-001.mp3`);
     const l = await get('/api/explained/test-mini-live');
     expect(l.body.sections[0].audio_url).toBe('/explained-media/test-mini-live/v1/slide-001.mp3');
-    expect(l.body.og_image_url).not.toContain('preview');
+    expect(l.body.og_image_url).not.toContain('/p/');
   });
   test('pending media via token is private, no-store', async () => {
-    const r = await get(`/explained-media/test-mini-pend/v1/slide-001.mp3?preview=${pendToken}`);
+    const r = await get(`/explained-media/test-mini-pend/v1/p/${pendToken}/slide-001.mp3`);
     expect(r.headers['cache-control']).toBe('private, no-store');
   });
 });
