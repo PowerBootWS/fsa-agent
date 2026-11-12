@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 // Plays a mini lesson the way a student on a phone would, before it goes live.
 //
-//   node mini-lesson-playthrough.js <url> [--expect-pitch <url>]
+//   node mini-lesson-playthrough.js <url> [--expect-pitch <url>] [--expect-version <N>]
 //
 // <url> is https://learn.fullsteamahead.ca/explained/<slug>[?preview=<token>].
 // Prints one JSON line {ok, failures[]} on stdout and exits 0 (ok) or 1.
 //
 // Checks:
 //  - the raw HTML (no JS) carries the Open Graph tags, and og:image returns 200
-//  - every slide's image_url and audio_url returns 200
+//  - with --expect-version N: the page serves draft version N (not a newer
+//    rebuild's draft, not the live version)
+//  - every slide's image_url and audio_url returns 200 as image/png / audio/mpeg
+//    (og:image as image/png), so an HTML page answering 200 doesn't pass
 //  - in Chromium at 390x844 with a fresh, cookie-less context, every slide
 //    renders (title, image, no KaTeX error), then every question step is
 //    answered wrong on one pass and right on another, checking the marking,
@@ -22,9 +25,10 @@ const STEP_TIMEOUT_MS = 15000;
 const SITE = 'https://fullsteamahead.ca';
 
 function parseArgs(argv) {
-  const out = { url: null, expectPitch: null };
+  const out = { url: null, expectPitch: null, expectVersion: null };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--expect-pitch') out.expectPitch = argv[++i];
+    else if (argv[i] === '--expect-version') out.expectVersion = parseInt(argv[++i], 10);
     else if (!out.url) out.url = argv[i];
   }
   return out;
@@ -44,14 +48,22 @@ function sameOrigin(origin, u) {
   return origin + p.pathname + p.search;
 }
 
-async function status(url) {
+async function fetchMedia(url) {
   try {
     const r = await fetch(url, { redirect: 'manual' });
     await r.arrayBuffer();
-    return r.status;
+    return { status: r.status, type: (r.headers.get('content-type') || '').split(';')[0].trim() };
   } catch (e) {
-    return `error ${e.message}`;
+    return { status: `error ${e.message}`, type: '' };
   }
+}
+
+// null when the media answered 200 with the expected type, else a failure.
+async function mediaProblem(url, what, type) {
+  const m = await fetchMedia(url);
+  if (m.status !== 200) return `${what} returned ${m.status}`;
+  if (m.type !== type) return `${what} is ${m.type || 'untyped'}, expected ${type}`;
+  return null;
 }
 
 function norm(s) {
@@ -79,8 +91,8 @@ async function checkStatic(url, origin, failures) {
   }
   const img = metaContent(html, 'og:image');
   if (img) {
-    const s = await status(sameOrigin(origin, img));
-    if (s !== 200) failures.push(`og:image returned ${s}`);
+    const p = await mediaProblem(sameOrigin(origin, img), 'og:image', 'image/png');
+    if (p) failures.push(p);
   }
 }
 
@@ -102,10 +114,10 @@ async function loadLesson(origin, slug, token, failures) {
 
 async function checkMedia(origin, lesson, failures) {
   for (const [i, s] of (lesson.sections || []).entries()) {
-    for (const f of ['image_url', 'audio_url']) {
+    for (const [f, what, type] of [['image_url', 'image', 'image/png'], ['audio_url', 'audio', 'audio/mpeg']]) {
       if (!s[f]) continue;
-      const st = await status(sameOrigin(origin, s[f]));
-      if (st !== 200) failures.push(`slide ${i + 1} ${f === 'image_url' ? 'image' : 'audio'} returned ${st}`);
+      const p = await mediaProblem(sameOrigin(origin, s[f]), `slide ${i + 1} ${what}`, type);
+      if (p) failures.push(p);
     }
   }
 }
@@ -215,7 +227,7 @@ async function playPass(browser, url, lesson, mode, expectPitch, failures) {
   }
 }
 
-async function playthrough(url, { expectPitch = null } = {}) {
+async function playthrough(url, { expectPitch = null, expectVersion = null } = {}) {
   const failures = [];
   let u;
   try {
@@ -231,6 +243,10 @@ async function playthrough(url, { expectPitch = null } = {}) {
   await checkStatic(url, u.origin, failures);
   const lesson = await loadLesson(u.origin, slug, token, failures);
   if (!lesson) return { ok: false, failures };
+  if (expectVersion != null && !(lesson.version === expectVersion && lesson.is_draft === true)) {
+    failures.push(`page serves v${lesson.version} (${lesson.is_draft ? 'draft' : 'live'}), expected draft v${expectVersion}`);
+    return { ok: false, failures };
+  }
   if (!(lesson.sections || []).length) failures.push('lesson has no slides');
   if (!(lesson.questions || []).length) failures.push('lesson has no questions');
   await checkMedia(u.origin, lesson, failures);
@@ -248,12 +264,12 @@ async function playthrough(url, { expectPitch = null } = {}) {
 module.exports = { playthrough, parseArgs, metaContent, plainLead };
 
 if (require.main === module) {
-  const { url, expectPitch } = parseArgs(process.argv.slice(2));
+  const { url, expectPitch, expectVersion } = parseArgs(process.argv.slice(2));
   if (!url) {
-    console.log(JSON.stringify({ ok: false, failures: ['usage: mini-lesson-playthrough.js <url> [--expect-pitch <url>]'] }));
+    console.log(JSON.stringify({ ok: false, failures: ['usage: mini-lesson-playthrough.js <url> [--expect-pitch <url>] [--expect-version <N>]'] }));
     process.exit(1);
   }
-  playthrough(url, { expectPitch })
+  playthrough(url, { expectPitch, expectVersion })
     .then((r) => { console.log(JSON.stringify(r)); process.exit(r.ok ? 0 : 1); })
     .catch((e) => { console.log(JSON.stringify({ ok: false, failures: [`playthrough crashed: ${e.message}`] })); process.exit(1); });
 }

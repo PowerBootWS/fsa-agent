@@ -147,6 +147,38 @@ test('a wrong preview token fails at the API, before any browser work', async ()
   expect(r.failures).toContain('lesson API returned 404');
 }, 90000);
 
+test('playthrough pinned to the version it was given', async () => {
+  expect((await playthrough(url(), { expectPitch: PITCH, expectVersion: 2 })).failures).toEqual([]);
+  const r = await playthrough(url(), { expectPitch: PITCH, expectVersion: 3 });
+  expect(r.ok).toBe(false);
+  expect(r.failures).toContain('page serves v2 (draft), expected draft v3');
+}, 90000);
+
+test('a live (non-draft) version fails a pinned draft check', async () => {
+  current = lesson({ is_draft: false });
+  const r = await playthrough(url(), { expectPitch: PITCH, expectVersion: 2 });
+  expect(r.failures).toContain('page serves v2 (live), expected draft v2');
+}, 90000);
+
+test('missing audio fails with a 404 for that slide', async () => {
+  current = lesson();
+  current.sections[1].audio_url = `/explained-media/${SLUG}/v2/slide-009.mp3`;
+  const r = await playthrough(url(), { expectPitch: PITCH });
+  expect(r.failures).toContain('slide 2 audio returned 404');
+}, 90000);
+
+test('media answered with the wrong content type fails', async () => {
+  current = lesson();
+  current.sections[0].audio_url = '/v2/index.html';        // an HTML page answering 200
+  current.sections[0].image_url = '/v2/index.html';
+  const r = await playthrough(url(), { expectPitch: PITCH });
+  expect(r.ok).toBe(false);
+  expect(r.failures).toEqual(expect.arrayContaining([
+    expect.stringMatching(/^slide 1 audio is text\/html, expected audio\/mpeg/),
+    expect.stringMatching(/^slide 1 image is text\/html, expected image\/png/),
+  ]));
+}, 90000);
+
 test('a non-lesson URL is refused', async () => {
   const r = await playthrough(`${origin}/lessons/2B3-1-7`);
   expect(r).toEqual({ ok: false, failures: [`not a mini lesson URL: ${origin}/lessons/2B3-1-7`] });

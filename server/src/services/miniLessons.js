@@ -168,7 +168,7 @@ async function setStatus(slug, to, { holdReason = null, checksPassed } = {}) {
 
 async function list() {
   const { rows } = await pool.query(
-    `SELECT m.slug, v.title, m.paper_code, m.source_lesson_code, m.status, m.updated_at
+    `SELECT m.slug, v.title, m.paper_code, m.source_lesson_code, m.status, m.draft_version, m.live_version, m.updated_at
        FROM mini_lessons m
        LEFT JOIN mini_lesson_versions v
          ON v.mini_lesson_id = m.id AND v.version = COALESCE(m.live_version, m.draft_version)

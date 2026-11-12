@@ -88,6 +88,7 @@ test('list', async () => {
   const l = (await ml.list()).find(r => r.slug === SLUG);
   expect(l).toMatchObject({ title: 'v1', paper_code: '2B3', source_lesson_code: '2B3-1-7', status: 'pending' });
   expect(l.updated_at).toBeTruthy();
+  expect(l).toMatchObject({ draft_version: 1, live_version: null });
 });
 
 test('rebuild metadata is versioned: live keeps title A, draft token sees B', async () => {
