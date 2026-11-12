@@ -34,7 +34,10 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;                 // fonts, GA, etc.
-  if (url.pathname.startsWith('/api') || url.pathname.startsWith('/media')) return; // never cache
+  // never cache: API, course media, and mini-lesson media (draft URLs carry a
+  // preview token and responses are no-store; a cached 404 would outlive go-live)
+  if (url.pathname.startsWith('/api') || url.pathname.startsWith('/media')
+      || url.pathname.startsWith('/explained-media')) return;
 
   // Page navigations: always try the network first (so online users get the
   // latest build + live data); fall back to a friendly offline page.
