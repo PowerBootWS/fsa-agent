@@ -133,27 +133,27 @@ describe('publish flow', () => {
     }
     expect((await status('held', { hold_reason: 5 })).status).toBe(400);
     expect((await status('held', { hold_reason: 'x'.repeat(2001) })).status).toBe(400);
-    expect((await status('live', { checks_passed: false })).status).toBe(409);
+    expect((await status('live', { checks_passed: false, expected_version: 1 })).status).toBe(409);
   });
   test('unknown slug status -> 404', async () => {
-    expect((await status('live', { checks_passed: true }, 'test-mini-nope')).status).toBe(404);
+    expect((await status('live', { checks_passed: true, expected_version: 1 }, 'test-mini-nope')).status).toBe(404);
   });
   test('pending -> live without checks -> 409', async () => {
     await put(payload());
-    const r = await status('live');
+    const r = await status('live', { expected_version: 1 });
     expect(r.status).toBe(409);
     expect(r.body.error).toBe('transition not allowed');
   });
   test('pending -> live with checks_passed -> 200', async () => {
     await put(payload());
-    const r = await status('live', { checks_passed: true });
+    const r = await status('live', { checks_passed: true, expected_version: 1 });
     expect(r.status).toBe(200);
     expect(r.body).toEqual({ slug: SLUG, status: 'live' });
   });
   test('held -> live -> 409', async () => {
     await put(payload());
     expect((await status('held', { hold_reason: 'bad' })).status).toBe(200);
-    expect((await status('live', { checks_passed: true })).status).toBe(409);
+    expect((await status('live', { checks_passed: true, expected_version: 1 })).status).toBe(409);
   });
   test('invalid target status -> 400', async () => {
     await put(payload());
@@ -161,11 +161,42 @@ describe('publish flow', () => {
   });
   test('rebuild of live slug -> pending, live_version unchanged', async () => {
     await put(payload());
-    await status('live', { checks_passed: true });
+    await status('live', { checks_passed: true, expected_version: 1 });
     const r = await put(payload({ title: 'T2' }));
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ status: 'pending', version: 2 });
     const { rows: [m] } = await pool.query(`SELECT status, live_version, draft_version FROM mini_lessons WHERE slug = $1`, [SLUG]);
     expect(m).toEqual({ status: 'pending', live_version: 1, draft_version: 2 });
+  });
+});
+
+describe('expected version and create-only (final fix 2)', () => {
+  test('status live/awaiting_approval without expected_version -> 400; bad type -> 400', async () => {
+    await put(payload());
+    expect((await status('live', { checks_passed: true })).status).toBe(400);
+    expect((await status('awaiting_approval', { checks_passed: true })).status).toBe(400);
+    for (const v of ['1', 0, 1.5, null]) {
+      expect((await status('live', { checks_passed: true, expected_version: v })).status).toBe(400);
+    }
+  });
+  test('a version other than the current draft -> 409 and nothing changes', async () => {
+    await put(payload());
+    await put(payload({ title: 'T2' }));                     // a second build uploaded v2
+    const r = await status('live', { checks_passed: true, expected_version: 1 });
+    expect(r.status).toBe(409);
+    expect((await status('held', { hold_reason: 'x', expected_version: 1 })).status).toBe(409);
+    const { rows: [m] } = await pool.query(`SELECT status, live_version FROM mini_lessons WHERE slug = $1`, [SLUG]);
+    expect(m).toEqual({ status: 'pending', live_version: null });
+    expect((await status('live', { checks_passed: true, expected_version: 2 })).status).toBe(200);
+  });
+  test('create_only PUT on an existing slug -> 409 slug exists, row untouched', async () => {
+    expect((await put(payload({ create_only: true }))).status).toBe(200);
+    const r = await put(payload({ create_only: true, title: 'Other post' }));
+    expect(r.status).toBe(409);
+    expect(r.body.error).toBe('slug exists');
+    const { rows } = await pool.query(
+      `SELECT v.title FROM mini_lesson_versions v JOIN mini_lessons m ON m.id = v.mini_lesson_id WHERE m.slug = $1`, [SLUG]);
+    expect(rows.map(x => x.title)).toEqual(['T']);
+    expect((await put(payload({ create_only: 'yes' }))).status).toBe(400);
   });
 });

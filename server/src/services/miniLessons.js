@@ -13,6 +13,11 @@ class NotFoundError extends Error {
   constructor(message) { super(message); this.name = 'NotFoundError'; }
 }
 
+// A create-only upload for a slug that already exists (final fix 2).
+class SlugTakenError extends Error {
+  constructor(message) { super(message); this.name = 'SlugTakenError'; }
+}
+
 // Hash both sides so lengths always match (byte length != string length for non-ASCII).
 function tokenMatches(given, actual) {
   const h = (x) => crypto.createHash('sha256').update(x).digest();
@@ -85,6 +90,15 @@ async function upsertDraft(p) {
   try {
     await client.query('BEGIN');
     const token = crypto.randomBytes(32).toString('hex');
+    if (p.create_only === true) {
+      // Two builds of a new lesson can pick the same slug; the second must not
+      // overwrite the first one's row, so a create-only upload never updates.
+      const { rows: [created] } = await client.query(
+        `INSERT INTO mini_lessons (slug, paper_code, source_lesson_code, preview_token, version)
+         VALUES ($1,$2,$3,$4,1) ON CONFLICT (slug) DO NOTHING RETURNING id`,
+        [p.slug, p.paper_code, p.source_lesson_code || null, token]);
+      if (!created) throw new SlugTakenError(`slug ${p.slug} already exists`);
+    }
     const { rows: [ml] } = await client.query(
       `INSERT INTO mini_lessons (slug, paper_code, source_lesson_code, preview_token, version)
        VALUES ($1,$2,$3,$4,1)
@@ -131,7 +145,11 @@ async function upsertDraft(p) {
   }
 }
 
-async function setStatus(slug, to, { holdReason = null, checksPassed } = {}) {
+// expectedVersion is the draft version the caller checked (final fix 2). It is
+// required to go live or to awaiting_approval, and checked whenever it is
+// given: a second build that uploaded since then makes this a 409, so an
+// unchecked version can never be promoted and one build can't hold another's.
+async function setStatus(slug, to, { holdReason = null, checksPassed, expectedVersion } = {}) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -139,6 +157,12 @@ async function setStatus(slug, to, { holdReason = null, checksPassed } = {}) {
     if (!ml) throw new NotFoundError(`unknown slug ${slug}`);
     if (!(ALLOWED[ml.status] || []).includes(to)) {
       throw new TransitionError(`transition ${ml.status} -> ${to} not allowed`);
+    }
+    if ((to === 'live' || to === 'awaiting_approval') && expectedVersion === undefined) {
+      throw new TransitionError(`${to} requires expected_version`);
+    }
+    if (expectedVersion !== undefined && expectedVersion !== ml.draft_version) {
+      throw new TransitionError(`draft is v${ml.draft_version}, not v${expectedVersion}`);
     }
     const checks = checksPassed === undefined ? ml.checks_passed : checksPassed === true;
     if ((to === 'live' || to === 'awaiting_approval') && !checks) {
@@ -176,4 +200,4 @@ async function list() {
   return rows;
 }
 
-module.exports = { getPublic, mediaAccess, upsertDraft, setStatus, list, TransitionError, NotFoundError, classCodeFor };
+module.exports = { getPublic, mediaAccess, upsertDraft, setStatus, list, TransitionError, NotFoundError, SlugTakenError, classCodeFor };

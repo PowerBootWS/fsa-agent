@@ -38,8 +38,8 @@ test('getPublic pending: null without token, draft with token in slide order', a
 
 test('live requires checks_passed', async () => {
   await ml.upsertDraft(payload('v1'));
-  await expect(ml.setStatus(SLUG, 'live')).rejects.toBeInstanceOf(ml.TransitionError);
-  const r = await ml.setStatus(SLUG, 'live', { checksPassed: true });
+  await expect(ml.setStatus(SLUG, 'live', { expectedVersion: 1 })).rejects.toBeInstanceOf(ml.TransitionError);
+  const r = await ml.setStatus(SLUG, 'live', { checksPassed: true, expectedVersion: 1 });
   expect(r).toEqual({ slug: SLUG, status: 'live' });
   const p = await ml.getPublic(SLUG, null);
   expect(p.title).toBe('v1');
@@ -47,7 +47,7 @@ test('live requires checks_passed', async () => {
 
 test('rebuild while live keeps serving v1 publicly, v2 with token', async () => {
   await ml.upsertDraft(payload('v1'));
-  await ml.setStatus(SLUG, 'live', { checksPassed: true });
+  await ml.setStatus(SLUG, 'live', { checksPassed: true, expectedVersion: 1 });
   const r2 = await ml.upsertDraft(payload('v2', { title: 'T2' }));
   expect(r2.version).toBe(2);
   expect(r2.status).toBe('pending');
@@ -62,7 +62,7 @@ test('rebuild while live keeps serving v1 publicly, v2 with token', async () => 
 test('held to live throws; invalid and unknown transitions throw', async () => {
   await ml.upsertDraft(payload('v1'));
   await ml.setStatus(SLUG, 'held', { holdReason: 'x' });
-  await expect(ml.setStatus(SLUG, 'live', { checksPassed: true })).rejects.toBeInstanceOf(ml.TransitionError);
+  await expect(ml.setStatus(SLUG, 'live', { checksPassed: true, expectedVersion: 1 })).rejects.toBeInstanceOf(ml.TransitionError);
   await expect(ml.setStatus('test-mini-nope', 'live', { checksPassed: true })).rejects.toBeInstanceOf(ml.NotFoundError);
   const { rows } = await pool.query(`SELECT hold_reason FROM mini_lessons WHERE slug=$1`, [SLUG]);
   expect(rows[0].hold_reason).toBe('x');
@@ -70,9 +70,9 @@ test('held to live throws; invalid and unknown transitions throw', async () => {
 
 test('awaiting_approval needs checks, then live', async () => {
   await ml.upsertDraft(payload('v1'));
-  await expect(ml.setStatus(SLUG, 'awaiting_approval')).rejects.toBeInstanceOf(ml.TransitionError);
-  await ml.setStatus(SLUG, 'awaiting_approval', { checksPassed: true });
-  await ml.setStatus(SLUG, 'live');
+  await expect(ml.setStatus(SLUG, 'awaiting_approval', { expectedVersion: 1 })).rejects.toBeInstanceOf(ml.TransitionError);
+  await ml.setStatus(SLUG, 'awaiting_approval', { checksPassed: true, expectedVersion: 1 });
+  await ml.setStatus(SLUG, 'live', { expectedVersion: 1 });
   expect((await ml.getPublic(SLUG, null)).slug).toBe(SLUG);
 });
 
@@ -93,7 +93,7 @@ test('list', async () => {
 
 test('rebuild metadata is versioned: live keeps title A, draft token sees B', async () => {
   await ml.upsertDraft(payload('v1', { title: 'A' }));
-  await ml.setStatus(SLUG, 'live', { checksPassed: true });
+  await ml.setStatus(SLUG, 'live', { checksPassed: true, expectedVersion: 1 });
   const r2 = await ml.upsertDraft(payload('v2', { title: 'B', description: 'd2', og_image_url: 'og.png' }));
   expect((await ml.getPublic(SLUG, null)).title).toBe('A');
   expect((await ml.getPublic(SLUG, null)).og_image_url).toBeNull();
@@ -114,7 +114,7 @@ test('mediaAccess: live version anyone; draft only with token; held/superseded/w
   expect(await ml.mediaAccess(SLUG, 1, 'wrong')).toBe(false);
   expect(await ml.mediaAccess(SLUG, 1, '')).toBe(false);
   expect(await ml.mediaAccess('test-mini-nope', 1, r1.preview_token)).toBe(false);
-  await ml.setStatus(SLUG, 'live', { checksPassed: true });
+  await ml.setStatus(SLUG, 'live', { checksPassed: true, expectedVersion: 1 });
   expect(await ml.mediaAccess(SLUG, 1, null)).toBe(true);
   const r2 = await ml.upsertDraft(payload('v2'));
   expect(await ml.mediaAccess(SLUG, 1, null)).toBe(true);   // live stays served
@@ -127,7 +127,7 @@ test('mediaAccess: live version anyone; draft only with token; held/superseded/w
   expect(await ml.mediaAccess(SLUG, 1, null)).toBe(true);
   // promote a new draft: old v1 superseded
   const r3 = await ml.upsertDraft(payload('v3'));
-  await ml.setStatus(SLUG, 'live', { checksPassed: true });
+  await ml.setStatus(SLUG, 'live', { checksPassed: true, expectedVersion: r3.version });
   expect(await ml.mediaAccess(SLUG, r3.version, null)).toBe(true);
   expect(await ml.mediaAccess(SLUG, 1, null)).toBe(false);
 });
@@ -135,7 +135,7 @@ test('mediaAccess: live version anyone; draft only with token; held/superseded/w
 test('getPublic reports version and is_draft', async () => {
   const r1 = await ml.upsertDraft(payload('v1'));
   expect(await ml.getPublic(SLUG, r1.preview_token)).toMatchObject({ version: 1, is_draft: true });
-  await ml.setStatus(SLUG, 'live', { checksPassed: true });
+  await ml.setStatus(SLUG, 'live', { checksPassed: true, expectedVersion: 1 });
   expect(await ml.getPublic(SLUG, null)).toMatchObject({ version: 1, is_draft: false });
   const r2 = await ml.upsertDraft(payload('v2'));
   expect(await ml.getPublic(SLUG, r2.preview_token)).toMatchObject({ version: 2, is_draft: true });
@@ -155,5 +155,47 @@ test('upsertDraft stores media URLs built from the assigned version', async () =
 
 test('setStatus: checksPassed must be strictly true', async () => {
   await ml.upsertDraft(payload('v1'));
-  await expect(ml.setStatus(SLUG, 'live', { checksPassed: 'false' })).rejects.toBeInstanceOf(ml.TransitionError);
+  await expect(ml.setStatus(SLUG, 'live', { checksPassed: 'false', expectedVersion: 1 })).rejects.toBeInstanceOf(ml.TransitionError);
+});
+
+// Final fix 2: a status change names the draft version it checked
+describe('expected version (final fix 2)', () => {
+  test('live and awaiting_approval require it', async () => {
+    await ml.upsertDraft(payload('v1'));
+    await expect(ml.setStatus(SLUG, 'live', { checksPassed: true })).rejects.toThrow(/requires expected_version/);
+    await expect(ml.setStatus(SLUG, 'awaiting_approval', { checksPassed: true })).rejects.toThrow(/requires expected_version/);
+  });
+
+  test('a second upload between playthrough and go-live is refused, not promoted', async () => {
+    await ml.upsertDraft(payload('v1'));                         // build A checks v1
+    const b = await ml.upsertDraft(payload('v2'));               // build B uploads v2 meanwhile
+    await expect(ml.setStatus(SLUG, 'live', { checksPassed: true, expectedVersion: 1 }))
+      .rejects.toBeInstanceOf(ml.TransitionError);
+    // A's hold for v1 must not hold B's draft either
+    await expect(ml.setStatus(SLUG, 'held', { holdReason: 'A failed', expectedVersion: 1 }))
+      .rejects.toBeInstanceOf(ml.TransitionError);
+    const { rows: [m] } = await pool.query('SELECT status, live_version, draft_version FROM mini_lessons WHERE slug=$1', [SLUG]);
+    expect(m).toEqual({ status: 'pending', live_version: null, draft_version: 2 });
+    await ml.setStatus(SLUG, 'live', { checksPassed: true, expectedVersion: b.version });
+    expect((await ml.getPublic(SLUG, null)).title).toBe('v2');
+  });
+
+  test('approve of an awaiting draft checks the version too', async () => {
+    await ml.upsertDraft(payload('v1'));
+    await ml.setStatus(SLUG, 'awaiting_approval', { checksPassed: true, expectedVersion: 1 });
+    await expect(ml.setStatus(SLUG, 'live', { expectedVersion: 2 })).rejects.toBeInstanceOf(ml.TransitionError);
+    await ml.setStatus(SLUG, 'live', { expectedVersion: 1 });
+  });
+});
+
+describe('create-only upload (final fix 2)', () => {
+  test('a new build never overwrites an existing slug', async () => {
+    const first = await ml.upsertDraft(payload('first', { create_only: true }));
+    expect(first.version).toBe(1);
+    await expect(ml.upsertDraft(payload('second', { create_only: true }))).rejects.toBeInstanceOf(ml.SlugTakenError);
+    expect((await ml.getPublic(SLUG, first.preview_token)).title).toBe('first');
+    const { rows } = await pool.query(
+      'SELECT count(*)::int AS n FROM mini_lesson_versions v JOIN mini_lessons m ON m.id = v.mini_lesson_id WHERE m.slug = $1', [SLUG]);
+    expect(rows[0].n).toBe(1);
+  });
 });

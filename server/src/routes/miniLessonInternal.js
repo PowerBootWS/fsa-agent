@@ -68,6 +68,7 @@ function validatePayload(p, slug) {
     });
   }
   if (p.og_image_url != null && p.og_image_url !== 'og.png') errs.push('og_image_url must be og.png');
+  if (p.create_only !== undefined && typeof p.create_only !== 'boolean') errs.push('create_only must be a boolean');
   if (!Array.isArray(p.questions) || p.questions.length === 0) errs.push('questions must be a non-empty array');
   else {
     const seen = new Set();
@@ -102,6 +103,7 @@ function validatePayload(p, slug) {
 function fail(res, err) {
   if (err instanceof miniLessons.TransitionError) return res.status(409).json({ error: 'transition not allowed', detail: err.message });
   if (err instanceof miniLessons.NotFoundError) return res.status(404).json({ error: 'not found' });
+  if (err instanceof miniLessons.SlugTakenError) return res.status(409).json({ error: 'slug exists', detail: err.message });
   console.error('mini-lesson internal error:', err);
   return res.status(500).json({ error: 'internal error' });
 }
@@ -117,14 +119,16 @@ router.put('/:slug', async (req, res) => {
 });
 
 router.post('/:slug/status', async (req, res) => {
-  const { to, hold_reason: holdReason, checks_passed: checksPassed } = req.body || {};
+  const { to, hold_reason: holdReason, checks_passed: checksPassed, expected_version: expectedVersion } = req.body || {};
   const details = [];
   if (!STATUSES.includes(to)) details.push('to must be one of ' + STATUSES.join(', '));
   if (checksPassed !== undefined && typeof checksPassed !== 'boolean') details.push('checks_passed must be a boolean');
   if (holdReason !== undefined && (typeof holdReason !== 'string' || holdReason.length > 2000)) details.push('hold_reason must be a string up to 2000 chars');
+  if (expectedVersion !== undefined && !(Number.isInteger(expectedVersion) && expectedVersion >= 1)) details.push('expected_version must be a positive integer');
+  if ((to === 'live' || to === 'awaiting_approval') && expectedVersion === undefined) details.push(`expected_version is required for ${to}`);
   if (details.length) return res.status(400).json({ error: 'invalid payload', details });
   try {
-    res.json(await miniLessons.setStatus(req.params.slug, to, { holdReason: holdReason || null, checksPassed }));
+    res.json(await miniLessons.setStatus(req.params.slug, to, { holdReason: holdReason || null, checksPassed, expectedVersion }));
   } catch (e) { fail(res, e); }
 });
 
