@@ -6,6 +6,7 @@ const FIXTURE_EMAIL_LIKE = 'annelig-%@example.com';
 
 async function cleanup() {
   await pool.query(`DELETE FROM announcements WHERE slug LIKE 'test-%'`);
+  await pool.query(`DELETE FROM user_progress WHERE user_email LIKE $1`, [FIXTURE_EMAIL_LIKE]);
   await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
 }
 
@@ -27,6 +28,12 @@ async function makeUser(tag, { subs = [], savedJobs = 0 } = {}) {
   return { id: u.id, email };
 }
 
+async function touchLesson(email, lessonCode, ago = '1 day') {
+  await pool.query(
+    `INSERT INTO user_progress (user_email, lesson_code, last_accessed) VALUES ($1, $2, now() - $3::interval)`,
+    [email, lessonCode, ago]);
+}
+
 async function announce(slug, audiences, { startsAgo = '0 minutes', endsIn = '30 days' } = {}) {
   const { rows: [a] } = await pool.query(
     `INSERT INTO announcements (slug, title, body, audiences, starts_at, ends_at)
@@ -43,7 +50,31 @@ describe('announcement eligibility', () => {
 
   it('userGroups: live 2nd Class student', async () => {
     const u = await makeUser('second', { subs: [{ class_code: 'second', active_paper: '2A1' }] });
-    expect([...(await userGroups(pool, u.id))].sort()).toEqual(['everyone', 'second', 'students']);
+    expect([...(await userGroups(pool, u.id))].sort()).toEqual(['2A1', 'everyone', 'second', 'students']);
+  });
+
+  it('userGroups: current paper is an audience', async () => {
+    const u = await makeUser('paper', { subs: [{ class_code: 'second', active_paper: '2A3' }] });
+    expect([...(await userGroups(pool, u.id))].sort()).toEqual(['2A3', 'everyone', 'second', 'students']);
+  });
+
+  it('userGroups: a paper opened in the last 30 days counts; older or lapsed does not', async () => {
+    const u = await makeUser('recent', { subs: [{ class_code: 'second', active_paper: '2B1' }] });
+    await touchLesson(u.email, '2A3-4-2', '5 days');
+    await touchLesson(u.email, '2A1-1-1', '40 days');
+    expect([...(await userGroups(pool, u.id))].sort()).toEqual(['2A3', '2B1', 'everyone', 'second', 'students']);
+
+    const lapsed = await makeUser('recentlapsed', { subs: [{ class_code: 'second', active_paper: '2A3', status: 'inactive' }] });
+    await touchLesson(lapsed.email, '2A3-4-2', '5 days');
+    expect(await userGroups(pool, lapsed.id)).not.toContain('2A3');
+  });
+
+  it('paper announcements reach only that paper', async () => {
+    const on = await makeUser('on2a3', { subs: [{ class_code: 'second', active_paper: '2A3' }] });
+    const off = await makeUser('on2a1', { subs: [{ class_code: 'second', active_paper: '2A1' }] });
+    const id = await announce('test-2a3', ['2A3']);
+    expect((await findNextForUser(pool, on, { isAffiliate: notAffiliate })).id).toBe(id);
+    expect(await findNextForUser(pool, off, { isAffiliate: notAffiliate })).toBeNull();
   });
 
   it('userGroups: job-only account is a job seeker, not a student', async () => {

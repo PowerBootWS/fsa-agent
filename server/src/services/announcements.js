@@ -4,11 +4,33 @@
 // Audience rules match the rest of the platform: a "live" subscription is the
 // requireAuth condition, and a job seeker is anyone with a non-archived saved
 // job or an account that never had a subscription (a free job-only signup).
+// A paper code (e.g. "2A3") is also an audience: a student with a live
+// subscription for that paper's class who has it as their current paper, or
+// has opened one of its lessons in the last PAPER_ACTIVE_DAYS days.
+
+const { PAPERS_BY_CLASS } = require('../config/papersForClass');
 
 const AUDIENCES = ['everyone', 'students', 'second', 'third', 'fourth_a', 'fourth_b', 'affiliates', 'job_seekers'];
 const CLASS_AUDIENCES = ['second', 'third', 'fourth_a', 'fourth_b'];
+const PAPERS = Object.values(PAPERS_BY_CLASS).flat();
+const PAPER_CLASS = Object.entries(PAPERS_BY_CLASS).flatMap(([c, ps]) => ps.map(p => [p, c]));
+const PAPER_ACTIVE_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LIVE_SUB = `s.status = 'active' AND (s.cancel_at IS NULL OR s.cancel_at > NOW())`;
+
+// Papers a user counts as working on. $papers/$classes are PAPER_CLASS as two
+// parallel arrays; userId/email are SQL expressions for the user.
+function papersSql(userId, email, papers, classes) {
+  return `ARRAY(
+    SELECT s.active_paper FROM subscriptions s
+     WHERE s.user_id = ${userId} AND ${LIVE_SUB} AND s.active_paper IS NOT NULL
+    UNION
+    SELECT pc.paper FROM unnest(${papers}::text[], ${classes}::text[]) AS pc(paper, class_code)
+     WHERE EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = ${userId} AND s.class_code = pc.class_code AND ${LIVE_SUB})
+       AND EXISTS (SELECT 1 FROM user_progress up
+                    WHERE up.user_email = lower(${email}) AND up.lesson_code LIKE pc.paper || '-%'
+                      AND up.last_accessed > now() - interval '${PAPER_ACTIVE_DAYS} days'))`;
+}
 
 function validateAnnouncement(input, now = new Date()) {
   const a = input || {};
@@ -32,7 +54,7 @@ function validateAnnouncement(input, now = new Date()) {
 
   const audiences = Array.isArray(a.audiences) ? [...new Set(a.audiences)] : [];
   if (audiences.length === 0) errors.push('audiences must list at least one group');
-  const unknown = audiences.filter(g => !AUDIENCES.includes(g));
+  const unknown = audiences.filter(g => !AUDIENCES.includes(g) && !PAPERS.includes(g));
   if (unknown.length) errors.push(`unknown audience(s): ${unknown.join(', ')}`);
 
   const copy = [title, body, ctaLabel || ''].join('\n');
@@ -93,6 +115,7 @@ async function countEligible(pool, v) {
        SELECT pu.id,
          EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = pu.id AND ${LIVE_SUB}) AS student,
          ARRAY(SELECT s.class_code FROM subscriptions s WHERE s.user_id = pu.id AND ${LIVE_SUB}) AS classes,
+         ${papersSql('pu.id', 'pu.email', '$3', '$4')} AS papers,
          ${affiliateExpr} AS affiliate,
          (EXISTS (SELECT 1 FROM saved_jobs j WHERE j.user_id = pu.id AND j.status <> 'archived')
           OR NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = pu.id)) AS job_seeker
@@ -103,9 +126,10 @@ async function countEligible(pool, v) {
      WHERE 'everyone' = ANY($2::text[])
         OR (student AND 'students' = ANY($2::text[]))
         OR (classes && $2::text[])
+        OR (papers && $2::text[])
         OR (affiliate AND 'affiliates' = ANY($2::text[]))
         OR (job_seeker AND 'job_seekers' = ANY($2::text[]))`,
-    [v.starts_at, v.audiences]
+    [v.starts_at, v.audiences, PAPER_CLASS.map(([p]) => p), PAPER_CLASS.map(([, c]) => c)]
   );
   return count;
 }
@@ -115,13 +139,15 @@ async function userGroups(pool, userId) {
     `SELECT
        ARRAY(SELECT s.class_code FROM subscriptions s WHERE s.user_id = $1 AND ${LIVE_SUB}) AS classes,
        EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = $1) AS had_any,
-       EXISTS (SELECT 1 FROM saved_jobs j WHERE j.user_id = $1 AND j.status <> 'archived') AS has_saved`,
-    [userId]
+       EXISTS (SELECT 1 FROM saved_jobs j WHERE j.user_id = $1 AND j.status <> 'archived') AS has_saved,
+       ${papersSql('$1', '(SELECT email FROM platform_users WHERE id = $1)', '$2', '$3')} AS papers`,
+    [userId, PAPER_CLASS.map(([p]) => p), PAPER_CLASS.map(([, c]) => c)]
   );
   const groups = new Set(['everyone']);
   if (r.classes.length > 0) {
     groups.add('students');
     for (const c of r.classes) if (CLASS_AUDIENCES.includes(c)) groups.add(c);
+    for (const p of r.papers) if (PAPERS.includes(p)) groups.add(p);
   }
   if (r.has_saved || !r.had_any) groups.add('job_seekers');
   return groups;
@@ -210,7 +236,7 @@ async function getReport(pool, slug) {
 }
 
 module.exports = {
-  AUDIENCES, CLASS_AUDIENCES, LIVE_SUB,
+  AUDIENCES, CLASS_AUDIENCES, PAPERS, PAPER_ACTIVE_DAYS, LIVE_SUB,
   validateAnnouncement, upsertAnnouncement, endAnnouncementNow, countEligible,
   userGroups, findNextForUser,
   recordView, saveFeedback, announcementExists, getReport,

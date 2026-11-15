@@ -14,6 +14,7 @@ const base = { slug: 'test-home', title: 'Meet your new Home page', body: 'Every
 
 async function cleanup() {
   await pool.query(`DELETE FROM announcements WHERE slug LIKE 'test-%'`);
+  await pool.query(`DELETE FROM user_progress WHERE user_email LIKE $1`, [FIXTURE_EMAIL_LIKE]);
   await deleteFixtureUsersByEmailLike(pool, FIXTURE_EMAIL_LIKE);
 }
 
@@ -24,6 +25,11 @@ describe('validateAnnouncement', () => {
     expect(r.value.starts_at.toISOString()).toBe('2026-10-01T12:00:00.000Z');
     expect(r.value.ends_at.toISOString()).toBe('2026-10-31T12:00:00.000Z');
     expect(r.value.cta_label).toBeNull();
+  });
+
+  it('accepts a paper code as an audience, rejects an unknown one', () => {
+    expect(validateAnnouncement({ ...base, audiences: ['2A3', '4B'] }, NOW).ok).toBe(true);
+    expect(validateAnnouncement({ ...base, audiences: ['2A9'] }, NOW).errors).toContain('unknown audience(s): 2A9');
   });
 
   it('lists every problem at once', () => {
@@ -98,6 +104,21 @@ describe('publishing', () => {
     const after = await countEligible(pool, validateAnnouncement({ ...base, audiences: ['second'] }).value);
     expect(before - after).toBe(1);
     expect(allBefore).toBeGreaterThanOrEqual(2);
+  });
+
+  it('countEligible counts a paper audience by current paper or recent lessons', async () => {
+    const mk = (email) => pool.query(
+      `INSERT INTO platform_users (email, first_name, last_name, password_hash, created_at)
+       VALUES ($1, 'A', 'B', 'x', now() - interval '1 day') RETURNING id`, [email]);
+    const v = validateAnnouncement({ ...base, audiences: ['2A3'] }).value;
+    const before = await countEligible(pool, v);
+    const { rows: [current] } = await mk('annpub-current@example.com');
+    const { rows: [recent] } = await mk('annpub-recent@example.com');
+    await pool.query(`INSERT INTO subscriptions (user_id, class_code, status, active_paper) VALUES ($1, 'second', 'active', '2A3')`, [current.id]);
+    await pool.query(`INSERT INTO subscriptions (user_id, class_code, status, active_paper) VALUES ($1, 'second', 'active', '2B1')`, [recent.id]);
+    expect(await countEligible(pool, v)).toBe(before + 1);
+    await pool.query(`INSERT INTO user_progress (user_email, lesson_code) VALUES ('annpub-recent@example.com', '2A3-1-1')`);
+    expect(await countEligible(pool, v)).toBe(before + 2);
   });
 
   it('countEligible does not fail when the affiliate schema is absent', async () => {

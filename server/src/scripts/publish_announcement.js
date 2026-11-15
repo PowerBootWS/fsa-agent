@@ -7,6 +7,10 @@
  *
  * Process rule: Russ approves the title, body, button and audience list in
  * chat before this runs. See wiki/projects/fsa-agent.md "Announcements".
+ *
+ * "audiences" takes groups (everyone, students, second, ...) and/or paper codes
+ * ("2A3"): a paper reaches students whose current paper it is or who opened
+ * one of its lessons in the last 30 days.
  */
 const fs = require('fs');
 const { pool } = require('../services/database');
