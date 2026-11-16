@@ -65,6 +65,8 @@ describe('validation -> 400', () => {
     'encoded traversal media': { slides: [{ slide_number: 1, title: 's', body: 'b', audio_url: `/explained-media/${SLUG}/v1/%2e%2e/x.mp3` }] },
     'full explained url media': { slides: [{ slide_number: 1, title: 's', body: 'b', image_url: `/explained-media/${SLUG}/v1/slide-001.png` }] },
     'bad og': { og_image_url: 'x.png' },
+    'webp og': { og_image_url: 'og.webp' },
+    'jpg slide image': { slides: [{ slide_number: 1, title: 's', body: 'b', image_url: 'slide-001.jpg' }] },
     'step missing question': { questions: [{ position: 1, question_text: 'q', step_data: { steps: [{ ...step(), question: undefined }] } }] },
     'step missing type': { questions: [{ position: 1, question_text: 'q', step_data: { steps: [{ ...step(), type: '' }] } }] },
     'step missing explanation': { questions: [{ position: 1, question_text: 'q', step_data: { steps: [{ ...step(), explanation: undefined }] } }] },
@@ -125,6 +127,14 @@ describe('publish flow', () => {
     expect(r2.body.version).toBe(r1.body.version + 1);
     const { rows: s2 } = await pool.query(`SELECT s.audio_url FROM mini_lesson_slides s JOIN mini_lessons m ON m.id = s.mini_lesson_id WHERE m.slug = $1 AND s.version = 2`, [SLUG]);
     expect(s2[0].audio_url).toBe(`/explained-media/${SLUG}/v2/slide-001.mp3`);
+  });
+  test('a WebP slide image filename is accepted and stored as a versioned URL', async () => {
+    const p = payload();
+    p.slides[0].image_url = 'slide-001.webp';
+    const r = await put(p);
+    expect(r.status).toBe(200);
+    const { rows } = await pool.query(`SELECT s.image_url FROM mini_lesson_slides s JOIN mini_lessons m ON m.id = s.mini_lesson_id WHERE m.slug = $1 AND s.version = $2`, [SLUG, r.body.version]);
+    expect(rows[0].image_url).toBe(`/explained-media/${SLUG}/v${r.body.version}/slide-001.webp`);
   });
   test('status checks_passed/hold_reason typing', async () => {
     await put(payload());

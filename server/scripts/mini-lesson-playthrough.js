@@ -60,6 +60,14 @@ async function fetchMedia(url) {
 }
 
 // null when the media answered 200 with the expected type, else a failure.
+// The type a slide's media must come back as. Slide images are WebP since
+// 2026-11-16 (a .webp URL must be image/webp); anything else stays image/png,
+// as lessons published before that are.
+function expectedType(field, url) {
+  if (field === 'audio_url') return 'audio/mpeg';
+  return /\.webp$/i.test(String(url).split(/[?#]/)[0]) ? 'image/webp' : 'image/png';
+}
+
 async function mediaProblem(url, what, type) {
   const m = await fetchMedia(url);
   if (m.status !== 200) return `${what} returned ${m.status}`;
@@ -115,9 +123,9 @@ async function loadLesson(origin, slug, token, failures) {
 
 async function checkMedia(origin, lesson, failures) {
   for (const [i, s] of (lesson.sections || []).entries()) {
-    for (const [f, what, type] of [['image_url', 'image', 'image/png'], ['audio_url', 'audio', 'audio/mpeg']]) {
+    for (const [f, what] of [['image_url', 'image'], ['audio_url', 'audio']]) {
       if (!s[f]) continue;
-      const p = await mediaProblem(sameOrigin(origin, s[f]), `slide ${i + 1} ${what}`, type);
+      const p = await mediaProblem(sameOrigin(origin, s[f]), `slide ${i + 1} ${what}`, expectedType(f, s[f]));
       if (p) failures.push(p);
     }
   }
@@ -281,7 +289,7 @@ async function playthrough(url, { expectPitch = null, expectVersion = null } = {
   return { ok: failures.length === 0, failures };
 }
 
-module.exports = { playthrough, parseArgs, metaContent, plainLead };
+module.exports = { playthrough, parseArgs, metaContent, plainLead, expectedType };
 
 if (require.main === module) {
   const { url, expectPitch, expectVersion } = parseArgs(process.argv.slice(2));

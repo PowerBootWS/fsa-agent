@@ -8,7 +8,9 @@ const miniLessons = require('../services/miniLessons');
 
 const MINI_MEDIA_DIR = process.env.MINI_MEDIA_DIR || '/srv/fsa-mini-media';
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-const FILE_RE = /^slide-\d{3}\.(mp3|png)$|^og\.png$/;
+// Slide images are WebP since 2026-11-16 (fsa-lesson-creator lib/webp.py);
+// .png stays allowed for lessons published before that.
+const FILE_RE = /^slide-\d{3}\.(mp3|png|webp)$|^og\.png$/;
 
 function previewParam(req) {
   const p = req.query.preview;

@@ -34,7 +34,8 @@ function* strings(v) {
   else if (v && typeof v === 'object') for (const x of Object.values(v)) yield* strings(x);
 }
 
-const SLIDE_FILE_RE = /^slide-\d{3}\.(mp3|png)$/;
+// Slide images are WebP since 2026-11-16; .png kept for older versions.
+const SLIDE_FILE_RE = /^slide-\d{3}\.(mp3|png|webp)$/;
 const LESSON_CODE_RE = /^[0-9][A-B0-9]{1,3}-\d{1,2}-\d{1,2}$/;
 const isIdx = (n) => Number.isInteger(n) && n >= 0 && n <= 9999;
 const nonEmpty = (v) => typeof v === 'string' && v.trim() !== '';

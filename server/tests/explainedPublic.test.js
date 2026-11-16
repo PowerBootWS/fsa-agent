@@ -15,6 +15,7 @@ for (const s of ['test-mini-live', 'test-mini-pend']) {
   fs.mkdirSync(path.join(MINI_DIR, s, 'v1'), { recursive: true });
   fs.writeFileSync(path.join(MINI_DIR, s, 'v1', 'slide-001.mp3'), 'mini audio ' + s);
   fs.writeFileSync(path.join(MINI_DIR, s, 'v1', 'og.png'), 'mini og ' + s);
+  fs.writeFileSync(path.join(MINI_DIR, s, 'v1', 'slide-001.webp'), 'mini webp ' + s);
 }
 fs.mkdirSync(path.join(MINI_DIR, 'test-mini-live', 'v2'), { recursive: true });
 fs.writeFileSync(path.join(MINI_DIR, 'test-mini-live', 'v2', 'slide-001.mp3'), 'DRAFT v2 audio');
@@ -104,6 +105,16 @@ describe('GET /explained-media/:slug/:file', () => {
     const r = await get('/explained-media/test-mini-live/v1/slide-001.mp3');
     expect(r.status).toBe(200);
     expect(r.headers['cache-control']).toBe('public, max-age=3600');
+  });
+  test('live slug WebP slide image: 200 as image/webp (slide images are WebP since 2026-11-16)', async () => {
+    const r = await get('/explained-media/test-mini-live/v1/slide-001.webp');
+    expect(r.status).toBe(200);
+    expect(r.headers['content-type']).toMatch(/^image\/webp/);
+    expect(r.headers['cache-control']).toBe('public, max-age=3600');
+  });
+  test('og image stays PNG only; other image extensions 404', async () => {
+    expect((await get('/explained-media/test-mini-live/v1/og.webp')).status).toBe(404);
+    expect((await get('/explained-media/test-mini-live/v1/slide-001.jpg')).status).toBe(404);
   });
   test('traversal and course codes: 404', async () => {
     for (const p of [

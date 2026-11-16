@@ -54,6 +54,9 @@ fs.writeFileSync(path.join(MEDIA_FIXTURE_DIR, '2A1-1-1', 'slide-003.mp3'), FIXTU
 // 2A1 and 2A2 have zero rows with an image_url and no .png files on disk.)
 const PNG_FIXTURE_BYTES = Buffer.from('fake png bytes for test fixture');
 fs.writeFileSync(path.join(MEDIA_FIXTURE_DIR, '2A1-1-1', 'slide-004.png'), PNG_FIXTURE_BYTES);
+// Slide images are WebP since 2026-11-16 (lesson_chunks.image_url -> .webp).
+const WEBP_FIXTURE_BYTES = Buffer.from('fake webp bytes for test fixture!');
+fs.writeFileSync(path.join(MEDIA_FIXTURE_DIR, '2A1-1-1', 'slide-004.webp'), WEBP_FIXTURE_BYTES);
 
 const request = require('supertest');
 const { pool } = require('./testPool');
@@ -148,6 +151,23 @@ describe('GET /media requires authentication', () => {
     expect(res.headers['content-type']).toMatch(/image\/png/);
     expect(res.headers['content-length']).toBe(String(PNG_FIXTURE_BYTES.length));
     expect(res.headers['cache-control']).toBe('private, max-age=300');
+  });
+
+  it('serves a WebP slide image as image/webp with the same private cache header', async () => {
+    const { token } = await createUser({ email: OWNER, withSubscription: true });
+    const res = await request(app)
+      .get('/media/2A1-1-1/slide-004.webp')
+      .set('Host', LEARN)
+      .set('Cookie', `fsa_session=${token}`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/^image\/webp/);
+    expect(res.headers['content-length']).toBe(String(WEBP_FIXTURE_BYTES.length));
+    expect(res.headers['cache-control']).toBe('private, max-age=300');
+  });
+
+  it('refuses a WebP slide image to an anonymous caller (401)', async () => {
+    const res = await request(app).get('/media/2A1-1-1/slide-004.webp').set('Host', LEARN);
+    expect(res.status).toBe(401);
   });
 
   it('refuses a slide image to an anonymous caller (401)', async () => {

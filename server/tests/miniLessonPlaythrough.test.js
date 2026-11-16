@@ -25,7 +25,7 @@ const miniLessons = require('../src/services/miniLessons');
 const express = require('express');
 const { apiRouter, mediaRouter, withPreview } = require('../src/routes/explained');
 const { renderExplainedHtml } = require('../src/services/explainedOg');
-const { playthrough } = require('../scripts/mini-lesson-playthrough');
+const { playthrough, expectedType } = require('../scripts/mini-lesson-playthrough');
 
 const SLUG = '2b3-net-reactance-sign';
 const TOKEN = 'tok123tok123tok123';
@@ -199,4 +199,11 @@ test('media answered with the wrong content type fails', async () => {
 test('a non-lesson URL is refused', async () => {
   const r = await playthrough(`${origin}/lessons/2B3-1-7`);
   expect(r).toEqual({ ok: false, failures: [`not a mini lesson URL: ${origin}/lessons/2B3-1-7`] });
+});
+
+test('media type is expected from the extension: WebP slides since 2026-11-16, PNG before', () => {
+  expect(expectedType('image_url', '/explained-media/a/v1/slide-001.webp')).toBe('image/webp');
+  expect(expectedType('image_url', '/explained-media/a/v1/p/tok/slide-001.webp')).toBe('image/webp');
+  expect(expectedType('image_url', '/explained-media/a/v1/slide-001.png')).toBe('image/png');
+  expect(expectedType('audio_url', '/explained-media/a/v1/slide-001.mp3')).toBe('audio/mpeg');
 });
