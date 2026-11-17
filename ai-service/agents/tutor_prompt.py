@@ -170,13 +170,21 @@ def _build_exercise_block(ex):
         recap = '\nThe check-in card summarised them as:\n' + '\n'.join(f'- {p}' for p in ex['recap_points'])
     last = exercise_mod.describe_last(ex.get('last'))
     finished = bool(ex.get('last')) and ex['asked'] >= exercise_mod.MAX_QUESTIONS
+    # The question card is gone once they pick, so a miss answered with only a
+    # hint ("take another look at the options") left students never learning
+    # the right answer, worst on the final question (Russ, 2026-11-17).
+    miss = ('If they got it wrong, say which option is correct (its letter and what it says) and give a '
+            'one-line reason why, tied to the slides. Do not answer a miss with only a hint or a question. '
+            'Only call a pick "close" or "almost" when it really is close (e.g. a near-miss number or the right '
+            'idea with one detail off); otherwise say plainly, and kindly, that it is not the one. ')
     if finished:
-        step = ('This was the final question. Give brief feedback on their pick, then a one or two sentence '
-                'wrap-up: how they did overall and anything worth reviewing. Do NOT include a question block.')
+        step = ('This was the final question. Give brief feedback on their pick. ' + miss +
+                'Then a one or two sentence wrap-up: how they did overall and anything worth reviewing. '
+                'Do NOT include a question block.')
     elif ex.get('last'):
         step = ('Respond to their pick in two or three sentences at most (the grading above is final; do not '
-                're-derive it, and only describe the pick stated above). If they got it wrong, point to the idea they '
-                'missed and make your next question a follow-up on that same idea, giving a little more support each '
+                're-derive it, and only describe the pick stated above). ' + miss +
+                'Make your next question a follow-up on the idea they missed, giving a little more support each '
                 'time they miss. Then you MUST end with the next question block.')
     elif ex['asked'] == 0:
         step = 'Start the exercise: one short friendly line, then the first question.'
@@ -581,8 +589,9 @@ FEEDBACK:
 - Correct: Acknowledge specifically what they got right. Add a brief reinforcing note tied to the lesson content.
   Example: "Exactly right, {name}! The 0.005D term is the manufacturing tolerance — and as you can see in the formula, it's added on top of the pressure term, not multiplied. That's an important distinction for the exam."
 - Wrong: NEVER say "wrong", "incorrect", "that's not right", or "you got it wrong". Use warm, redirecting language instead.
-  Examples: "You're close — let's think about this a bit differently.", "Good try! Here's something to consider:", "Almost there — think about what the letter 'e' represents in the formula.", "Not quite, but you're on the right track. The note in PG-27.4 is worth checking — which of those options relates to manufacturing?"
-  Do NOT give the answer away. Ask a guiding question that steers their thinking toward it.
+  Examples: "Good try! Here's something to consider:", "Not quite. Think about what the letter 'e' represents in the formula.", "Not that one. The note in PG-27.4 is worth checking — which of those options relates to manufacturing?"
+  Only say "close", "almost" or "on the right track" when the answer really is close (a near-miss number, or the right idea with one detail off). Saying it about a pick that is not close hides that the student needs to review.
+  While a question is still open, do NOT give the answer away. Ask a guiding question that steers their thinking toward it. Once a multiple-choice answer has been graded (quick exercise or practice card), always state the correct answer and a one-line reason.
 - Partially correct: Name what's right first, then gently guide toward what's missing.
   Example: "You've got the right idea with the pressure term — now think about what gets added to account for manufacturing tolerances."
 

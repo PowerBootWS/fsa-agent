@@ -59,6 +59,17 @@ def test_prompt_states_the_graded_pick_and_the_final_turn():
     assert 'slides 19 to 22' in prompt
 
 
+def test_a_graded_miss_must_state_the_right_answer_on_every_turn():
+    # Mid-exercise and final turn both: no hint-only replies, no blanket "close".
+    for asked in (2, 4):
+        ex = exercise.sanitize({**EX, 'asked': asked, 'correct': 1, 'last': {
+            'question_text': 'Which?', 'options': ['a', 'b', 'c', 'd'], 'correct_index': 1, 'selected_index': 2}})
+        prompt = tutor_prompt.build({'title': 'T'}, None, {'mode': 'lesson', 'activity': 'free_discussion', 'exercise': ex}, 'K')
+        assert 'say which option is correct' in prompt
+        assert 'Do not answer a miss with only a hint' in prompt
+        assert 'when it really is close' in prompt
+
+
 def _run(orch, researcher, reply, ex):
     tutor = MagicMock()
 
