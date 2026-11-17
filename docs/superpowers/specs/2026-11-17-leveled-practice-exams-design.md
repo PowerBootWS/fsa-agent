@@ -1,0 +1,246 @@
+# Leveled Practice Exams — Design
+
+Date: 2026-11-17 · Backlog: #147 · Owner: Russ · Status: draft for owner approval (builder check done)
+
+## Intent
+
+Practice exams today re-weight *which chapters* a student sees: after each sitting, weak
+chapters get more questions and strong ones fewer (`_compute_chapter_allocations`,
+`ai-service/agents/orchestrator.py`). The structure of the exam drifts away from the real paper,
+and difficulty never changes.
+
+The new approach inverts that. **Every sitting keeps the real exam's topic mix exactly; what
+adapts is difficulty, per topic.** A student who is strong in Boilers gets harder Boilers
+questions; one who is struggling in Electricity gets easier Electricity questions until they're
+comfortable, then climbs. Why:
+
+- **For students:** a clear, motivating progress signal (gamified levels per topic) and an honest
+  answer to "am I ready to write?" There is no point re-serving questions they already handle.
+- **For FSA:** a readiness verdict that means something, a free exam that honestly shows an
+  unprepared candidate they aren't ready, and (later) defensible performance data for marketing.
+
+Owner has tested the idea with several enrolled 2nd Class students; they strongly prefer it. Owner
+judges the value to outweigh the risk to the enrolled base.
+
+## Goals
+
+- Fixed topic mix per paper, every sitting, matching the typical real exam.
+- Four difficulty levels per topic group, graded against a written rubric calibrated to Russ.
+- Per-topic level progression across sittings, plus an overall readiness verdict in plain
+  language.
+- Leveled free practice exam that produces an honest "not ready" for most unprepared candidates.
+- Runs in parallel with the current adaptive exam; new signups get the leveled exam, existing
+  students opt in.
+- Rollout: 2B1 pilot → remaining 2nd and 3rd Class papers → 4th Class (graded inside the 4th Class
+  course build).
+
+## Non-goals
+
+- Chapter tests (chapter quizzes) are untouched.
+- The old `questions.difficulty` (1–5) and everything that reads it (tutor difficulty phrasing,
+  chapter tests) are untouched.
+- No change to the AI tutor or lessons.
+- Real SOPEEC results are never claimed as measured by us (see Phase 6).
+
+## Anti-goals (failure even if it "works")
+
+- Levels that bounce on a lucky guess, so a level means nothing.
+- "Ready" shown to someone who would fail the real paper.
+- A free exam rigged to fail people (it must be honest: unprepared people fail it because it's
+  exam-level, not because it's padded with impossible questions).
+- Breaking the current exam for students who stay on it, or losing anyone's answer history
+  (`question_responses` cascades on question delete — never delete questions; retire with
+  `standalone = false`, rewrite in place).
+
+## Constraints
+
+- **Production DB safety** (root `CLAUDE.md`): backups before writes, work in `fsa_agent_scratch`,
+  tests only against `fsa_agent_test`. Auto mode refuses agent-run production writes; bulk prod
+  writes (grading results, new questions) ship as an owner-run script, like the course cutovers.
+- **Question DB rules** (`fsa-agent/CLAUDE.md`): non-empty `options`, `question_type` in
+  `objective_practice | chapter_quiz`, calculations as staged multi-step MCQ, self-contained, never
+  reference a table/figure, LaTeX conventions.
+- **LLM work runs through `claude -p`** on the Max subscription, not the paid API.
+- **The topic mix is a typical guide, not a fixed published structure.** SOPEEC publishes no
+  per-topic split and sets several versions a year (`wiki/entities/sopeec.md`). Student-facing copy
+  says the exam "follows the typical real-exam mix", never "the exact SOPEEC structure".
+- **Real exam format:** 100 questions, 3 hours, 65% to pass.
+- **4th Class has no AI tutor** — its debrief is stats-only; the leveled results must work without
+  LLM prose.
+
+## Approaches considered
+
+- **A. Second mode inside the existing practice-exam flow — CHOSEN.** A per-student engine flag;
+  new code only for question selection, level updates and the results/verdict. Reuses one-question-
+  at-a-time delivery, timer, resume, retry, debrief plumbing and the free-exam gate, which carry
+  months of hard-won fixes (e.g. the dropped-question-1 bug, `tests/test_practice_exam_answer_count.py`).
+  Trade-off: both modes share `orchestrator.py`; keep the new logic in its own module and branch
+  once at selection/debrief.
+- **B. Separate exam service, AI only writes the debrief.** Cleanest to test, but rebuilds the exam
+  screen, session/resume and free-exam gate — weeks of extra work and re-fixing old bugs.
+- **C. Pre-built fixed forms per level.** Simplest, but can't mix levels per topic within a
+  sitting (Boilers at Max, Electricity at level 1), which is the core idea. Rejected.
+
+## Design
+
+### 1. Topic groups (the unit of everything student-facing)
+
+- Source: `wiki/reference/sopeec-exam-breakdown.csv`, generated by
+  `fsa-marketing/scripts/build_exam_breakdown_csv.py` (asserts each paper sums to 100 and every
+  course chapter maps exactly once). Each row = one topic group: paper, name, `typical_questions`,
+  `fsa_chapters`.
+- New table `exam_topic_groups (paper_code, topic_key, display_name, exam_questions, chapters[])`,
+  loaded from the CSV by an idempotent loader script. Re-run when the CSV is regenerated.
+- Questions map to a topic group via their `chapter_id`. Chapters are backend-only: they drive
+  question selection, never the student view.
+- Rows with 0 typical questions (e.g. 3A1 "Math foundations") get no exam slots.
+
+### 2. The difficulty rubric (Phase 1 — shared by every paper and by the 4th Class course build)
+
+Levels are relative to **each paper's own real exam**. Anchor: **level 3 = a typical real exam
+question; Max = the hardest question you'd realistically see; level 2 = straightforward textbook;
+level 1 = a building block.**
+
+Each question is scored on five dimensions; the level follows from the scores:
+
+| Level | Concepts | Thinking | Wording | Wrong answers | Calculation |
+|---|---|---|---|---|---|
+| 1 | one | recall a fact/definition | plain, direct | clearly wrong | one step, formula given |
+| 2 | one | understand: what happens and why | plain | plausible, from other topics | 2 steps: choose formula, convert units |
+| 3 | two combined | apply to an unfamiliar situation | NOT/EXCEPT/MOST, some traps | common misconceptions | multi-step, tables/carried values |
+| Max (4) | several | diagnose a plant scenario | full trap set | near-misses (wrong unit, gauge vs absolute, sign) | multi-step with an easy-to-make error |
+
+- **Trap catalogue:** compiled from the two live articles
+  (`fsa-website/articles/sopeec-multiple-choice-traps/`,
+  `fsa-website/articles/multiple-choice-power-engineering-strategy/`), common wrong answers in
+  `question_responses`, and Russ's examiner experience. Level 3 introduces traps; Max uses them
+  freely.
+- **Deliverable:** a rubric document (`docs/leveled-exams/rubric.md` — builder may relocate) plus
+  the grader prompt that applies it, both versioned.
+- **Calibration (gate before any bulk grading):** Russ blind-grades ~30 questions per class
+  (2nd and 3rd Class first; 4th Class gets its own sample after its course build); the
+  automated grader is tuned until it agrees. Target: ≥80% exact level match with Russ, never off by
+  two. Calibration samples and results are kept — they are also the evidence for any future
+  "as hard as / harder than the real exam" claim (Phase 6).
+- **4th Class (owner decision):** the 4th Class course build (starting 2026-11-18, about a day) goes
+  ahead first with its normal question step. 4A/4B are graded and gap-filled against this rubric a
+  few days afterwards, on the post-build bank, so nothing the course build writes is overwritten.
+
+### 3. Question data
+
+New columns on `questions` (old `difficulty` untouched):
+
+- `exam_level smallint NULL CHECK (exam_level BETWEEN 1 AND 4)` — NULL = ungraded, never served by
+  the leveled engine.
+- `level_scores jsonb` — the five dimension scores + grader rationale + rubric version.
+- `topic_key` — denormalised from chapter for fast selection (or derived by join; builder's call).
+
+Bank work for a paper (2B1 first): grade every standalone question → flag bad keys/figure
+references via the existing keep/rewrite/drop process (rewrite in place, retire with
+`standalone = false`) → generate new questions to fill gaps → independent verify pass (reuse
+fsa-lesson-creator's re-solve/claim-audit verification and `fsa-agent/scripts/audit_question_keys.py`)
+→ owner-run production apply script with backup. **Owner review (owner decision):** Russ spot-checks
+~20 questions per batch; he does not read every question. The automated verify pass from the course
+rebuilds is trusted (tuned over several iterations until he could rarely find errors), and student
+question flags remain the safety net after go-live.
+
+**Bank size target (my call):** per topic group, per level, at least 3× (target 4×) that topic's
+questions-per-100-question sitting, so a student can sit several times at a level without heavy
+repeats. For 2B1 that is ~1,200–1,600 graded questions, against ~1,170 standalone today, unevenly
+distributed (level 1 nearly empty on every paper except 2B3). Expect generation to dominate the
+work. **Pilot gate (my call):** 2B1 goes live when every topic/level meets the 3× minimum; the 4×
+target fills in afterwards. Engine, UI and free-exam work proceed in parallel with generation.
+
+### 4. The leveled exam engine (mode A)
+
+- **Engine flag:** `platform_users.exam_engine` (`'adaptive' | 'leveled'`), plus a config list of
+  papers where leveled is enabled (2B1 only during the pilot). A student on `leveled` sitting a
+  paper not yet enabled gets the current adaptive exam.
+- **Who's on it:** new signups default to `leveled` once the pilot is live. Existing students opt in
+  via a switch in their profile and a one-time prompt in the lobby. They can switch back (my call,
+  during rollout); their topic levels are kept.
+- **Lengths:** 100 (exact typical mix) and 50 (every topic halved; odd counts rounded, alternating
+  direction between sittings so it averages out). **25 is removed** from course exams and the free
+  exam, for every paper, at pilot launch (lobby `[25, 50, 100]` in `LobbyPage.jsx`, timer map in
+  `ExamRouter.jsx`, and the free exam page copy in `fsa-website/free-practice-exam.html`, which
+  mentions 25 in several places including FAQ structured data).
+- **Selection:** for each topic group, draw its slot count at the student's current level for that
+  topic, spread across the group's chapters, preferring questions the student hasn't seen recently.
+  If a topic/level runs short, fill from the adjacent level (down first) and log it — never shrink
+  the topic's slot count.
+- **Starting level:** level 2 for every topic, for new and switching students alike (owner rule).
+  Old history isn't on the new scale, so it doesn't seed levels.
+- **Level movement, per topic, after each completed sitting (50 or 100):** ≥80% at the current level
+  → up one; <50% → down one; otherwise stay. Floor 1, cap Max. Topics with fewer than 5 questions
+  in a sitting are judged on the combined last two sittings. Thresholds are config values, tuned
+  after the pilot.
+- **Abandoned sittings** (left unfinished) don't move levels (my call). **Timed-out sittings count as
+  completed** with unanswered questions wrong, as on the real exam (my call), so letting the clock run
+  out can't dodge a level drop.
+- **Record:** new table `leveled_exam_sittings` (user, paper, length, started/completed, per-topic
+  {level served, correct, total}, level changes, predicted score, verdict band). Feeds the results
+  screen, level history, Phase 5 and Phase 6.
+
+### 5. Results and readiness verdict
+
+- **Predicted real-exam score:** for each topic, estimate the student's accuracy on level 3
+  questions from their accuracy at the level served (a strong score at Max implies a high level 3
+  score; a strong score at level 2 implies less — start with a fixed adjustment per level step,
+  refit from pilot data). Weight by the topic's exam share. Compare against the 65% pass mark.
+- **Verdict bands (owner's statements):**
+
+  | Predicted | Message |
+  |---|---|
+  | < 60% | If you wrote this paper today, you'd likely fail. |
+  | 60–70% | You could pass, but it would be close. |
+  | 70–80% | You have a solid grasp and would likely pass comfortably. |
+  | ≥ 80% and most topics at Max | You're ready — you're handling questions harder than the real exam. |
+
+- **Band edge cases (my call):** ≥80% predicted without "most topics at Max" shows the 70–80%
+  message. "Most topics at Max" = topics carrying ≥75% of the exam's question weight are at Max,
+  and no topic is below level 3. Weighted, not counted, so a 30% topic can't be skipped.
+- **Results screen (by topic, not chapter):** each topic's level (with any change this sitting),
+  score at that level, and the verdict with the topics holding it back. The verdict is computed
+  deterministically; 2nd/3rd Class keep an LLM-written debrief layered on top (new prompt: topics,
+  levels, verdict — no chapter weighting talk); 4th Class gets the stats view only.
+- **Level names (my proposal, owner to confirm):** Foundation (1), Core (2), Exam-Level (3), Max (4).
+  Stored as 1–4.
+
+### 6. Free practice exam
+
+- Uses the leveled engine for papers where it's enabled; others keep today's free exam until their
+  rollout.
+- Takers choose 50 or 100 questions (my call; same as course exams minus 25).
+- No history, so each topic's slots are a fixed mix of levels 2/3/Max (starting point, my call:
+  30% / 40% / 30%, tuned so a typical unprepared candidate lands in the bottom two bands).
+- Same verdict bands and topic breakdown, framed toward signing up. Existing once-per-email gate,
+  verification and nurture enrolment (`server/src/routes/practiceExam.js`) unchanged.
+- Risk to watch: 50 questions minimum means some people who would have finished a 25 drop out
+  before the verdict. Track free-exam completion rate before/after.
+
+## Phases
+
+1. **Rubric + calibration** (shared). Ready before the 4th Class course build's question step.
+2. **2B1 pilot:** topic groups, grade + fill the 2B1 bank, engine, results/verdict, free exam on
+   2B1, drop 25 everywhere, engine flag + opt-in.
+3. **Rollout to the other 2nd and 3rd Class papers** (no 3rd Class rebuild planned; their books are
+   current). Each paper is enabled once its bank meets the size target.
+4. **4th Class (4A, 4B):** graded and filled a few days after the 4th Class course build (starts
+   2026-11-18) completes, then enabled.
+5. **Progress notes via fsa-nurture** — outlined, planned separately: event-triggered (level up,
+   verdict band improves, one topic left holding them back), at most one a week, only when
+   something real changed, with specifics.
+6. **Results data** — outlined, planned separately: our own stats (typical level-3 performance per
+   paper, improvement across sittings, share reaching "likely pass"), plus a voluntary
+   post-exam-date "how did you do?" email for real results and testimonials. Claims must meet
+   Canada's Competition Act "adequate and proper test" bar: "XX% on our practice exams" is fine;
+   "as hard as / harder than SOPEEC" relies on the kept calibration evidence.
+
+## Left to the builder
+
+- Module boundaries inside the AI service (keep leveled logic out of the existing adaptive path).
+- Exact schema details (`topic_key` denormalised vs joined, indexes), migration numbering.
+- How "seen recently" is defined for repeat avoidance.
+- The level-step adjustment used by the predicted score, until pilot data refits it.
+- Grading/generation script structure, batching and concurrency for `claude -p`.
+- UI layout of the results screen and opt-in prompt, within `client-v2` styling rules.
