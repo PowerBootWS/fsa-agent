@@ -104,3 +104,52 @@ def test_plain_chat_turns_are_untouched():
     out = _run(fresh_orchestrator(), make_researcher_mock(), REPLY, None)
     assert out['exercise_question'] is None
     assert '[QUESTION]' in out['tutor_response']
+
+
+def test_a_prose_copy_of_the_question_is_dropped_from_the_message():
+    # Real Nov 2026 shape: the model wrote the question in prose too, once with
+    # options that differed from the card's.
+    prose = ("That's the spirit! Here's the next one.\n\n"
+             "If a force of 150 N moves equipment 4 m, what is the work done?\n"
+             "A) 150 J\nB) 300 J\nC) 600 J\nD) 600 kJ\n\n")
+    message, q = exercise.parse_reply(prose + REPLY.split('\n\n', 1)[1])
+    assert q is not None
+    assert message == "That's the spirit! Here's the next one."
+    # A message that merely mentions an option letter is left alone.
+    message, _ = exercise.parse_reply('Not quite. A) was the trap here.\n\n' + REPLY.split('\n\n', 1)[1])
+    assert message == 'Not quite. A) was the trap here.'
+
+
+def test_questions_from_earlier_rounds_reach_the_prompt():
+    transcript = [
+        {'role': 'user', 'content': 'go'},
+        {'role': 'assistant', 'content': exercise.as_text('First one.', {
+            'question_text': 'What temperature window suits SNCR?', 'options': ['a', 'b', 'c', 'd']})},
+        {'role': 'assistant', 'content': exercise.as_text('', {
+            'question_text': 'What temperature window suits SNCR?', 'options': ['a', 'b', 'c', 'd']})},
+        {'role': 'assistant', 'content': 'Plain chat with no question.'},
+    ]
+    assert exercise.asked_before(transcript) == ['What temperature window suits SNCR?']
+    ex = exercise.sanitize({**EX, 'asked': 1})
+    ex['asked_before'] = exercise.asked_before(transcript)
+    prompt = tutor_prompt.build({'title': 'T'}, None, {'mode': 'lesson', 'activity': 'free_discussion', 'exercise': ex}, 'K')
+    assert 'Do NOT ask any of these again' in prompt
+    assert '- What temperature window suits SNCR?' in prompt
+
+
+def test_orchestrator_feeds_the_saved_transcript_into_the_exercise():
+    orch = fresh_orchestrator()
+    r = make_researcher_mock()
+    seen = {}
+    tutor = MagicMock()
+
+    def respond(user_message, lesson_context, progress, state, first_name=None):
+        seen['before'] = list(state['exercise'].get('asked_before', []))
+        return {'response': REPLY}
+    tutor.respond.side_effect = respond
+    # Earlier rounds live only in the restored transcript, beyond the history window.
+    r.get_chat_history.return_value = [
+        {'role': 'assistant', 'content': 'Ok.\n\nOld round-one question?\nA) a\nB) b\nC) c\nD) d'}]
+    orch.process(user='k@example.com', lesson_id='2B1-1-1', message='go', lesson_context={'title': 'T'},
+                 progress=None, tutor=tutor, display=MagicMock(), researcher=r, slide_number=23, exercise=EX)
+    assert seen['before'] == ['Old round-one question?']

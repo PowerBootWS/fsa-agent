@@ -89,12 +89,60 @@ def parse_reply(text):
     why = re.search(r'^\s*WHY:\s*(.+)', block, re.MULTILINE | re.DOTALL)
     if not q or not answer or sorted(options) != list(_LETTERS):
         return message, None
-    return message, {
+    return _strip_prose_copy(message), {
         'question_text': ' '.join(q.group(1).split()),
         'options': [options[letter] for letter in _LETTERS],
         'correct_answer': _LETTERS.index(answer.group(1).upper()),
         'explanation': ' '.join(why.group(1).split()) if why else '',
     }
+
+
+_PROSE_OPTION = re.compile(r'^\s*\(?([A-D])[).:]\s+\S')
+
+
+def _strip_prose_copy(message):
+    """
+    Drop a question the model also wrote out in prose above the block. The
+    student saw it twice (about 7% of questions, Nov 2026), once with options
+    that differed from the card's. Only an A-D run of option lines counts, and
+    the question removed with it is the paragraph directly above that run.
+    """
+    lines = message.split('\n')
+    i = 0
+    while i < len(lines):
+        run = lines[i:i + 4]
+        letters = [m.group(1) for m in (_PROSE_OPTION.match(l) for l in run) if m]
+        if len(run) == 4 and letters == list(_LETTERS):
+            start = i
+            while start > 0 and lines[start - 1].strip():
+                start -= 1
+            del lines[start:i + 4]
+            i = start
+        else:
+            i += 1
+    return re.sub(r'\n{3,}', '\n\n', '\n'.join(lines)).strip()
+
+
+def asked_before(transcript, limit=40):
+    """
+    Questions already put to the student in this lesson, oldest first, read
+    from the saved transcript (as_text writes each one as a question line
+    followed by A-D). The tutor's own history window is only the last ten
+    exchanges, so without this it re-asked round-one questions by round three.
+    """
+    seen, out = set(), []
+    for turn in transcript or []:
+        if turn.get('role') != 'assistant' or not isinstance(turn.get('content'), str):
+            continue
+        lines = turn['content'].split('\n')
+        for i in range(1, len(lines)):
+            if _PROSE_OPTION.match(lines[i]) and lines[i].lstrip(' (').startswith('A'):
+                question = lines[i - 1].strip()
+                key = ' '.join(question.lower().split())
+                if question and key not in seen:
+                    seen.add(key)
+                    out.append(question)
+    return out[-limit:]
 
 
 def as_text(message, question):

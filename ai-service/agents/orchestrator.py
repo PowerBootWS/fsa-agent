@@ -501,6 +501,8 @@ class Orchestrator:
 
         _apply_screen_question(state, screen_question)
         state['exercise'] = exercise_mod.sanitize(exercise)
+        if state['exercise']:
+            state['exercise']['asked_before'] = exercise_mod.asked_before(state.get('full_transcript'))
 
         tutor_result = tutor.respond(
             user_message=message,

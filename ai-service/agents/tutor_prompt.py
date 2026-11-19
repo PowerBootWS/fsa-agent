@@ -192,13 +192,19 @@ def _build_exercise_block(ex):
         step = ('The student has typed something instead of picking an answer. If they are asking for the next '
                 'question, ask it with a question block. Otherwise answer them briefly and invite them to pick from '
                 'the question card they already have, without a new block.')
+    prior = ''
+    if ex.get('asked_before'):
+        prior = ('\nQuestions already asked in this lesson (earlier rounds included). Do NOT ask any of these again, '
+                 'and do not ask the same fact reworded or with the options shuffled; test a different point from '
+                 'the slides. The one exception: a follow-up on an idea they just missed, which must still be a new '
+                 'question:\n' + '\n'.join(f'- {q}' for q in ex['asked_before']) + '\n')
     return f"""## QUICK EXERCISE IN PROGRESS
 The student chose a quick multiple-choice exercise on {span} of this lesson. This overrides the LESSON CHAT rule about writing practice questions into your reply.{recap}
 
 Questions asked so far in THIS exercise: {ex['asked']} of {exercise_mod.MAX_QUESTIONS}. Answered correctly: {ex['correct']}.
 These counts are the truth. Any earlier exercise in the conversation history is finished and does not count, so never say "again" or "last one" based on it. Never wrap up or end the exercise yourself before question {exercise_mod.MAX_QUESTIONS} has been answered; the app ends it.
 {last}
-
+{prior}
 What to do now: {step}
 
 Rules for every question:
