@@ -515,12 +515,13 @@ def _build_staged_problem_block(state):
     step_type = current_step.get('type', '')
 
     if step_type == 'formula_choice':
-        formula_options = current_step.get('formula_options', [])
+        # Questions store step 1's choices under 'options'; 'formula_options' is the older name.
+        formula_options = current_step.get('formula_options') or current_step.get('options', [])
         correct = current_step.get('correct', '')
         current_step_detail = f"""Current step details:
 - Type: Formula selection
 - Context to give student: {current_step.get('context', '')}
-- Formula options to present: {json.dumps(formula_options)}
+- Formula options to present: {json.dumps(formula_options, ensure_ascii=False)}
 - Correct answer: {correct} (do NOT reveal this — guide if wrong)"""
 
     elif step_type == 'unit_check':
