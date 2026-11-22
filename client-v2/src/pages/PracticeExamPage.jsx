@@ -24,7 +24,11 @@ export default function PracticeExamPage() {
   const initialConfig = countParam ? { count: parseInt(countParam, 10), timed } : null;
 
   return (
+    // key: the results screen's "Retry the N you got wrong" links back to this
+    // same page with a new ?quiz=. ExamRouter only reads it on mount, so a new
+    // address must remount it or the old results stay on screen.
     <ExamRouter
+      key={params.toString()}
       courseId={paper}
       learnerId={user.email}
       classCode={user.class_code}
