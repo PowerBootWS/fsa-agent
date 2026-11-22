@@ -265,7 +265,8 @@ const CHECKPOINT_POOL_SELECT = `
   FROM questions
   WHERE lesson_code = $1
     AND question_type = 'objective_practice'
-    AND standalone = true`;
+    AND standalone = true
+    AND NOT leveled_only`;
 
 // `strict` (the optional in-slide prompt) skips the whole-pool fallback: an
 // opt-in prompt can simply not appear, so it never needs to offer a question on

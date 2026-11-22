@@ -775,6 +775,7 @@ class Researcher:
                 WHERE {lesson_filter}
                   AND difficulty <= %s
                   AND question_type = %s
+                  AND NOT leveled_only
                   AND options IS NOT NULL
                   AND jsonb_array_length(options) > 0
                   {exclude_clause}
@@ -1064,7 +1065,7 @@ class Researcher:
                 """
                 SELECT DISTINCT chapter_id FROM questions
                 WHERE course_id = %s AND chapter_id IS NOT NULL
-                  AND standalone = TRUE
+                  AND standalone = TRUE AND NOT leveled_only
                   AND options IS NOT NULL AND jsonb_array_length(options) > 0
                 ORDER BY chapter_id
                 """,
@@ -1102,6 +1103,7 @@ class Researcher:
                     WHERE course_id = %s
                       AND chapter_id = %s
                       AND standalone = TRUE
+                      AND NOT leveled_only
                       AND options IS NOT NULL
                       AND jsonb_array_length(options) > 0
                       {ex_clause}
@@ -1224,6 +1226,7 @@ class Researcher:
                 WHERE chapter_id = %s
                   AND question_type IN ('chapter_quiz', 'objective_practice')
                   AND standalone = TRUE
+                  AND NOT leveled_only
                   AND options IS NOT NULL AND jsonb_array_length(options) > 0
                 ORDER BY RANDOM()
                 LIMIT %s

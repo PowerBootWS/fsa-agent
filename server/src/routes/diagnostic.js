@@ -35,6 +35,7 @@ router.get('/questions', async (req, res) => {
       `SELECT DISTINCT course_id FROM questions
        WHERE course_id = ANY($1::text[])
          AND question_type IN ('objective_practice', 'chapter_quiz')
+         AND NOT leveled_only
          AND standalone = TRUE`,
       [classPapers]
     );
@@ -53,6 +54,7 @@ router.get('/questions', async (req, res) => {
          WHERE course_id = $1
            AND difficulty BETWEEN 3 AND 4
            AND question_type IN ('objective_practice', 'chapter_quiz')
+           AND NOT leveled_only
            AND standalone = TRUE
          ORDER BY RANDOM()
          LIMIT $2`,
@@ -69,6 +71,7 @@ router.get('/questions', async (req, res) => {
            FROM questions
            WHERE course_id = $1
              AND question_type IN ('objective_practice', 'chapter_quiz')
+             AND NOT leveled_only
              AND standalone = TRUE
              AND id != ALL($2::int[])
            ORDER BY RANDOM()
