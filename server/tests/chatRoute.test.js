@@ -120,3 +120,16 @@ describe('GET /api/chat/history/:lessonCode', () => {
     await request(app()).get('/api/chat/history/2B1-1-1').expect(500);
   });
 });
+
+describe('POST /api/chat examConfig', () => {
+  it('forwards only a sanitised exam config', async () => {
+    await request(app()).post('/api/chat')
+      .send({ lessonId: '2B1', message: 'hello', examConfig: { count: 25, lead_magnet: true, x: 1 } }).expect(200);
+    expect(sent().examConfig).toEqual({ count: 50, timed: false });
+  });
+
+  it('sends no exam config when none was given', async () => {
+    await request(app()).post('/api/chat').send({ lessonId: '2B1', message: 'My answer is A' }).expect(200);
+    expect(sent()).not.toHaveProperty('examConfig');
+  });
+});

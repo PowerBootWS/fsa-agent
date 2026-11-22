@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const { sanitizeExamConfig } = require('../services/examConfig');
 const db = require('../services/database');
 const { requirePaperEntitlement } = require('../middleware/requirePaperEntitlement');
 
@@ -74,7 +75,8 @@ router.post('/', requirePaperEntitlement(req => req.body && req.body.lessonId), 
 
     // Forward to Python AI service — include examConfig when present
     const payload = { user, lessonId, message };
-    if (examConfig) payload.examConfig = examConfig;
+    const cfg = sanitizeExamConfig(examConfig);
+    if (cfg) payload.examConfig = cfg;
     if (Number.isInteger(slideNumber) && slideNumber >= 0) payload.slideNumber = slideNumber;
     const sq = cleanScreenQuestion(screenQuestion);
     if (sq) payload.screenQuestion = sq;

@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const axios = require('axios');
+const { sanitizeExamConfig } = require('../services/examConfig');
 const router = express.Router();
 
 const { pool } = require('../services/database');
@@ -292,9 +293,9 @@ router.post('/chat', async (req, res) => {
       user: claims.email,
       lessonId: claims.paperCode,
       message: req.body?.message,
+      // count/timed only when the client sent a config (its first message), as before.
       examConfig: {
-        count: clientExamConfig.count,
-        timed: clientExamConfig.timed,
+        ...(req.body?.examConfig ? sanitizeExamConfig(clientExamConfig) : {}),
         lead_magnet: true,
         first_name: row.first_name,
       },
