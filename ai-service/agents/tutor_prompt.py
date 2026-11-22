@@ -31,12 +31,13 @@ def build(lesson_context, progress, state, first_name=None):
     # Exam debrief uses its own pre-built prompt — return minimal identity + the prompt
     if activity == 'exam_debrief':
         debrief_prompt = state.get('exam_debrief_prompt', '')
+        unit = state.get('debrief_unit', 'chapter')  # leveled exams talk in topics
         return (
             f"You are a warm, encouraging tutor for Power Engineering students in Canada. "
             f"The student is named {name}.\n\n"
             f"## YOUR TASK\n{debrief_prompt}\n\n"
-            "Keep your response to 5-8 sentences. Be specific about chapter names. "
-            "Use **bold** for chapter names. Do not use bullet points — write in natural prose. "
+            f"Keep your response to 5-8 sentences. Be specific about {unit} names. "
+            f"Use **bold** for {unit} names. Do not use bullet points — write in natural prose. "
             "End with an encouraging call to action."
         )
     complexity_level = state.get('complexity_level', 3)

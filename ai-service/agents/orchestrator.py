@@ -8,6 +8,8 @@ import requests
 
 from agents import memory
 from agents import exercise as exercise_mod
+from agents import leveled_session
+from agents.leveled_store import LeveledStore
 from agents.tutor import MAX_HISTORY_ENTRIES
 
 
@@ -131,6 +133,9 @@ def _apply_screen_question(state, screen_question):
 
 
 class Orchestrator:
+    # The leveled practice exam's DB access; overridable in tests.
+    leveled_store_factory = LeveledStore
+
     def __init__(self):
         self.conversation_state = {}
         self._api_key = os.getenv('OPENROUTER_API_KEY')
@@ -1347,13 +1352,7 @@ class Orchestrator:
 
         # Load questions on first message
         if not state['exam_questions'] and not state.get('exam_done'):
-            weights = researcher.get_chapter_weights(user, course_id)
-            count = state.get('exam_question_count', PRACTICE_EXAM_QUESTION_COUNT)
-            qs = researcher.get_exam_questions(
-                course_id=course_id,
-                limit=count,
-                weights=weights if weights else None,
-            )
+            qs, _weights = self._select_exam_questions(state, user, course_id, researcher)
             state['exam_questions'] = qs
             state['exam_index'] = 0
             state['exam_results'] = []
@@ -1419,6 +1418,30 @@ class Orchestrator:
         # taken (100-question exams recorded 99, 50 recorded 49). Reported
         # 2026-08-11 by a student on the free 2A2 exam; see
         # tests/test_practice_exam_answer_count.py.
+        leveled = state.get('exam_engine') == 'leveled'
+        # Leveled sitting: a page refresh re-sends 'hello'; show the current question
+        # again instead of scoring 'hello' as its answer.
+        if leveled and idx > 0 and message.strip().lower() == 'hello':
+            q = questions[idx - 1]
+            return {
+                'tutor_response': None,
+                'display_update': self._build_exam_question_display(q, idx - 1, total, state),
+                'progress_update': {},
+                'complexity_level': state['complexity_level'],
+                'first_name': first_name,
+                'action': None,
+                'mode': 'practice_exam',
+                'exam_progress': {'current': idx, 'total': total},
+            }
+        # Leveled sitting: time ran out. Every unanswered question counts as wrong.
+        if leveled and message.strip() == '__time_up__':
+            self._leveled_time_up(state, user, course_id, researcher)
+            state['exam_done'] = True
+            state['exam_phase'] = 'debrief'
+            return self._generate_exam_debrief(
+                state, user, course_id, first_name, researcher, tutor, lesson_context, progress
+            )
+
         if idx > 0:
             self._record_exam_answer(state, user, course_id, message, researcher)
 
@@ -1432,10 +1455,17 @@ class Orchestrator:
 
         # ---- Present next question ----
         q = questions[idx]
-        display_update = self._build_exam_question_display(q, idx, total)
+        display_update = self._build_exam_question_display(q, idx, total, state)
         state['exam_index'] = idx + 1
 
-        if idx == 0:
+        if idx == 0 and leveled:
+            intro = (
+                f"Welcome to your {course_id} Practice Exam, {first_name}! "
+                f"You'll get **{total} questions** following the typical real-exam topic mix, "
+                f"each topic at your current level. Just select your answer for each one — "
+                f"your results by topic come at the end. Let's begin."
+            )
+        elif idx == 0:
             intro = (
                 f"Welcome to your {course_id} Practice Exam, {first_name}! "
                 f"You'll get **{total} questions** from across all chapters. "
@@ -1456,9 +1486,21 @@ class Orchestrator:
             'exam_progress': {'current': idx + 1, 'total': total},
         }
 
-    def _build_exam_question_display(self, q, idx, total):
+    def _build_exam_question_display(self, q, idx, total, state=None):
         options = q.get('options', [])
         formatted = [{'label': chr(65 + i), 'text': opt} for i, opt in enumerate(options)]
+        if state and state.get('exam_engine') == 'leveled':
+            names = {g['topic_key']: g['display_name'] for g in state['leveled']['groups']}
+            return {
+                'type': 'exam_question',
+                'title': f'Question {idx + 1} of {total}',
+                'question': q.get('question_text', ''),
+                'options': formatted,
+                'topic': names.get(q.get('topic_key'), ''),
+                'engine': 'leveled',
+                'question_id': q['id'],
+                'progress': {'current': idx + 1, 'total': total},
+            }
         return {
             'type': 'exam_question',
             'title': f'Question {idx + 1} of {total}',
@@ -1673,6 +1715,9 @@ class Orchestrator:
     def _generate_exam_debrief(self, state, user, course_id, first_name,
                                 researcher, tutor, lesson_context, progress):
         """Generate the end-of-exam debrief with objective-level teaching tips."""
+        if state.get('exam_engine') == 'leveled':
+            return self._generate_leveled_debrief(
+                state, user, course_id, first_name, researcher, tutor, progress)
         results = state.get('exam_results', [])
         if not results:
             return {
@@ -1886,41 +1931,7 @@ class Orchestrator:
         # explanations for students already in an accredited program elsewhere).
         distractor_coaching = {}
         if not is_fourth_class and state.get('exam_lead_magnet'):
-            wrong_reviews = [q for q in question_review if not q.get('correct')]
-            if wrong_reviews:
-                numbered_lines = []
-                for i, q in enumerate(wrong_reviews, 1):
-                    options = q.get('options') or []
-                    selected_idx = q.get('selected_index')
-                    correct_idx = q.get('correct_index')
-                    selected_text = options[selected_idx] if selected_idx is not None and selected_idx < len(options) else 'unknown'
-                    correct_text = options[correct_idx] if correct_idx is not None and correct_idx < len(options) else 'unknown'
-                    explanation = q.get('explanation') or 'No additional context available.'
-                    numbered_lines.append(
-                        f"{i}. Question: {q.get('question_text', '')}\n"
-                        f"   Student picked: \"{selected_text}\" (wrong)\n"
-                        f"   Correct answer: \"{correct_text}\"\n"
-                        f"   Explanation: {explanation}"
-                    )
-                batch_prompt = (
-                    "A student took a free practice exam and got these questions wrong. "
-                    "For each, write a 1-2 sentence note explaining why the wrong option "
-                    "they picked is a common trap or misconception — not just restating "
-                    "the correct answer, but naming the specific misunderstanding that "
-                    "makes the wrong option tempting.\n\n"
-                    + '\n\n'.join(numbered_lines)
-                )
-                raw_coaching = self._call_llm_for_distractor_coaching(batch_prompt, len(wrong_reviews))
-                # Re-key from 1-based batch index back to the wrong question's
-                # identity so the client can match coaching text to the right
-                # card. question_review entries carry no explicit id (see the
-                # comprehension above), so question_text is the only field
-                # common to both this dict and question_review — use it unless
-                # an 'id' shows up in scope later.
-                for i, q in enumerate(wrong_reviews, 1):
-                    if i in raw_coaching:
-                        key = q.get('id') or q.get('question_text')
-                        distractor_coaching[key] = raw_coaching[i]
+            distractor_coaching = self._distractor_coaching(question_review)
 
         display_update = {
             'type': 'exam_done',
@@ -1947,6 +1958,165 @@ class Orchestrator:
             state.get('exam_attempt_id'), total_correct, score_pct,
             {cid: dict(s) for cid, s in chapter_stats.items()},
         )
+        return {
+            'tutor_response': tutor_response,
+            'display_update': display_update,
+            'progress_update': {},
+            'complexity_level': state['complexity_level'],
+            'first_name': first_name,
+            'action': None,
+            'mode': 'practice_exam',
+        }
+
+    def _distractor_coaching(self, question_review):
+        """Free-exam only: why each wrong pick was a tempting trap (one LLM call)."""
+        distractor_coaching = {}
+        wrong_reviews = [q for q in question_review if not q.get('correct')]
+        if wrong_reviews:
+            numbered_lines = []
+            for i, q in enumerate(wrong_reviews, 1):
+                options = q.get('options') or []
+                selected_idx = q.get('selected_index')
+                correct_idx = q.get('correct_index')
+                selected_text = options[selected_idx] if selected_idx is not None and selected_idx < len(options) else 'unknown'
+                correct_text = options[correct_idx] if correct_idx is not None and correct_idx < len(options) else 'unknown'
+                explanation = q.get('explanation') or 'No additional context available.'
+                numbered_lines.append(
+                    f"{i}. Question: {q.get('question_text', '')}\n"
+                    f"   Student picked: \"{selected_text}\" (wrong)\n"
+                    f"   Correct answer: \"{correct_text}\"\n"
+                    f"   Explanation: {explanation}"
+                )
+            batch_prompt = (
+                "A student took a free practice exam and got these questions wrong. "
+                "For each, write a 1-2 sentence note explaining why the wrong option "
+                "they picked is a common trap or misconception — not just restating "
+                "the correct answer, but naming the specific misunderstanding that "
+                "makes the wrong option tempting.\n\n"
+                + '\n\n'.join(numbered_lines)
+            )
+            raw_coaching = self._call_llm_for_distractor_coaching(batch_prompt, len(wrong_reviews))
+            # Re-key from 1-based batch index back to the wrong question's
+            # identity so the client can match coaching text to the right
+            # card. question_review entries carry no explicit id (see the
+            # comprehension above), so question_text is the only field
+            # common to both this dict and question_review — use it unless
+            # an 'id' shows up in scope later.
+            for i, q in enumerate(wrong_reviews, 1):
+                if i in raw_coaching:
+                    key = q.get('id') or q.get('question_text')
+                    distractor_coaching[key] = raw_coaching[i]
+
+        return distractor_coaching
+
+    def _select_exam_questions(self, state, user, course_id, researcher):
+        """(questions, adaptive chapter weights or None). Decides the sitting's engine:
+        leveled when the paper is in LEVELED_PAPERS and the student hasn't opted out."""
+        count = state.get('exam_question_count', PRACTICE_EXAM_QUESTION_COUNT)
+        lead = bool(state.get('exam_lead_magnet'))
+        engine, store = 'adaptive', None
+        if count in (50, 100):
+            try:
+                store = self.leveled_store_factory(researcher)
+                engine = store.engine_for(user, course_id, lead)
+            except Exception as e:  # never block an exam on the new engine
+                print(f'[leveled] engine check failed, using adaptive: {e}', flush=True)
+                engine = 'adaptive'
+        state['exam_engine'] = engine
+        if engine == 'leveled':
+            qs, meta = leveled_session.start(store, user, course_id, count, lead)
+            state['leveled'] = meta
+            state['leveled_status'] = 'completed'
+            return qs, None
+        weights = researcher.get_chapter_weights(user, course_id)
+        qs = researcher.get_exam_questions(
+            course_id=course_id,
+            limit=count,
+            weights=weights if weights else None,
+        )
+        return qs, weights
+
+    def _leveled_time_up(self, state, user, course_id, researcher):
+        """Record every question not yet answered as wrong (the shown one included)."""
+        questions = state['exam_questions']
+        first_unanswered = max(0, state['exam_index'] - 1)
+        for i in range(first_unanswered, len(questions)):
+            state['exam_index'] = i + 1
+            self._record_exam_answer(state, user, course_id, '', researcher)
+        state['leveled_status'] = 'timed_out'
+
+    def _generate_leveled_debrief(self, state, user, course_id, first_name, researcher, tutor, progress):
+        results = state.get('exam_results', [])
+        questions = state.get('exam_questions', [])
+        lead = bool(state.get('exam_lead_magnet'))
+        if not state.get('exam_attempt_id'):
+            state['exam_attempt_id'] = researcher.start_attempt(
+                user, course_id, 'practice_exam', question_count=len(questions))
+        leveled = leveled_session.finish(
+            self.leveled_store_factory(researcher), user, course_id, state['leveled'], questions, results,
+            state.get('leveled_status', 'completed'), state.get('exam_attempt_id'), lead)
+        total_q = len(results)
+        total_correct = sum(1 for r in results if r['correct'])
+        score_pct = int(total_correct / total_q * 100) if total_q else 0
+        question_review = [
+            {
+                'question_text': r.get('question_text', ''),
+                'options': r.get('options', []),
+                'correct_index': r.get('correct_index'),
+                'selected_index': r.get('selected_index'),
+                'correct': r['correct'],
+                'explanation': r.get('explanation', ''),
+            }
+            for r in results
+        ]
+        tutor_response = ''
+        if course_id not in FOURTH_CLASS_COURSES:
+            prompt = leveled_session.debrief_prompt(first_name, course_id, leveled)
+            debrief_state = {
+                'activity': 'exam_debrief',
+                'debrief_unit': 'topic',
+                'mode': 'practice_exam',
+                'complexity_level': state.get('complexity_level', 3),
+                'questions_done': total_q,
+                'session_limit_reached': False,
+                'chat_history': state.get('chat_history', []),
+                'relevant_chunks': [],
+                'display_is_question': False,
+                'awaiting_next_question': False,
+                'is_resume': False,
+                'no_questions_available': False,
+                'first_name': first_name,
+                'exam_debrief_prompt': prompt,
+            }
+            tutor_result = tutor.respond(
+                user_message=prompt,
+                lesson_context={'title': f'{course_id} Practice Exam', 'summary': '', 'key_points': [],
+                                'narration_text': '', 'video_transcript': ''},
+                progress=progress,
+                state=debrief_state,
+                first_name=first_name,
+            )
+            tutor_response = tutor_result.get('response', '') if isinstance(tutor_result, dict) else str(tutor_result)
+        distractor_coaching = self._distractor_coaching(question_review) if lead else {}
+        display_update = {
+            'type': 'exam_done',
+            'title': f'{course_id} Exam Results',
+            'score': total_correct,
+            'total': total_q,
+            'score_pct': score_pct,
+            'question_review': question_review,
+            'distractor_coaching': distractor_coaching,
+            'attempt_id': state.get('exam_attempt_id'),
+            'leveled': leveled,
+        }
+        state['last_debrief'] = {'tutor_response': tutor_response, 'display_update': display_update}
+        researcher.save_last_debrief(user, course_id, state['last_debrief'])
+        chapter_stats = {}
+        for r in results:
+            s = chapter_stats.setdefault(r['chapter_id'], {'correct': 0, 'total': 0})
+            s['total'] += 1
+            s['correct'] += 1 if r['correct'] else 0
+        researcher.finish_attempt(state.get('exam_attempt_id'), total_correct, score_pct, chapter_stats)
         return {
             'tutor_response': tutor_response,
             'display_update': display_update,
@@ -2042,13 +2212,8 @@ class Orchestrator:
         return False
 
     def _reset_and_start_exam(self, state, user, course_id, first_name, researcher, display):
-        weights = researcher.get_chapter_weights(user, course_id)
-        count = state.get('exam_question_count', PRACTICE_EXAM_QUESTION_COUNT)
-        qs = researcher.get_exam_questions(
-            course_id=course_id,
-            limit=count,
-            weights=weights if weights else None,
-        )
+        state['exam_questions'] = []
+        qs, weights = self._select_exam_questions(state, user, course_id, researcher)
 
         if not qs:
             return {
@@ -2071,7 +2236,7 @@ class Orchestrator:
         state['exam_done'] = False
         state['exam_attempt_id'] = None
 
-        display_update = self._build_exam_question_display(qs[0], 0, len(qs))
+        display_update = self._build_exam_question_display(qs[0], 0, len(qs), state)
         state['exam_index'] = 1
 
         weak_text = ''
@@ -2083,6 +2248,8 @@ class Orchestrator:
                     f"based on your last attempt. "
                 )
 
+        if state.get('exam_engine') == 'leveled':
+            weak_text = 'same typical real-exam topic mix, each topic at your current level — '
         intro = (
             f"Here we go, {first_name}! Fresh {course_id} practice exam — "
             f"{weak_text}"

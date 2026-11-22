@@ -89,7 +89,8 @@ def predicted_pct(topics: dict, groups: list) -> float:
         if not t:
             continue
         acc = t['correct'] / t['total'] if t['total'] else 0.0
-        adj = min(1.0, max(0.0, acc + CONFIG['level_step'] * (t['level'] - 3)))
+        served = t.get('served_level', t['level'])
+        adj = min(1.0, max(0.0, acc + CONFIG['level_step'] * (served - 3)))
         total += adj * g['exam_questions']
         weight += g['exam_questions']
     return round(100 * total / weight, 1) if weight else 0.0

@@ -79,3 +79,9 @@ def test_holding_back_lowest_level_then_weight():
               {"topic_key": "d", "exam_questions": 40, "sort_order": 3}]
     assert holding_back({"a": 1, "b": 1, "c": 2, "d": 4}, groups, n=3) == ["b", "a", "c"]
     assert holding_back({"a": 4, "b": 4, "c": 4, "d": 4}, groups) == []
+
+
+def test_predicted_pct_uses_the_level_actually_served():
+    one = [{"topic_key": "a", "exam_questions": 100, "sort_order": 0}]
+    # student at level 2, but fallback served level-3 questions on average
+    assert predicted_pct({"a": {"level": 2, "served_level": 3.0, "correct": 5, "total": 10}}, one) == 50.0
