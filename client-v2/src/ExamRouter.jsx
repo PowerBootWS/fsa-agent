@@ -672,7 +672,7 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
   // returns the results; sent at most once per sitting.
   const timeUpSentRef = useRef(false);
   const sendTimeUp = () => {
-    if (timeUpSentRef.current || isDone) return;
+    if (timeUpSentRef.current || isDone || compilingResults) return;
     timeUpSentRef.current = true;
     setCompilingResults(true);
     setChatError(null);
@@ -765,7 +765,7 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
             <CountdownTimer
               totalSeconds={{ 50: 5400, 100: 10800 }[examConfig.count] ?? 5400}
               stopped={isDone}
-              onExpire={displayContent?.engine === 'leveled' ? sendTimeUp : null}
+              onExpire={displayContent?.engine === 'leveled' && !compilingResults ? sendTimeUp : null}
             />
           )}
         </div>

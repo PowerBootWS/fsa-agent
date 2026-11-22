@@ -31,6 +31,8 @@ def start(store, user: str, paper: str, length: int, lead_magnet: bool) -> tuple
             qs, _notes = store.pick(paper, g, lv, k, avoid, taken)
             taken.update(q['id'] for q in qs)
             questions.extend(qs)
+    if not questions:
+        return [], None
     random.shuffle(questions)
     sitting_id = store.start_sitting(user, paper, length, lead_magnet, round_up, [q['id'] for q in questions])
     return questions, {'sitting_id': sitting_id, 'levels': levels,
@@ -78,8 +80,10 @@ def finish(store, user: str, paper: str, meta: dict, questions: list, results: l
         if k not in topics:
             continue
         t = topics[k]
+        # Free exam: no level history, so show the level the student would start at.
+        shown = new_levels[k] if lead_magnet else t['level']
         rows.append({'topic_key': k, 'name': g['display_name'], 'weight': g['exam_questions'],
-                     'level': t['level'], 'level_name': LEVEL_NAMES[t['level']],
+                     'level': shown, 'level_name': LEVEL_NAMES[shown],
                      'new_level': new_levels[k], 'new_level_name': LEVEL_NAMES[new_levels[k]],
                      'correct': t['correct'], 'total': t['total']})
     return {'topics': rows, 'predicted_pct': pred, 'band': band, 'message': message,
@@ -91,6 +95,9 @@ def debrief_prompt(first_name: str, paper: str, leveled: dict) -> str:
     """The tutor's spoken debrief for a leveled sitting: topics and levels, no chapters."""
     lines = []
     for t in leveled['topics']:
+        if leveled.get('lead_magnet'):
+            lines.append(f"- {t['name']}: {t['correct']}/{t['total']}; they would start at {t['level_name']}")
+            continue
         change = (f", moving to {t['new_level_name']}" if t['new_level'] != t['level'] else '')
         lines.append(f"- {t['name']}: {t['correct']}/{t['total']} at {t['level_name']}{change}")
     hold = ', '.join(leveled['holding_back']) or 'none'

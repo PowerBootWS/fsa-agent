@@ -199,3 +199,67 @@ def test_retake_starts_a_new_leveled_sitting():
     r = send('retake')
     assert len(store.started) == 2 and r['display_update']['engine'] == 'leveled'
     assert len(state['exam_questions']) == 50 and state['exam_results'] == []
+
+
+class BrokenStore(FakeStore):
+    def topic_groups(self, paper):
+        raise RuntimeError('db down')
+
+
+class EmptyStore(FakeStore):
+    def topic_groups(self, paper):
+        return []
+
+
+def test_leveled_failure_falls_back_to_adaptive():
+    for store in (BrokenStore(), EmptyStore()):
+        _, state, researcher, send = make(store, 50)
+        r = send('hello')
+        assert state['exam_engine'] == 'adaptive'
+        researcher.get_exam_questions.assert_called_once_with(course_id=P, limit=50, weights=None)
+        assert r['display_update']['type'] == 'exam_question'
+        assert store.started == []                       # no empty sitting written
+
+
+def test_time_up_after_results_returns_the_results():
+    store = FakeStore()
+    _, state, _, send = make(store, 50)
+    send('hello')
+    done = answer_all(state, send)
+    again = send('__time_up__')
+    assert again['display_update'] == done['display_update']
+    assert len(store.finished) == 1 and len(store.saved) == 1
+
+
+def test_time_up_while_results_are_being_built_does_nothing():
+    store = FakeStore()
+    o, state, _, send = make(store, 50)
+    send('hello')
+    state['exam_done'] = True
+    state['exam_phase'] = 'debrief'
+    state['_debrief_started'] = True                     # the final answer's request is building them
+    r = send('__time_up__')
+    assert r['display_update'] is None and store.finished == []
+
+
+def test_late_time_up_never_restarts_a_finished_exam():
+    store = FakeStore()
+    o, state, _, send = make(store, 50, lead=True)
+    send('hello')
+    done = answer_all(state, send)
+    assert o._time_up_after_done(state)['display_update'] == done['display_update']
+    state2 = {'exam_done': False}
+    assert o._time_up_after_done(state2) is None
+
+
+def test_free_exam_shows_a_starting_level_not_a_level_change():
+    store = FakeStore()
+    _, state, _, send = make(store, 50, lead=True)
+    send('hello')
+    r = answer_all(state, send, right_topics=('a',))
+    rows = {t['topic_key']: t for t in r['display_update']['leveled']['topics']}
+    assert rows['a']['level'] == rows['a']['new_level'] == 3
+    assert rows['b']['level'] == rows['b']['new_level'] == 1
+    from agents.leveled_session import debrief_prompt
+    p = debrief_prompt('Sam', P, r['display_update']['leveled'])
+    assert 'moving to' not in p and 'would start' in p

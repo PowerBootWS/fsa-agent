@@ -180,7 +180,7 @@ export default function ExamResultsPage() {
 
   const dc = debrief?.display_update;
   const hasFull = !!(dc && ((dc.objective_breakdowns && dc.objective_breakdowns.length) ||
-                            (dc.chapter_stats && dc.chapter_stats.length)));
+                            (dc.chapter_stats && dc.chapter_stats.length) || dc.leveled));
 
   // ── Loading ──
   if (loading && !debrief && !summary) {

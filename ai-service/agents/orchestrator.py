@@ -269,6 +269,11 @@ class Orchestrator:
             # A bare 'hello' with no examConfig is a refresh/review and must NOT
             # spin up a new exam (see the DB-restore guard in _process_practice_exam).
             state['_starting_new_exam'] = exam_config is not None
+            # A leveled sitting's time-up can arrive after it has already ended (it raced
+            # the final answer). Never let it restart the exam or reach the tutor.
+            late = self._time_up_after_done(state) if message.strip() == '__time_up__' else None
+            if late:
+                return late
             # If the lobby is starting a fresh exam (examConfig provided) and the previous
             # session is in the debrief/done state, reset exam-specific state now so that
             # _process_practice_exam sees a clean slate and doesn't re-run the debrief LLM call.
@@ -1364,6 +1369,8 @@ class Orchestrator:
 
         # ---- Debrief phase ----
         if state.get('exam_done') or state.get('exam_phase') == 'debrief':
+            if message.strip() == '__time_up__':
+                return self._time_up_after_done(state) or self._exam_noop(state, first_name)
             if self._is_exam_retry(message):
                 return self._reset_and_start_exam(
                     state, user, course_id, first_name, researcher, display
@@ -2022,12 +2029,20 @@ class Orchestrator:
             except Exception as e:  # never block an exam on the new engine
                 print(f'[leveled] engine check failed, using adaptive: {e}', flush=True)
                 engine = 'adaptive'
-        state['exam_engine'] = engine
         if engine == 'leveled':
-            qs, meta = leveled_session.start(store, user, course_id, count, lead)
-            state['leveled'] = meta
-            state['leveled_status'] = 'completed'
-            return qs, None
+            try:
+                qs, meta = leveled_session.start(store, user, course_id, count, lead)
+            except Exception as e:  # never block an exam on the new engine
+                print(f'[leveled] start failed for {course_id}, using adaptive: {e}', flush=True)
+                qs = []
+            if qs:
+                state['exam_engine'] = 'leveled'
+                state['leveled'] = meta
+                state['leveled_status'] = 'completed'
+                state['_debrief_started'] = False
+                return qs, None
+            print(f'[leveled] no questions for {course_id}, using adaptive', flush=True)
+        state['exam_engine'] = 'adaptive'
         weights = researcher.get_chapter_weights(user, course_id)
         qs = researcher.get_exam_questions(
             course_id=course_id,
@@ -2035,6 +2050,35 @@ class Orchestrator:
             weights=weights if weights else None,
         )
         return qs, weights
+
+    def _time_up_after_done(self, state):
+        """The results again for a time-up that arrives after the sitting ended, or a no-op
+        while the results are still being built. None when the sitting isn't over."""
+        if not state.get('exam_done'):
+            return None
+        cached = state.get('last_debrief')
+        if cached:
+            return {
+                'tutor_response': cached.get('tutor_response', ''),
+                'display_update': cached.get('display_update'),
+                'progress_update': {},
+                'complexity_level': state.get('complexity_level', 3),
+                'first_name': state.get('first_name'),
+                'action': None,
+                'mode': 'practice_exam',
+            }
+        return self._exam_noop(state, state.get('first_name'))
+
+    def _exam_noop(self, state, first_name):
+        return {
+            'tutor_response': None,
+            'display_update': None,
+            'progress_update': {},
+            'complexity_level': state.get('complexity_level', 3),
+            'first_name': first_name,
+            'action': None,
+            'mode': 'practice_exam',
+        }
 
     def _leveled_time_up(self, state, user, course_id, researcher):
         """Record every question not yet answered as wrong (the shown one included)."""
@@ -2046,6 +2090,7 @@ class Orchestrator:
         state['leveled_status'] = 'timed_out'
 
     def _generate_leveled_debrief(self, state, user, course_id, first_name, researcher, tutor, progress):
+        state['_debrief_started'] = True
         results = state.get('exam_results', [])
         questions = state.get('exam_questions', [])
         lead = bool(state.get('exam_lead_magnet'))
