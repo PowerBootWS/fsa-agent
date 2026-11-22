@@ -4,7 +4,6 @@ import { getJson } from '../utils/api';
 import { pastAttemptsHref } from '../pages/attemptFormat';
 
 const COUNT_OPTIONS = [
-  { count: 25,  label: '25 Questions', sublabel: '~45 min' },
   { count: 50,  label: '50 Questions', sublabel: '~1.5 hrs' },
   { count: 100, label: '100 Questions', sublabel: '~3 hrs' },
 ];

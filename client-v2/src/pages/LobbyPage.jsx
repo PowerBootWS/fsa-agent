@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInstall } from '../hooks/useInstall';
 import './LobbyPage.css';
+import ExamLengthPicker from '../components/ExamLengthPicker';
 
 // Maps paper codes to human-readable names
 const PAPER_NAMES = {
@@ -358,17 +359,11 @@ export default function LobbyPage() {
               <div className="lb-count-section-label">
                 Question count
               </div>
-              <div className="lb-count-group">
-                {[25, 50, 100].map(n => (
-                  <button
-                    key={n}
-                    className={`lb-count-btn${examCount === n ? ' lb-count-btn--active' : ''}`}
-                    onClick={() => setExamCount(n)}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
+              <ExamLengthPicker
+                value={examCount}
+                onChange={setExamCount}
+                leveled={account?.exam_engine_effective === 'leveled'}
+              />
             </div>
 
             {/* Timed toggle */}

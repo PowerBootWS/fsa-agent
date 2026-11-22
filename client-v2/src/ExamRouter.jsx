@@ -8,6 +8,7 @@ import { PracticeExamLobby } from './components/PracticeExamLobby.jsx';
 import { TeachingNotes, NextAttemptPreview } from './components/TeachingNotes.jsx';
 import { QuestionReview, QuestionReviewModal } from './components/QuestionReview.jsx';
 import { DistractorCoaching } from './components/DistractorCoaching.jsx';
+import LeveledResults from './components/LeveledResults.jsx';
 import { MathContent } from './components/MathContent.jsx';
 import { CountdownTimer } from './components/CountdownTimer.jsx';
 import { isFourthClassCode } from './utils/fourthClass';
@@ -199,6 +200,8 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
         {score}/{total} <span className="results-score-pct">({score_pct}%)</span>
       </div>
 
+      {displayContent.leveled && <LeveledResults data={displayContent.leveled} />}
+
       {chapter_stats && chapter_stats.length > 0 && (
         <table className="results-table">
           <thead>
@@ -250,11 +253,13 @@ export function ResultsPanel({ displayContent, isExam, onRetry, onSelectChapter,
           >
             {retrying
               ? 'Loading…'
-              : isExam ? 'Retake Exam (Adaptive)' : retryOfMissed ? 'Retry what I still missed' : 'Retry Quiz'}
+              : isExam ? (displayContent.leveled ? 'Retake Exam' : 'Retake Exam (Adaptive)') : retryOfMissed ? 'Retry what I still missed' : 'Retry Quiz'}
           </button>
           <p className="results-retry-hint">
             {isExam
-              ? 'Your next exam will pull more questions from chapters you struggled with.'
+              ? (displayContent.leveled
+                ? 'Your next exam keeps the typical real-exam mix, at your new level in each topic.'
+                : 'Your next exam will pull more questions from chapters you struggled with.')
               : retryOfMissed
                 ? 'Serves only the questions you got wrong this time.'
                 : 'Get a fresh, randomly selected set of questions for this chapter.'}
@@ -663,6 +668,32 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
     }
   }, [displayContent?.type]);  // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Leveled exam: time ran out. The server marks unanswered questions wrong and
+  // returns the results; sent at most once per sitting.
+  const timeUpSentRef = useRef(false);
+  const sendTimeUp = () => {
+    if (timeUpSentRef.current || isDone) return;
+    timeUpSentRef.current = true;
+    setCompilingResults(true);
+    setChatError(null);
+    postChatMessage('__time_up__', { leadMagnetToken, user, lessonId })
+      .then(readChatResponse)
+      .then(data => {
+        setChatState(prev => {
+          const msgs = [...prev.messages];
+          if (data.tutor_response) msgs.push({ role: 'tutor', content: extractResponse(data.tutor_response) });
+          return { ...prev, messages: msgs, displayContent: data.display_update ?? prev.displayContent };
+        });
+        setCompilingResults(false);
+      })
+      .catch(err => {
+        console.error('Time-up error:', err);
+        timeUpSentRef.current = false;
+        setCompilingResults(false);
+        setChatError(chatErrorMessage(err, { leadMagnet: !!leadMagnetToken }));
+      });
+  };
+
   const sendAnswer = (answer) => {
     const isLastQuestion = isExam && !isDone && examProgress && examProgress.current === examProgress.total;
     const suppressChat = isExam && !isDone && !isLastQuestion;
@@ -732,8 +763,9 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
           )}
           {isExam && examConfig?.timed && examProgress && !isDone && (
             <CountdownTimer
-              totalSeconds={{ 25: 2700, 50: 5400, 100: 10800 }[examConfig.count] ?? 5400}
+              totalSeconds={{ 50: 5400, 100: 10800 }[examConfig.count] ?? 5400}
               stopped={isDone}
+              onExpire={displayContent?.engine === 'leveled' ? sendTimeUp : null}
             />
           )}
         </div>

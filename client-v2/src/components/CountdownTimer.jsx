@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 
-export function CountdownTimer({ totalSeconds, stopped = false }) {
+export function CountdownTimer({ totalSeconds, stopped = false, onExpire = null }) {
   const startRef = useRef(Date.now());
+  const expiredRef = useRef(false);
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -13,6 +14,14 @@ export function CountdownTimer({ totalSeconds, stopped = false }) {
   }, [stopped]);
 
   const remaining = totalSeconds - elapsed;
+
+  // Leveled exams end when time runs out (unanswered questions count as wrong).
+  useEffect(() => {
+    if (onExpire && !stopped && remaining <= 0 && !expiredRef.current) {
+      expiredRef.current = true;
+      onExpire();
+    }
+  }, [remaining, stopped, onExpire]);
   const isOver = remaining <= 0;
   const displaySeconds = isOver ? -remaining : remaining;
 
