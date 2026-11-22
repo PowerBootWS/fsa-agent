@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getJson } from '../utils/api';
+import ExamStyleCard from '../components/ExamStyleCard';
 import './ProfilePage.css';
 
 // /home is the landing page for every account.
@@ -18,6 +19,7 @@ export default function ProfilePage() {
   const [pwSending, setPwSending] = useState(false);
   const [documents, setDocuments] = useState({});
   const [docUploadError, setDocUploadError] = useState('');
+  const [examStyle, setExamStyle] = useState({ available: false, engine: null });
 
   const [form, setForm] = useState({
     first_name: '',
@@ -43,6 +45,7 @@ export default function ProfilePage() {
           phone: data.phone || '',
           address: data.address || '',
         });
+        setExamStyle({ available: !!data.leveled_available, engine: data.exam_engine || null });
       } catch {
         navigate('/login', { replace: true });
       } finally {
@@ -251,6 +254,8 @@ export default function ProfilePage() {
             </div>
           </form>
         </div>
+
+        {examStyle.available && <ExamStyleCard available engine={examStyle.engine} />}
 
         {/* Change password */}
         <div className="pf-card">

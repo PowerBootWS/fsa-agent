@@ -16,6 +16,7 @@ const DEACTIVATION_REQUIRES_CONFIRMATION =
 const requireAuth = require('../middleware/requireAuth');
 const axios = require('axios');
 const { featuresFor } = require('../config/features');
+const { effectiveExamEngine, leveledPapers } = require('../config/leveledPapers');
 
 const router = express.Router();
 
@@ -915,9 +916,28 @@ router.get('/me', requireAuth, async (req, res) => {
       had_subscription: hist.had_subscription,
       has_billing_history: hist.has_stripe_sub,
       features: featuresFor(u.email),
+      exam_engine: u.exam_engine || null,
+      exam_engine_effective: effectiveExamEngine(u.active_paper, u.exam_engine),
+      leveled_available: leveledPapers().has(u.active_paper),
     });
   } catch (err) {
     console.error('GET /api/platform/me error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/platform/exam-engine — the student's practice-exam style. 'adaptive' is the
+// fallback to the previous exam while the leveled exam rolls out (backlog #147).
+router.put('/exam-engine', requireAuth, async (req, res) => {
+  const engine = req.body && req.body.engine;
+  if (engine !== 'leveled' && engine !== 'adaptive') {
+    return res.status(400).json({ error: 'Choose leveled or adaptive' });
+  }
+  try {
+    await pool.query('UPDATE platform_users SET exam_engine = $1 WHERE id = $2', [engine, req.user.id]);
+    return res.json({ exam_engine: engine });
+  } catch (err) {
+    console.error('PUT /api/platform/exam-engine error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
