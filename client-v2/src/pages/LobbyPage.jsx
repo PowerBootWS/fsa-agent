@@ -93,6 +93,15 @@ export default function LobbyPage() {
       const me = await meRes.json();
       setAccount(me);
 
+      // Refresh the browser copy from the server. ProtectedRoute decides
+      // /select-paper's requireCourse from localStorage, so a copy saved at
+      // signup (before payment) still has no class_code; without this sync
+      // the picker bounces back here and the two pages loop forever.
+      const stored = JSON.parse(localStorage.getItem('fsa_user') || '{}');
+      localStorage.setItem('fsa_user', JSON.stringify({
+        ...stored, class_code: me.class_code, active_paper: me.active_paper,
+      }));
+
       if (me.class_code && !me.active_paper) {
         navigate('/select-paper', { replace: true });
         return;

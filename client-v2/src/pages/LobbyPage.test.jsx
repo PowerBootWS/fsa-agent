@@ -74,3 +74,20 @@ describe('LobbyPage — session and account state disagree', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 });
+
+describe('LobbyPage — browser copy saved before payment (Elliot, 2026-11-23)', () => {
+  it('refreshes class_code in localStorage before sending a paid, paperless account to the picker', async () => {
+    // Saved at signup, before the Stripe payment provisioned a subscription.
+    localStorage.setItem('fsa_user', JSON.stringify({ id: 1, email: 'a@b.c', class_code: null, active_paper: null }));
+    globalThis.fetch.mockResolvedValue(respond({ class_code: 'second', active_paper: null }));
+
+    renderLobby();
+
+    await vi.waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/select-paper', { replace: true }));
+    // ProtectedRoute(requireCourse) on /select-paper reads this; stale null
+    // bounced the student straight back to /lobby in an endless loop.
+    const stored = JSON.parse(localStorage.getItem('fsa_user'));
+    expect(stored.class_code).toBe('second');
+    expect(stored.email).toBe('a@b.c');
+  });
+});
