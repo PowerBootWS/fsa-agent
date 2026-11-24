@@ -13,6 +13,10 @@ const PORT = process.env.PORT || 3000;
 // Trust Cloudflare as the first proxy so express-rate-limit can read the real client IP
 app.set('trust proxy', 1);
 
+// Per-request log line (see middleware/requestLog.js). First, so every request
+// is timed, including ones rejected by later middleware.
+app.use(require('./middleware/requestLog'));
+
 const LEARN_DOMAIN = process.env.LEARN_DOMAIN || 'learn.fullsteamahead.ca';
 const LEGACY_DOMAIN = process.env.LEGACY_DOMAIN || 'fsachat.fullsteamahead.ca';
 
