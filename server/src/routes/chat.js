@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
-const { sanitizeExamConfig } = require('../services/examConfig');
+const { sanitizeExamConfig, cleanElapsedSeconds } = require('../services/examConfig');
 const db = require('../services/database');
 const { requirePaperEntitlement } = require('../middleware/requirePaperEntitlement');
 
@@ -63,7 +63,7 @@ function cleanExercise(ex) {
 // Send message to Tutor Agent
 router.post('/', requirePaperEntitlement(req => req.body && req.body.lessonId), async (req, res) => {
   try {
-    const { lessonId, message, examConfig, slideNumber, screenQuestion, exercise } = req.body;
+    const { lessonId, message, examConfig, slideNumber, screenQuestion, exercise, elapsedSeconds } = req.body;
     // The session owner, never the body: the tutor now reads saved transcripts
     // and a cross-objective memory keyed on this, so a client-chosen `user`
     // would let one student read another's conversations.
@@ -77,6 +77,8 @@ router.post('/', requirePaperEntitlement(req => req.body && req.body.lessonId), 
     const payload = { user, lessonId, message };
     const cfg = sanitizeExamConfig(examConfig);
     if (cfg) payload.examConfig = cfg;
+    const elapsed = cleanElapsedSeconds(elapsedSeconds);
+    if (elapsed !== undefined) payload.elapsedSeconds = elapsed;
     if (Number.isInteger(slideNumber) && slideNumber >= 0) payload.slideNumber = slideNumber;
     const sq = cleanScreenQuestion(screenQuestion);
     if (sq) payload.screenQuestion = sq;

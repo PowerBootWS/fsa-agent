@@ -1,4 +1,4 @@
-const { sanitizeExamConfig } = require('../src/services/examConfig');
+const { sanitizeExamConfig, cleanElapsedSeconds } = require('../src/services/examConfig');
 
 describe('sanitizeExamConfig', () => {
   it('passes nothing through when nothing was sent', () => {
@@ -20,5 +20,19 @@ describe('sanitizeExamConfig', () => {
   it('forces lead_magnet on the free exam path', () => {
     expect(sanitizeExamConfig({ count: 100, timed: 'yes' }, { leadMagnet: true }))
       .toEqual({ count: 100, timed: false, lead_magnet: true });
+  });
+});
+
+describe('cleanElapsedSeconds', () => {
+  it('keeps a whole number of seconds up to a day', () => {
+    expect(cleanElapsedSeconds(0)).toBe(0);
+    expect(cleanElapsedSeconds(5400)).toBe(5400);
+    expect(cleanElapsedSeconds(86400)).toBe(86400);
+  });
+
+  it('drops anything else', () => {
+    for (const v of [undefined, null, -1, 1.5, 86401, '60', true, {}, NaN]) {
+      expect(cleanElapsedSeconds(v)).toBeUndefined();
+    }
   });
 });

@@ -128,6 +128,16 @@ describe('POST /api/chat examConfig', () => {
     expect(sent().examConfig).toEqual({ count: 50, timed: false });
   });
 
+  it('forwards a timed answer clock', async () => {
+    await request(app()).post('/api/chat').send({ lessonId: '2B1', message: 'B', elapsedSeconds: 312 }).expect(200);
+    expect(sent().elapsedSeconds).toBe(312);
+  });
+
+  it('drops a clock that is not whole seconds', async () => {
+    await request(app()).post('/api/chat').send({ lessonId: '2B1', message: 'B', elapsedSeconds: 'x' }).expect(200);
+    expect(sent()).not.toHaveProperty('elapsedSeconds');
+  });
+
   it('sends no exam config when none was given', async () => {
     await request(app()).post('/api/chat').send({ lessonId: '2B1', message: 'My answer is A' }).expect(200);
     expect(sent()).not.toHaveProperty('examConfig');

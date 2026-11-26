@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const axios = require('axios');
-const { sanitizeExamConfig } = require('../services/examConfig');
+const { sanitizeExamConfig, cleanElapsedSeconds } = require('../services/examConfig');
 const router = express.Router();
 
 const { pool } = require('../services/database');
@@ -300,6 +300,8 @@ router.post('/chat', async (req, res) => {
         first_name: row.first_name,
       },
     };
+    const elapsed = cleanElapsedSeconds(req.body?.elapsedSeconds);
+    if (elapsed !== undefined) payload.elapsedSeconds = elapsed;
 
     const response = await axios.post(`${PYTHON_SERVICE_URL}/agent/chat`, payload);
     displayUpdate = response.data?.display_update;

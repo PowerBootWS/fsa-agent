@@ -11,4 +11,10 @@ function sanitizeExamConfig(raw, { leadMagnet = false } = {}) {
   return out;
 }
 
-module.exports = { sanitizeExamConfig };
+// Timed practice exam: the student's clock (pauses excluded) when they answered, in whole
+// seconds. Anything else is dropped rather than forwarded.
+function cleanElapsedSeconds(v) {
+  return Number.isInteger(v) && v >= 0 && v <= 86400 ? v : undefined;
+}
+
+module.exports = { sanitizeExamConfig, cleanElapsedSeconds };
