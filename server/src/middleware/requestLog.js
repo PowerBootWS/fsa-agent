@@ -7,7 +7,13 @@
 // tokens there), status, duration, platform user id (never the email),
 // Cloudflare ray id and country. Token-bearing path segments are redacted.
 
+// Lesson session ids are kept so one session can be followed through the log:
+// they are not credentials (the session routes check the id belongs to the
+// signed-in student, student-access audit 2026-10-21).
+const KEEP_ID = /^\/api\/v2\/session\/[0-9a-f-]{36}$/i;
+
 function redactPath(p) {
+  if (KEEP_ID.test(p)) return p;
   return p
     // /explained-media/<slug>/<ver>/p/<token>/<file>
     .replace(/\/p\/[^/]+\//, '/p/[token]/')

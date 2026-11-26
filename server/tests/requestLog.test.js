@@ -26,3 +26,9 @@ test('redacts token-bearing path segments', () => {
   expect(redactPath('/api/auth/verify/' + 'a'.repeat(40))).toBe('/api/auth/verify/[redacted]');
   expect(redactPath('/media/2A1-3-2/slide-003.mp3')).toBe('/media/2A1-3-2/slide-003.mp3');
 });
+
+test('keeps lesson session ids so a session can be followed', () => {
+  const id = '3f2b8c1e-9a4d-4e2b-8f1a-0c5d6e7f8a9b';
+  expect(redactPath('/api/v2/session/' + id)).toBe('/api/v2/session/' + id);
+  expect(redactPath('/api/v2/session/' + id + '/extra')).toContain('[redacted]');
+});
