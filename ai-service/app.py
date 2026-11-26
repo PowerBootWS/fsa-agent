@@ -44,6 +44,8 @@ def chat():
     slide_number = data.get('slideNumber')
     screen_question = data.get('screenQuestion')
     exercise = data.get('exercise')
+    # Timed practice exam: the student's clock (pauses excluded) when they answered.
+    elapsed_seconds = data.get('elapsedSeconds')
 
     if not all([user, lesson_id, message]):
         return jsonify({'error': 'Missing required parameters'}), 400
@@ -73,6 +75,8 @@ def chat():
         kwargs['screen_question'] = screen_question
     if isinstance(exercise, dict):
         kwargs['exercise'] = exercise
+    if isinstance(elapsed_seconds, int) and not isinstance(elapsed_seconds, bool) and elapsed_seconds >= 0:
+        kwargs['elapsed_seconds'] = elapsed_seconds
     response = orchestrator.process(**kwargs)
 
     return jsonify(response)

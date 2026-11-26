@@ -21,6 +21,16 @@ CONFIG = {
     'ready_weight': 0.75,  # share of exam weight that must be at Max for "ready"
 }
 
+# Timed sittings: the clock is the sum of these over the questions actually served, so a
+# student at Max in many topics gets more time (Max questions are harder than the real exam).
+MINUTES_PER_QUESTION = {1: 1.5, 2: 1.5, 3: 2, 4: 4}
+
+
+def time_limit_seconds(levels: list) -> int:
+    """Time limit for a sitting from each served question's level, rounded up to a whole minute."""
+    return math.ceil(sum(MINUTES_PER_QUESTION[lv] for lv in levels)) * 60
+
+
 VERDICTS = {
     'fail': "If you wrote this paper today, you'd likely fail.",
     'close': 'You could pass, but it would be close.',

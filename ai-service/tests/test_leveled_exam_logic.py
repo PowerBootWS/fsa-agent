@@ -1,8 +1,8 @@
 """Leveled exam engine: pure logic (Plan 3, Task 2)."""
 import math
 
-from agents.leveled_exam import (CONFIG, LEVEL_NAMES, free_mix, holding_back, next_level,
-                                 predicted_pct, slot_counts, verdict)
+from agents.leveled_exam import (CONFIG, LEVEL_NAMES, MINUTES_PER_QUESTION, free_mix, holding_back, next_level,
+                                 predicted_pct, slot_counts, time_limit_seconds, verdict)
 
 WEIGHTS = [15, 15, 10, 9, 9, 8, 7, 7, 6, 5, 5, 4]
 GROUPS = [{"topic_key": f"t{i}", "exam_questions": w, "sort_order": i} for i, w in enumerate(WEIGHTS)]
@@ -85,3 +85,15 @@ def test_predicted_pct_uses_the_level_actually_served():
     one = [{"topic_key": "a", "exam_questions": 100, "sort_order": 0}]
     # student at level 2, but fallback served level-3 questions on average
     assert predicted_pct({"a": {"level": 2, "served_level": 3.0, "correct": 5, "total": 10}}, one) == 50.0
+
+
+def test_time_limit_minutes_per_level():
+    assert MINUTES_PER_QUESTION == {1: 1.5, 2: 1.5, 3: 2, 4: 4}
+    assert time_limit_seconds([1, 2, 3, 4]) == 9 * 60
+    assert time_limit_seconds([3] * 50) == 100 * 60
+    assert time_limit_seconds([4] * 30 + [2] * 20) == 150 * 60
+
+
+def test_time_limit_rounds_up_to_a_whole_minute():
+    assert time_limit_seconds([1, 1, 1]) == 5 * 60
+    assert time_limit_seconds([]) == 0

@@ -148,7 +148,7 @@ class Orchestrator:
 
     def process(self, user, lesson_id, message, lesson_context, progress,
                 tutor, display, researcher, exam_config=None,
-                slide_number=None, screen_question=None, exercise=None):
+                slide_number=None, screen_question=None, exercise=None, elapsed_seconds=None):
         """
         Main entry point — coordinates the full agent pipeline.
 
@@ -288,7 +288,8 @@ class Orchestrator:
                 state['exam_timed'] = exam_config.get('timed', False)
                 state['exam_lead_magnet'] = exam_config.get('lead_magnet', False)
             return self._process_practice_exam(
-                state, user, lesson_id, message, researcher, display, tutor, lesson_context, progress
+                state, user, lesson_id, message, researcher, display, tutor, lesson_context, progress,
+                elapsed_seconds=elapsed_seconds,
             )
 
         # Detect page-reload / session-resume: client sends message='hello' on init.
@@ -1319,7 +1320,7 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def _process_practice_exam(self, state, user, lesson_id, message,
-                                researcher, display, tutor, lesson_context, progress):
+                                researcher, display, tutor, lesson_context, progress, elapsed_seconds=None):
         """
         Drive the adaptive practice exam session.
         - Pre-loads PRACTICE_EXAM_QUESTION_COUNT questions with chapter weighting.
@@ -1451,6 +1452,8 @@ class Orchestrator:
 
         if idx > 0:
             self._record_exam_answer(state, user, course_id, message, researcher)
+            # Timed sittings: the student's clock (pauses excluded) when they answered.
+            state['exam_results'][-1]['elapsed_s'] = elapsed_seconds
 
         # ---- Transition to debrief ----
         if idx >= total:
@@ -1507,6 +1510,12 @@ class Orchestrator:
                 'engine': 'leveled',
                 'question_id': q['id'],
                 'progress': {'current': idx + 1, 'total': total},
+                **({'timing': {'limit_s': state['leveled']['time_limit_s'],
+                               'max_count': state['leveled']['max_count'],
+                               # A refreshed page resumes the clock from the last answer.
+                               'elapsed_s': next((r['elapsed_s'] for r in reversed(state.get('exam_results') or [])
+                                                  if r.get('elapsed_s') is not None), None)}}
+                   if state.get('exam_timed') else {}),
             }
         return {
             'type': 'exam_question',
@@ -2100,6 +2109,8 @@ class Orchestrator:
         leveled = leveled_session.finish(
             self.leveled_store_factory(researcher), user, course_id, state['leveled'], questions, results,
             state.get('leveled_status', 'completed'), state.get('exam_attempt_id'), lead)
+        if state.get('exam_timed'):
+            leveled['timing'] = leveled_session.timing_summary(state['leveled'], results, len(questions))
         total_q = len(results)
         total_correct = sum(1 for r in results if r['correct'])
         score_pct = int(total_correct / total_q * 100) if total_q else 0

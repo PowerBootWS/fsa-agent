@@ -60,7 +60,7 @@ class FakeStore:
         self.saved.append(levels)
 
 
-def make(store, count=100, lead=False):
+def make(store, count=100, lead=False, timed=True):
     o = Orchestrator.__new__(Orchestrator)
     o.leveled_store_factory = store
     o._distractor_coaching = MagicMock(return_value={})
@@ -75,11 +75,11 @@ def make(store, count=100, lead=False):
     tutor.respond.return_value = {'response': 'debrief'}
     state = {'user': 's@example.com', 'lesson_id': P, 'first_name': 'Sam', 'complexity_level': 3,
              'exam_questions': [], 'exam_index': 0, 'exam_results': [], 'exam_phase': 'answering', 'exam_done': False,
-             'exam_question_count': count, 'exam_timed': True, 'exam_lead_magnet': lead, '_starting_new_exam': True}
+             'exam_question_count': count, 'exam_timed': timed, 'exam_lead_magnet': lead, '_starting_new_exam': True}
     kw = dict(researcher=researcher, display=MagicMock(), tutor=tutor, lesson_context={}, progress={})
 
-    def send(msg):
-        return o._process_practice_exam(state, 's@example.com', P, msg, **kw)
+    def send(msg, elapsed=None):
+        return o._process_practice_exam(state, 's@example.com', P, msg, elapsed_seconds=elapsed, **kw)
     return o, state, researcher, send
 
 
@@ -152,7 +152,8 @@ def test_time_up_with_no_answers():
     lv = r['display_update']['leveled']
     assert store.finished[0][1] == 'timed_out'
     assert all(t['correct'] == 0 for t in lv['topics']) and r['display_update']['total'] == 50
-    assert store.saved == [{'a': 1, 'b': 1}]
+    # Unanswered questions still score as wrong, but never move a level.
+    assert store.saved == [{'a': 2, 'b': 2}]
     assert researcher.start_attempt.call_count == 1
     assert researcher.record_response.call_count == 50
 
@@ -263,3 +264,63 @@ def test_free_exam_shows_a_starting_level_not_a_level_change():
     from agents.leveled_session import debrief_prompt
     p = debrief_prompt('Sam', P, r['display_update']['leveled'])
     assert 'moving to' not in p and 'would start' in p
+
+
+def test_timed_question_carries_a_time_limit_from_the_levels_served():
+    store = FakeStore(levels={'a': 4, 'b': 2})
+    _, state, _, send = make(store, 50)
+    r = send('hello')
+    # 30 Max questions at 4 min + 20 Core at 1.5 min = 150 min.
+    assert r['display_update']['timing'] == {'limit_s': 9000, 'max_count': 30, 'elapsed_s': None}
+
+
+def test_untimed_question_has_no_timing():
+    _, _, _, send = make(FakeStore(), 50, timed=False)
+    assert 'timing' not in send('hello')['display_update']
+
+
+def test_resume_returns_the_clock_at_the_last_answer():
+    _, state, _, send = make(FakeStore(), 50)
+    send('hello')
+    send('My answer is A', elapsed=95)
+    send('My answer is A', elapsed=230)
+    again = send('hello')
+    assert again['display_update']['timing']['elapsed_s'] == 230
+    assert [r['elapsed_s'] for r in state['exam_results']] == [95, 230]
+
+
+def test_overtime_answers_count_and_the_results_show_the_time():
+    store = FakeStore(levels={'a': 2, 'b': 2})       # 50 Core questions: 75 min = 4500 s
+    _, state, _, send = make(store, 50)
+    send('hello')
+    i = 0
+    while not state.get('exam_done'):
+        i += 1
+        q = state['exam_questions'][state['exam_index'] - 1]
+        r = send('My answer is A' if q['topic_key'] == 'a' else 'My answer is B', elapsed=i * 100)
+    lv = r['display_update']['leveled']
+    in_time = state['exam_questions'][:45]
+    assert lv['timing'] == {'limit_s': 4500, 'max_count': 0, 'taken_s': 5000, 'over_s': 500,
+                            'answered_in_time': 45, 'correct_in_time': sum(q['topic_key'] == 'a' for q in in_time),
+                            'total': 50}
+    # Every answer, overtime included, counts toward the levels.
+    assert store.saved == [{'a': 3, 'b': 1}]
+
+
+def test_untimed_results_have_no_timing():
+    _, state, _, send = make(FakeStore(), 50, timed=False)
+    send('hello')
+    r = answer_all(state, send)
+    assert 'timing' not in r['display_update']['leveled']
+
+
+def test_debrief_prompt_mentions_overtime_but_puts_understanding_first():
+    from agents import leveled_session
+    leveled = {'topics': [], 'holding_back': [], 'predicted_pct': 70, 'message': 'm',
+               'timing': {'limit_s': 4500, 'max_count': 12, 'taken_s': 5100, 'over_s': 600,
+                          'answered_in_time': 44, 'total': 50, 'correct_in_time': 30}}
+    p = leveled_session.debrief_prompt('Sam', P, leveled)
+    assert '75 min allowed (it included extra time for 12 Max questions)' in p
+    assert 'they took 85 min, 10 min over the limit' in p and '44 of 50' in p
+    assert 'Understanding comes first' in p
+    assert 'Timed sitting' not in leveled_session.debrief_prompt('Sam', P, dict(leveled, timing=None))
