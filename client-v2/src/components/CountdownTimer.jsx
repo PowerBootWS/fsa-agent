@@ -1,29 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
-
-export function CountdownTimer({ totalSeconds, stopped = false, onExpire = null }) {
-  const startRef = useRef(Date.now());
-  const expiredRef = useRef(false);
-  const [elapsed, setElapsed] = useState(0);
-
-  useEffect(() => {
-    if (stopped) return;
-    const id = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
-    }, 1000);
-    return () => clearInterval(id);
-  }, [stopped]);
-
+// Display only: the exam view owns the clock (see examClock.js) so it can pause, survive a
+// refresh and send the time with each answer. Past the limit it counts up: the student keeps
+// going and the results show how far over they went.
+export function CountdownTimer({ totalSeconds, elapsed, paused = false }) {
   const remaining = totalSeconds - elapsed;
-
-  // Leveled exams end when time runs out (unanswered questions count as wrong).
-  useEffect(() => {
-    if (onExpire && !stopped && remaining <= 0 && !expiredRef.current) {
-      expiredRef.current = true;
-      onExpire();
-    }
-  }, [remaining, stopped, onExpire]);
-  const isOver = remaining <= 0;
-  const displaySeconds = isOver ? -remaining : remaining;
+  const isOver = remaining < 0;
+  const displaySeconds = Math.abs(remaining);
 
   const h = Math.floor(displaySeconds / 3600);
   const m = Math.floor((displaySeconds % 3600) / 60);
@@ -38,7 +19,7 @@ export function CountdownTimer({ totalSeconds, stopped = false, onExpire = null 
 
   return (
     <span className={`exam-timer${isOver ? ' exam-timer--over' : warn ? ' exam-timer--warn' : ''}`}>
-      ⏱ {display}
+      ⏱ {display}{paused ? ' (Paused)' : ''}
     </span>
   );
 }

@@ -1,24 +1,21 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, act } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import { render } from '@testing-library/react';
 import { CountdownTimer } from './CountdownTimer';
 
-afterEach(() => { vi.useRealTimers(); });
-
 describe('CountdownTimer', () => {
-  it('calls onExpire once when time runs out', () => {
-    vi.useFakeTimers();
-    const onExpire = vi.fn();
-    render(<CountdownTimer totalSeconds={3} onExpire={onExpire} />);
-    act(() => { vi.advanceTimersByTime(2000); });
-    expect(onExpire).not.toHaveBeenCalled();
-    act(() => { vi.advanceTimersByTime(5000); });
-    expect(onExpire).toHaveBeenCalledTimes(1);
+  it('shows the time left', () => {
+    const { container } = render(<CountdownTimer totalSeconds={9000} elapsed={230} />);
+    expect(container.textContent).toContain('2:26:10');
   });
 
-  it('works without onExpire (keeps counting over)', () => {
-    vi.useFakeTimers();
-    const { container } = render(<CountdownTimer totalSeconds={1} />);
-    act(() => { vi.advanceTimersByTime(3000); });
+  it('counts up past the limit instead of stopping', () => {
+    const { container } = render(<CountdownTimer totalSeconds={60} elapsed={62} />);
     expect(container.textContent).toContain('+0:02');
+    expect(container.querySelector('.exam-timer--over')).not.toBeNull();
+  });
+
+  it('marks itself paused', () => {
+    const { container } = render(<CountdownTimer totalSeconds={60} elapsed={10} paused />);
+    expect(container.textContent).toContain('Paused');
   });
 });

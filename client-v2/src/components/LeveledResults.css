@@ -11,3 +11,7 @@
 .lr-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .lr-up td:last-child { color: #16a34a; font-weight: 600; }
 .lr-down td:last-child { color: #dc2626; font-weight: 600; }
+.lr-time { border-radius: 8px; padding: 12px 14px; border: 1px solid rgba(127, 127, 127, 0.35); display: grid; gap: 4px; font-size: 0.92rem; }
+.lr-time p { margin: 0; }
+.lr-time-head { font-weight: 600; }
+.lr-time-note { opacity: 0.8; }

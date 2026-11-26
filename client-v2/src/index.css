@@ -1488,6 +1488,60 @@ body {
 .exam-timer--warn { color: var(--amber); }
 .exam-timer--over { color: #f87171; }
 
+/* Timed exam: pause, paused panel, time notices */
+.exam-pause-btn,
+.exam-resume-btn,
+.exam-notice button {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--plate-edge);
+  background: var(--iron);
+  color: var(--off-white);
+  cursor: pointer;
+}
+.exam-pause-btn:hover,
+.exam-notice button:hover { border-color: var(--steel-light); }
+.exam-paused {
+  margin: 48px auto;
+  max-width: 480px;
+  padding: 28px 24px;
+  text-align: center;
+  border: 1px solid var(--plate-edge);
+  border-radius: 10px;
+  background: var(--plate);
+  color: var(--gray-light);
+  line-height: 1.5;
+}
+.exam-paused-title { font-size: 1.3rem; font-weight: 700; color: var(--off-white); margin-bottom: 8px; }
+.exam-resume-btn {
+  margin-top: 12px;
+  padding: 10px 22px;
+  font-size: 1rem;
+  background: var(--orange);
+  border-color: var(--orange);
+  color: var(--white);
+}
+.exam-resume-btn:hover { background: var(--orange-glow); }
+.exam-notice {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--steel-dim);
+  border-left: 3px solid var(--steel-light);
+  border-radius: 6px;
+  background: rgba(77, 136, 194, 0.10);
+  color: var(--off-white);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.exam-notice p { margin: 0; flex: 1; min-width: 0; }
+.exam-notice--over { border-color: rgba(245, 166, 35, 0.45); border-left-color: var(--amber); background: rgba(245, 166, 35, 0.10); }
+
 /* Lobby (old CSS path — client-v1 compat) */
 /* The lobby is the only .app-fullpage child with no inner scroller of its own.
    .app-fullpage is height:100vh/overflow:hidden for the exam phase, so without

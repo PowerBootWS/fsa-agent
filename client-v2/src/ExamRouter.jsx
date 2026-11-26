@@ -11,6 +11,7 @@ import { DistractorCoaching } from './components/DistractorCoaching.jsx';
 import LeveledResults from './components/LeveledResults.jsx';
 import { MathContent } from './components/MathContent.jsx';
 import { CountdownTimer } from './components/CountdownTimer.jsx';
+import { startClock, resumedClock, clockElapsed, pauseClock, resumeClock, isPaused, fmtDuration } from './components/examClock.js';
 import { isFourthClassCode } from './utils/fourthClass';
 import FlagQuestion from './components/FlagQuestion';
 import { track } from './utils/usage';
@@ -82,7 +83,9 @@ export function chatErrorMessage(err, { leadMagnet } = {}) {
   return 'Your answer could not be sent. Check your connection and select your answer again.';
 }
 
-function postChatMessage(message, { leadMagnetToken, user, lessonId, examConfig } = {}) {
+function postChatMessage(message, { leadMagnetToken, user, lessonId, examConfig, elapsedSeconds } = {}) {
+  // Timed exams send the student's clock (pauses excluded) with each answer.
+  const clock = Number.isInteger(elapsedSeconds) ? { elapsedSeconds } : {};
   if (leadMagnetToken) {
     return fetch('/api/practice-exam/chat', {
       method: 'POST',
@@ -90,13 +93,13 @@ function postChatMessage(message, { leadMagnetToken, user, lessonId, examConfig 
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${leadMagnetToken}`,
       },
-      body: JSON.stringify({ message, ...(examConfig ? { examConfig } : {}) }),
+      body: JSON.stringify({ message, ...(examConfig ? { examConfig } : {}), ...clock }),
     });
   }
   return fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user, lessonId, message, ...(examConfig ? { examConfig } : {}) }),
+    body: JSON.stringify({ user, lessonId, message, ...(examConfig ? { examConfig } : {}), ...clock }),
   });
 }
 
@@ -554,7 +557,7 @@ export function QuizExamChatSection({ messages, setMessages, user, lessonId, set
 // QuizExamView — full exam/quiz page
 // ---------------------------------------------------------------------------
 
-function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter, onComplete, leadMagnetToken, onExamDone, leadMagnetMode }) {
+export function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setChatState, examConfig, onSelectChapter, onComplete, leadMagnetToken, onExamDone, leadMagnetMode }) {
   const isExam = mode === 'practice_exam';
   // 4th Class has no AI tutor CHAT — but chapter-quiz mode's per-question
   // feedback ("Correct!" / "Not quite — the correct answer was...") is
@@ -620,6 +623,44 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
   const displayContent = chatState.displayContent;
   const isDone = displayContent?.type === 'exam_done' || displayContent?.type === 'quiz_done';
 
+  // ---- Timed exam clock ----
+  // Kept in chatState so it survives this view re-mounting. It can be paused (called away
+  // to an alarm or rounds), and past the limit it counts up: the student finishes the exam
+  // and the results show how far over they went. A refreshed page resumes it, paused, from
+  // the clock at the last answer.
+  const timed = isExam && (!!examConfig?.timed || !!displayContent?.timing);
+  const clock = chatState.examClock || null;
+  const setClock = (fn) => setChatState(prev => ({ ...prev, examClock: fn(prev.examClock || null) }));
+  const [now, setNow] = useState(() => Date.now());
+  const running = timed && !!clock && !isPaused(clock) && !isDone;
+  const paused = timed && isPaused(clock) && !isDone;
+  const limitS = displayContent?.timing?.limit_s ?? ({ 50: 5400, 100: 10800 }[examConfig?.count] ?? 5400);
+  const elapsed = clockElapsed(clock, now);
+  const over = timed && !!clock && elapsed > limitS;
+
+  useEffect(() => {
+    if (!timed || clock || isDone || displayContent?.type !== 'exam_question') return;
+    const resumeAt = displayContent.timing?.elapsed_s;
+    const t = Date.now();
+    setNow(t);
+    setClock(() => (Number.isInteger(resumeAt) ? resumedClock(resumeAt) : startClock(t)));
+  }, [timed, clock, isDone, displayContent]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [running]);
+
+  // A finished exam drops its clock so a retake starts fresh.
+  useEffect(() => {
+    if (isDone && clock) setClock(() => null);
+  }, [isDone]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pauseExam = () => { const t = Date.now(); setNow(t); setClock(c => pauseClock(c, t)); };
+  const resumeExam = () => { const t = Date.now(); setNow(t); setClock(c => resumeClock(c, t)); };
+  const dismissNotice = (key) => setClock(c => ({ ...c, [key]: true }));
+
   // Store exam results in localStorage when exam completes, then (in the
   // platform app) hand off to the durable /exam/results page via onComplete.
   useEffect(() => {
@@ -668,32 +709,6 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
     }
   }, [displayContent?.type]);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Leveled exam: time ran out. The server marks unanswered questions wrong and
-  // returns the results; sent at most once per sitting.
-  const timeUpSentRef = useRef(false);
-  const sendTimeUp = () => {
-    if (timeUpSentRef.current || isDone || compilingResults) return;
-    timeUpSentRef.current = true;
-    setCompilingResults(true);
-    setChatError(null);
-    postChatMessage('__time_up__', { leadMagnetToken, user, lessonId })
-      .then(readChatResponse)
-      .then(data => {
-        setChatState(prev => {
-          const msgs = [...prev.messages];
-          if (data.tutor_response) msgs.push({ role: 'tutor', content: extractResponse(data.tutor_response) });
-          return { ...prev, messages: msgs, displayContent: data.display_update ?? prev.displayContent };
-        });
-        setCompilingResults(false);
-      })
-      .catch(err => {
-        console.error('Time-up error:', err);
-        timeUpSentRef.current = false;
-        setCompilingResults(false);
-        setChatError(chatErrorMessage(err, { leadMagnet: !!leadMagnetToken }));
-      });
-  };
-
   const sendAnswer = (answer) => {
     const isLastQuestion = isExam && !isDone && examProgress && examProgress.current === examProgress.total;
     const suppressChat = isExam && !isDone && !isLastQuestion;
@@ -711,7 +726,8 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
     }
 
     setChatError(null);
-    postChatMessage(answer, { leadMagnetToken, user, lessonId })
+    const elapsedSeconds = timed && clock ? clockElapsed(clock, Date.now()) : undefined;
+    postChatMessage(answer, { leadMagnetToken, user, lessonId, elapsedSeconds })
       .then(readChatResponse)
       .then(data => {
         setChatState(prev => {
@@ -761,12 +777,13 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
               correct={displayContent.correct}
             />
           )}
-          {isExam && examConfig?.timed && examProgress && !isDone && (
-            <CountdownTimer
-              totalSeconds={{ 50: 5400, 100: 10800 }[examConfig.count] ?? 5400}
-              stopped={isDone}
-              onExpire={displayContent?.engine === 'leveled' && !compilingResults ? sendTimeUp : null}
-            />
+          {timed && clock && examProgress && !isDone && (
+            <>
+              <CountdownTimer totalSeconds={limitS} elapsed={elapsed} paused={paused} />
+              {!paused && !compilingResults && (
+                <button type="button" className="exam-pause-btn" onClick={pauseExam}>Pause</button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -782,17 +799,46 @@ function QuizExamView({ lesson, user, classCode, lessonId, mode, chatState, setC
               <div className="exam-compiling-title">Loading results, please stand by…</div>
               <div className="exam-compiling-sub">Scoring your exam and preparing your feedback.</div>
             </div>
+          ) : paused ? (
+            <div className="exam-paused" role="status">
+              <div className="exam-paused-title">Exam paused</div>
+              <p>Your clock is stopped and your place is saved. Pick up where you left off when you're ready.</p>
+              <button type="button" className="exam-resume-btn" onClick={resumeExam}>Resume exam</button>
+            </div>
           ) : (
-            <QuizExamDisplaySection
-              displayContent={displayContent}
-              onAnswer={sendAnswer}
-              mode={mode}
-              isExam={isExam}
-              onSelectChapter={onSelectChapter}
-              user={user}
-              leadMagnetMode={leadMagnetMode}
-              lessonId={lessonId}
-            />
+            <>
+              {timed && clock && !isDone && displayContent?.timing && !clock.limitNoticeDone && (
+                <div className="exam-notice">
+                  <p>
+                    Your time limit is {fmtDuration(displayContent.timing.limit_s)}.{' '}
+                    {displayContent.timing.max_count > 0
+                      ? `It includes 4 minutes for each of your ${displayContent.timing.max_count} Max-level questions, since they take more steps to work through. Other questions get 1.5 to 2 minutes each.`
+                      : 'Each question gets 1.5 to 2 minutes, depending on its level.'}
+                    {' '}Called away? Pause the clock. If time runs out, keep going: the clock counts up, and your results show both your score and your time.
+                  </p>
+                  <button type="button" onClick={() => dismissNotice('limitNoticeDone')}>Got it</button>
+                </div>
+              )}
+              {over && !isDone && !clock.overNoticeDone && (
+                <div className="exam-notice exam-notice--over">
+                  <p>
+                    Time's up, but keep going. Understanding the material comes first, so finish every question.
+                    Your results will show how far over the limit you went.
+                  </p>
+                  <button type="button" onClick={() => dismissNotice('overNoticeDone')}>OK</button>
+                </div>
+              )}
+              <QuizExamDisplaySection
+                displayContent={displayContent}
+                onAnswer={sendAnswer}
+                mode={mode}
+                isExam={isExam}
+                onSelectChapter={onSelectChapter}
+                user={user}
+                leadMagnetMode={leadMagnetMode}
+                lessonId={lessonId}
+              />
+            </>
           )}
         </div>
       </div>

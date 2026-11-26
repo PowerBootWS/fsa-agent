@@ -72,7 +72,7 @@ export function PracticeExamLobby({ courseId, user, lessonTitle, onStartExam, on
             <span className="lobby-timer-label">⏱ Timed Exam</span>
           </label>
           {timed && (
-            <p className="lobby-timer-note">Countdown starts when your first question loads.</p>
+            <p className="lobby-timer-note">Countdown starts when your first question loads, and your time limit is shown then. You can pause it if you're called away, and if time runs out you can still finish.</p>
           )}
 
           <button

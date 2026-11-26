@@ -39,4 +39,26 @@ describe('LeveledResults', () => {
     render(<LeveledResults data={{ ...data, holding_back: [] }} />);
     expect(screen.queryByText(/holding you back/i)).not.toBeInTheDocument();
   });
+
+  it('shows the time, how far over, and how far the student got by the limit', () => {
+    render(<LeveledResults data={{ ...data, timing: { limit_s: 9000, max_count: 30, taken_s: 10500, over_s: 1500,
+      answered_in_time: 44, correct_in_time: 35, total: 50 } }} />);
+    expect(screen.getByText(/You took 2 h 55 min of your 2 h 30 min/)).toBeInTheDocument();
+    expect(screen.getByText(/25 min over/)).toBeInTheDocument();
+    expect(screen.getByText(/By the time limit you had answered 44 of 50 \(35 correct\)/)).toBeInTheDocument();
+    expect(screen.getByText(/extra time for 30 Max-level questions/)).toBeInTheDocument();
+    expect(screen.getByText(/Understanding comes first/)).toBeInTheDocument();
+  });
+
+  it('says so when the student finished inside the limit', () => {
+    render(<LeveledResults data={{ ...data, timing: { limit_s: 4500, max_count: 0, taken_s: 4000, over_s: 0,
+      answered_in_time: 50, correct_in_time: 40, total: 50 } }} />);
+    expect(screen.getByText(/You finished in 1 h 7 min of your 1 h 15 min/)).toBeInTheDocument();
+    expect(screen.queryByText(/over/)).not.toBeInTheDocument();
+  });
+
+  it('shows no time section for an untimed exam', () => {
+    const { container } = render(<LeveledResults data={data} />);
+    expect(container.querySelector('.lr-time')).toBeNull();
+  });
 });
